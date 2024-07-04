@@ -103,79 +103,71 @@ villachToUdine =
 munchenToZoetermeer : Timetable
 munchenToZoetermeer =
     [ { from = "München Hbf"
-      , to = "Kassel-Wilhelmshöhe"
+      , to = "Hannover Hbf"
       , links =
-            [ { from = fromStringUnsafe "09:09"
-              , to = fromStringUnsafe "12:34"
+            [ { from = fromStringUnsafe "03:56"
+              , to = fromStringUnsafe "08:32"
               }
-            ]
-      }
-    , { from = "Kassel-Wilhelmshöhe"
-      , to = "Hamm(West)Hbf"
-      , links =
-            [ { from = fromStringUnsafe "13:03"
-              , to = fromStringUnsafe "14:52"
+            , { from = fromStringUnsafe "05:09"
+              , to = fromStringUnsafe "09:33"
               }
-            ]
-      }
-    , { from = "Hamm(West)Hbf"
-      , to = "Rheine"
-      , links =
-            [ { from = fromStringUnsafe "14:59"
-              , to = fromStringUnsafe "15:51"
+            , { from = fromStringUnsafe "05:55"
+              , to = fromStringUnsafe "10:32"
               }
-            ]
-      }
-    , { from = "Rheine"
-      , to = "Amersfoort Centraal"
-      , links =
-            [ { from = fromStringUnsafe "15:36"
-              , to = fromStringUnsafe "17:24"
+            , { from = fromStringUnsafe "07:09"
+              , to = fromStringUnsafe "11:33"
               }
-            ]
-      }
-    , { from = "Amersfoort Centraal"
-      , to = "Gouda"
-      , links =
-            [ { from = fromStringUnsafe "18:40"
-              , to = fromStringUnsafe "19:16"
+            , { from = fromStringUnsafe "07:52"
+              , to = fromStringUnsafe "12:32"
               }
-            ]
-      }
-    , { from = "Gouda"
-      , to = "Zoetermeer"
-      , links =
-            [ { from = fromStringUnsafe "17:35"
-              , to = fromStringUnsafe "17:49"
+            , { from = fromStringUnsafe "09:09"
+              , to = fromStringUnsafe "13:33"
               }
-            , { from = fromStringUnsafe "19:20"
-              , to = fromStringUnsafe "19:34"
+            , { from = fromStringUnsafe "09:52"
+              , to = fromStringUnsafe "14:32"
+              }
+            , { from = fromStringUnsafe "11:09"
+              , to = fromStringUnsafe "15:33"
+              }
+            , { from = fromStringUnsafe "11:52"
+              , to = fromStringUnsafe "16:33"
+              }
+            , { from = fromStringUnsafe "13:09"
+              , to = fromStringUnsafe "17:33"
+              }
+            , { from = fromStringUnsafe "13:52"
+              , to = fromStringUnsafe "18:33"
+              }
+            , { from = fromStringUnsafe "15:12"
+              , to = fromStringUnsafe "19:33"
+              }
+            , { from = fromStringUnsafe "17:09"
+              , to = fromStringUnsafe "21:33"
+              }
+            , { from = fromStringUnsafe "17:52"
+              , to = fromStringUnsafe "22:31"
               }
             ]
       }
     , { from = "München Hbf"
-      , to = "Düsseldorf Hbf"
+      , to = "Halle(Saale)Hbf"
       , links =
-            [ { from = fromStringUnsafe "09:43"
-              , to = fromStringUnsafe "14:39"
-              }
-            ]
+            []
       }
-    , { from = "Düsseldorf Hbf"
-      , to = "Utrecht Centraal"
+    , { from = "Halle(Saale)Hbf"
+      , to = "Hannover Hbf"
       , links =
-            [ { from = fromStringUnsafe "15:11"
-              , to = fromStringUnsafe "16:59"
-              }
-            ]
+            []
       }
-    , { from = "Utrecht Centraal"
-      , to = "Gouda"
+    , { from = "München Hbf"
+      , to = "Nürnberg Hbf"
       , links =
-            [ { from = fromStringUnsafe "17:13"
-              , to = fromStringUnsafe "17:31"
-              }
-            ]
+            []
+      }
+    , { from = "Nürnberg Hbf"
+      , to = "Halle(Saale)Hbf"
+      , links =
+            []
       }
     ]
 
