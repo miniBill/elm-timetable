@@ -200,26 +200,6 @@ view model =
 viewSimple : Model -> Html msg
 viewSimple model =
     let
-        fullWidth : number
-        fullWidth =
-            1000
-
-        namesWidth : number
-        namesWidth =
-            150
-
-        tableHorizontalMargin : number
-        tableHorizontalMargin =
-            50
-
-        lineHeight : number
-        lineHeight =
-            50
-
-        timesHeight : number
-        timesHeight =
-            100
-
         fullHeight : Float
         fullHeight =
             timesHeight * 2 + lineHeight * toFloat (Dict.size stations - 1)
@@ -290,7 +270,8 @@ viewSimple model =
                             links
                     )
 
-        { minTime, maxTime } =
+        timeRange : { minTime : Maybe Time.Posix, maxTime : Maybe Time.Posix }
+        timeRange =
             List.foldl
                 (\( from, to ) acc ->
                     { minTime =
@@ -351,104 +332,9 @@ viewSimple model =
 
         stationsViews : List (Svg msg)
         stationsViews =
-            sortedStations
-                |> List.map
-                    (\( name, { events } ) ->
-                        let
-                            stationY : Float
-                            stationY =
-                                stationToY name
-
-                            waitLines : List (Svg msg)
-                            waitLines =
-                                let
-                                    go queue acc =
-                                        case queue of
-                                            [] ->
-                                                List.reverse acc
-
-                                            ( at, _ ) :: tail ->
-                                                let
-                                                    nextDeparture : Maybe Int
-                                                    nextDeparture =
-                                                        List.Extra.findMap
-                                                            (\( dep, kind ) ->
-                                                                if kind == Departure then
-                                                                    Just dep
-
-                                                                else
-                                                                    Nothing
-                                                            )
-                                                            tail
-                                                in
-                                                case nextDeparture of
-                                                    Nothing ->
-                                                        List.reverse acc
-
-                                                    Just dep ->
-                                                        let
-                                                            duration =
-                                                                Duration.milliseconds (toFloat (dep - at))
-
-                                                            minString : String
-                                                            minString =
-                                                                Duration.inMinutes duration
-                                                                    |> floor
-                                                                    |> String.fromInt
-                                                        in
-                                                        go tail
-                                                            (line
-                                                                [ class [ "wait" ]
-                                                                , x1 <| timeToX (Time.millisToPosix at)
-                                                                , x2 <| timeToX (Time.millisToPosix dep)
-                                                                , y1 stationY
-                                                                , y2 stationY
-                                                                , stroke (Paint (waitTimeToColor duration))
-                                                                ]
-                                                                [ title []
-                                                                    [ text
-                                                                        (minString
-                                                                            ++ " min"
-                                                                        )
-                                                                    ]
-                                                                ]
-                                                                :: acc
-                                                            )
-                                in
-                                go (Dict.toList events) []
-                        in
-                        g []
-                            ([ line
-                                [ class [ "horiz" ]
-                                , x1 namesWidth
-                                , x2 fullWidth
-                                , y1 stationY
-                                , y2 stationY
-                                ]
-                                []
-                             , text_
-                                [ y stationY ]
-                                [ text name ]
-                             ]
-                                ++ waitLines
-                            )
-                    )
-
-        timeToX : Time.Posix -> Float
-        timeToX time =
-            case ( minTime, maxTime ) of
-                ( Just min, Just max ) ->
-                    namesWidth
-                        + tableHorizontalMargin
-                        + (fullWidth - namesWidth - tableHorizontalMargin * 2)
-                        * toFloat
-                            (Time.posixToMillis time - Time.posixToMillis min)
-                        / toFloat
-                            (Time.posixToMillis max - Time.posixToMillis min)
-
-                _ ->
-                    -- This never happens but we're going to force a mislayout if the assumptions are wrong
-                    namesWidth / 2
+            List.map
+                (viewStation timeRange stationPositions)
+                sortedStations
 
         stationToY : Station -> Float
         stationToY station =
@@ -466,8 +352,8 @@ viewSimple model =
                                 (\link ->
                                     line
                                         [ class [ "link" ]
-                                        , x1 <| timeToX link.from
-                                        , x2 <| timeToX link.to
+                                        , x1 <| timeToX timeRange link.from
+                                        , x2 <| timeToX timeRange link.to
                                         , y1 <| stationToY from
                                         , y2 <| stationToY to
                                         ]
@@ -495,7 +381,7 @@ viewSimple model =
 
                             timeX : Float
                             timeX =
-                                timeToX time
+                                timeToX timeRange time
 
                             vline : Svg msg
                             vline =
@@ -594,6 +480,141 @@ viewSimple model =
         , viewBox -5 -5 (fullWidth + 10) (fullHeight + 10)
         ]
         (styleNode :: stationsViews ++ linksViews ++ timesViews)
+
+
+fullWidth : number
+fullWidth =
+    1000
+
+
+tableHorizontalMargin : number
+tableHorizontalMargin =
+    50
+
+
+lineHeight : number
+lineHeight =
+    50
+
+
+timesHeight : number
+timesHeight =
+    100
+
+
+namesWidth : number
+namesWidth =
+    150
+
+
+timeToX :
+    { minTime : Maybe Time.Posix
+    , maxTime : Maybe Time.Posix
+    }
+    -> Time.Posix
+    -> Float
+timeToX { minTime, maxTime } time =
+    case ( minTime, maxTime ) of
+        ( Just min, Just max ) ->
+            namesWidth
+                + tableHorizontalMargin
+                + (fullWidth - namesWidth - tableHorizontalMargin * 2)
+                * toFloat
+                    (Time.posixToMillis time - Time.posixToMillis min)
+                / toFloat
+                    (Time.posixToMillis max - Time.posixToMillis min)
+
+        _ ->
+            -- This never happens but we're going to force a mislayout if the assumptions are wrong
+            namesWidth / 2
+
+
+viewStation :
+    { minTime : Maybe Time.Posix, maxTime : Maybe Time.Posix }
+    -> Dict Station Int
+    -> ( Station, { events : Dict Int Event, min : Time.Posix, max : Time.Posix } )
+    -> Svg msg
+viewStation timeRange stationPositions ( name, { events } ) =
+    let
+        stationY : Float
+        stationY =
+            Dict.get name stationPositions
+                |> Maybe.withDefault -1
+                |> toFloat
+
+        waitLines : List (Svg msg)
+        waitLines =
+            let
+                go queue acc =
+                    case queue of
+                        [] ->
+                            List.reverse acc
+
+                        ( at, _ ) :: tail ->
+                            let
+                                nextDeparture : Maybe Int
+                                nextDeparture =
+                                    List.Extra.findMap
+                                        (\( dep, kind ) ->
+                                            if kind == Departure then
+                                                Just dep
+
+                                            else
+                                                Nothing
+                                        )
+                                        tail
+                            in
+                            case nextDeparture of
+                                Nothing ->
+                                    List.reverse acc
+
+                                Just dep ->
+                                    let
+                                        duration =
+                                            Duration.milliseconds (toFloat (dep - at))
+
+                                        minString : String
+                                        minString =
+                                            Duration.inMinutes duration
+                                                |> floor
+                                                |> String.fromInt
+                                    in
+                                    go tail
+                                        (line
+                                            [ class [ "wait" ]
+                                            , x1 <| timeToX timeRange (Time.millisToPosix at)
+                                            , x2 <| timeToX timeRange (Time.millisToPosix dep)
+                                            , y1 stationY
+                                            , y2 stationY
+                                            , stroke (Paint (waitTimeToColor duration))
+                                            ]
+                                            [ title []
+                                                [ text
+                                                    (minString
+                                                        ++ " min"
+                                                    )
+                                                ]
+                                            ]
+                                            :: acc
+                                        )
+            in
+            go (Dict.toList events) []
+    in
+    g []
+        ([ line
+            [ class [ "horiz" ]
+            , x1 namesWidth
+            , x2 fullWidth
+            , y1 stationY
+            , y2 stationY
+            ]
+            []
+         , text_
+            [ y stationY ]
+            [ text name ]
+         ]
+            ++ waitLines
+        )
 
 
 waitTimeToColor : Duration -> Color.Color
