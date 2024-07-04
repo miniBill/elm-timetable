@@ -12,7 +12,7 @@ import Time
 import TypedSvg exposing (g, line, svg, text_)
 import TypedSvg.Attributes exposing (class, textAnchor, transform, viewBox)
 import TypedSvg.Attributes.InPx exposing (x1, x2, y, y1, y2)
-import TypedSvg.Core exposing (text)
+import TypedSvg.Core exposing (Svg, text)
 import TypedSvg.Types exposing (AnchorAlignment(..), DominantBaseline(..), Transform(..))
 
 
@@ -123,6 +123,29 @@ view model =
 viewSimple : Model -> Html msg
 viewSimple model =
     let
+        fullWidth : number
+        fullWidth =
+            500
+
+        namesWidth : number
+        namesWidth =
+            100
+
+        tableHorizontalMargin : number
+        tableHorizontalMargin =
+            50
+
+        lineHeight : number
+        lineHeight =
+            50
+
+        timesHeight : number
+        timesHeight =
+            100
+
+        fullHeight =
+            timesHeight + lineHeight * toFloat (Dict.size stations - 1)
+
         liftTime :
             (Int -> Int -> Int)
             -> Maybe Time.Posix
@@ -199,11 +222,8 @@ viewSimple model =
         stationPositions =
             sortedStations
                 |> List.indexedMap
-                    (\i ( name, _ ) -> ( name, (i + 1) * 100 ))
+                    (\i ( name, _ ) -> ( name, timesHeight + i * lineHeight ))
                 |> Dict.fromList
-
-        bottom =
-            100 * toFloat (Dict.size stations)
 
         stationsViews =
             sortedStations
@@ -216,8 +236,8 @@ viewSimple model =
                         g []
                             [ line
                                 [ class [ "horiz" ]
-                                , x1 100
-                                , x2 500
+                                , x1 namesWidth
+                                , x2 fullWidth
                                 , y1 stationY
                                 , y2 stationY
                                 ]
@@ -232,15 +252,17 @@ viewSimple model =
         timeToX time =
             case ( minTime, maxTime ) of
                 ( Just min, Just max ) ->
-                    150
-                        + 300
+                    namesWidth
+                        + tableHorizontalMargin
+                        + (fullWidth - namesWidth - tableHorizontalMargin * 2)
                         * toFloat
                             (Time.posixToMillis time - Time.posixToMillis min)
                         / toFloat
                             (Time.posixToMillis max - Time.posixToMillis min)
 
                 _ ->
-                    50
+                    -- This never happens but we're going to force a mislayout if the assumptions are wrong
+                    namesWidth / 2
 
         stationToY station =
             Dict.get station stationPositions
@@ -278,24 +300,27 @@ viewSimple model =
                             time =
                                 Time.millisToPosix t
 
+                            timeX : Float
                             timeX =
                                 timeToX time
 
+                            vline : Svg msg
                             vline =
                                 line
                                     [ class [ "grid" ]
                                     , x1 0
                                     , x2 0
-                                    , y1 (100 - 50 - pushUp)
-                                    , y2 bottom
+                                    , y1 (timesHeight - pushUp)
+                                    , y2 fullHeight
                                     ]
                                     []
 
+                            label : Svg msg
                             label =
                                 text_
-                                    [ textAnchor AnchorEnd
+                                    [ textAnchor AnchorStart
                                     , transform
-                                        [ Translate 5 (84 - pushUp)
+                                        [ Translate 5 (timesHeight - pushUp)
                                         , Rotate 90 0 0
                                         ]
                                     ]
@@ -313,17 +338,17 @@ viewSimple model =
                             pushUp =
                                 case last of
                                     Nothing ->
-                                        0
+                                        timesHeight / 2
 
                                     Just lastTime ->
                                         if
                                             Duration.from time lastTime
-                                                |> Quantity.greaterThan (Duration.minutes 10)
+                                                |> Quantity.greaterThan (Duration.minutes 30)
                                         then
-                                            0
+                                            timesHeight / 2
 
                                         else
-                                            50
+                                            timesHeight
 
                             next =
                                 g
@@ -365,7 +390,7 @@ viewSimple model =
         , Html.Attributes.style "margin-left" "5vmin"
         , Html.Attributes.style "max-height" "90vh"
         , Html.Attributes.style "max-width" "90vw"
-        , viewBox 0 0 500 bottom
+        , viewBox -5 -5 (fullWidth + 10) (fullHeight + 10)
         ]
         (styleNode :: stationsViews ++ linksViews ++ timesViews)
 
