@@ -1,19 +1,21 @@
 module Main exposing (main)
 
 import Browser
+import Color
 import Dict exposing (Dict)
-import Duration
+import Duration exposing (Duration)
 import Html exposing (Html)
 import Html.Attributes
 import Iso8601
+import List.Extra
 import Quantity
 import Set
 import Time
-import TypedSvg exposing (g, line, svg, text_)
-import TypedSvg.Attributes exposing (class, textAnchor, transform, viewBox)
+import TypedSvg exposing (g, line, svg, text_, title)
+import TypedSvg.Attributes exposing (class, stroke, textAnchor, transform, viewBox)
 import TypedSvg.Attributes.InPx exposing (x1, x2, y, y1, y2)
 import TypedSvg.Core exposing (Svg, text)
-import TypedSvg.Types exposing (AnchorAlignment(..), DominantBaseline(..), Transform(..))
+import TypedSvg.Types exposing (AnchorAlignment(..), DominantBaseline(..), Paint(..), Transform(..))
 
 
 type alias Timetable =
@@ -31,6 +33,11 @@ type alias Spacetime =
 
 type alias Station =
     String
+
+
+type Event
+    = Arrival
+    | Departure
 
 
 type alias Model =
@@ -164,30 +171,37 @@ viewSimple model =
 
         addStation :
             Spacetime
+            -> Event
             ->
                 Dict
                     Station
                     { min : Time.Posix
                     , max : Time.Posix
+                    , events : Dict Int Event
                     }
             ->
                 Dict
                     Station
                     { min : Time.Posix
                     , max : Time.Posix
+                    , events : Dict Int Event
                     }
-        addStation { station, time } dict =
+        addStation { station, time } event dict =
             let
                 new =
                     case Dict.get station dict of
                         Nothing ->
                             { min = time
                             , max = time
+                            , events =
+                                Dict.singleton (Time.posixToMillis time) event
                             }
 
                         Just existing ->
                             { min = liftTime min (Just existing.min) time
                             , max = liftTime max (Just existing.max) time
+                            , events =
+                                Dict.insert (Time.posixToMillis time) event existing.events
                             }
             in
             Dict.insert station new dict
@@ -202,8 +216,8 @@ viewSimple model =
                             Just <| liftTime max acc.maxTime to.time
                         , stations =
                             acc.stations
-                                |> addStation from
-                                |> addStation to
+                                |> addStation from Departure
+                                |> addStation to Arrival
                         }
                     )
                     { minTime = Nothing
@@ -228,13 +242,68 @@ viewSimple model =
         stationsViews =
             sortedStations
                 |> List.map
-                    (\( name, _ ) ->
+                    (\( name, { events } ) ->
                         let
                             stationY =
                                 stationToY name
+
+                            waitLines =
+                                let
+                                    go queue acc =
+                                        case queue of
+                                            [] ->
+                                                List.reverse acc
+
+                                            ( at, _ ) :: tail ->
+                                                let
+                                                    nextDeparture =
+                                                        List.Extra.findMap
+                                                            (\( dep, kind ) ->
+                                                                if kind == Departure then
+                                                                    Just dep
+
+                                                                else
+                                                                    Nothing
+                                                            )
+                                                            tail
+                                                in
+                                                case nextDeparture of
+                                                    Nothing ->
+                                                        List.reverse acc
+
+                                                    Just dep ->
+                                                        let
+                                                            duration =
+                                                                Duration.milliseconds (toFloat (dep - at))
+
+                                                            minString =
+                                                                Duration.inMinutes duration
+                                                                    |> floor
+                                                                    |> String.fromInt
+                                                        in
+                                                        go tail
+                                                            (line
+                                                                [ class [ "wait" ]
+                                                                , x1 <| timeToX (Time.millisToPosix at)
+                                                                , x2 <| timeToX (Time.millisToPosix dep)
+                                                                , y1 stationY
+                                                                , y2 stationY
+                                                                , stroke (Paint (waitTimeToColor duration))
+                                                                ]
+                                                                [ title []
+                                                                    [ text
+                                                                        (minString
+                                                                            ++ " min"
+                                                                        )
+                                                                    ]
+                                                                ]
+                                                                :: acc
+                                                            )
+                                in
+                                go (Dict.toList events) []
                         in
                         g []
-                            [ line
+                            ([ line
                                 [ class [ "horiz" ]
                                 , x1 namesWidth
                                 , x2 fullWidth
@@ -242,10 +311,12 @@ viewSimple model =
                                 , y2 stationY
                                 ]
                                 []
-                            , text_
+                             , text_
                                 [ y stationY ]
                                 [ text name ]
-                            ]
+                             ]
+                                ++ waitLines
+                            )
                     )
 
         timeToX : Time.Posix -> Float
@@ -381,6 +452,10 @@ viewSimple model =
                         stroke-width: 1px;
                         stroke-dasharray: 4;
                     }
+
+                    .wait {
+                        stroke-width: 4px;
+                    }
                     """
                 ]
     in
@@ -393,6 +468,18 @@ viewSimple model =
         , viewBox -5 -5 (fullWidth + 10) (fullHeight + 10)
         ]
         (styleNode :: stationsViews ++ linksViews ++ timesViews)
+
+
+waitTimeToColor : Duration -> Color.Color
+waitTimeToColor f =
+    if Quantity.lessThan (Duration.minutes 10) f then
+        Color.red
+
+    else if Quantity.lessThan (Duration.minutes 60) f then
+        Color.orange
+
+    else
+        Color.green
 
 
 update : Msg -> Model -> ( Model, Cmd msg )
