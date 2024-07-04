@@ -1,0 +1,6 @@
+{
+  "devDependencies": {
+    "elm": "^0.19.1-6",
+    "elm-watch": "^2.0.0-beta.3"
+  }
+}
