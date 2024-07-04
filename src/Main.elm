@@ -152,7 +152,52 @@ munchenToZoetermeer =
     , { from = "München Hbf"
       , to = "Halle(Saale)Hbf"
       , links =
-            []
+            [ { from = fromStringUnsafe "05:48"
+              , to = fromStringUnsafe "08:38"
+              }
+            , { from = fromStringUnsafe "06:52"
+              , to = fromStringUnsafe "09:45"
+              }
+            , { from = fromStringUnsafe "07:13"
+              , to = fromStringUnsafe "11:04"
+              }
+            , { from = fromStringUnsafe "08:52"
+              , to = fromStringUnsafe "11:45"
+              }
+            , { from = fromStringUnsafe "09:55"
+              , to = fromStringUnsafe "13:04"
+              }
+            , { from = fromStringUnsafe "10:52"
+              , to = fromStringUnsafe "13:45"
+              }
+            , { from = fromStringUnsafe "11:14"
+              , to = fromStringUnsafe "15:04"
+              }
+            , { from = fromStringUnsafe "12:52"
+              , to = fromStringUnsafe "15:45"
+              }
+            , { from = fromStringUnsafe "13:54"
+              , to = fromStringUnsafe "17:04"
+              }
+            , { from = fromStringUnsafe "14:52"
+              , to = fromStringUnsafe "17:45"
+              }
+            , { from = fromStringUnsafe "15:14"
+              , to = fromStringUnsafe "19:04"
+              }
+            , { from = fromStringUnsafe "16:50"
+              , to = fromStringUnsafe "19:45"
+              }
+            , { from = fromStringUnsafe "17:35"
+              , to = fromStringUnsafe "20:38"
+              }
+            , { from = fromStringUnsafe "18:52"
+              , to = fromStringUnsafe "21:45"
+              }
+            , { from = fromStringUnsafe "19:55"
+              , to = fromStringUnsafe "22:38"
+              }
+            ]
       }
     , { from = "Halle(Saale)Hbf"
       , to = "Hannover Hbf"
