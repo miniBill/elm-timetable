@@ -439,12 +439,12 @@ viewSimple model =
                     """
                     .horiz {
                         stroke: black;
-                        stroke-width: 1px;
+                        stroke-width: 2px;
                     }
 
                     .link {
                         stroke: blue;
-                        stroke-width: 1px;
+                        stroke-width: 2px;
                     }
 
                     .grid {
@@ -454,7 +454,7 @@ viewSimple model =
                     }
 
                     .wait {
-                        stroke-width: 4px;
+                        stroke-width: 2px;
                     }
                     """
                 ]
