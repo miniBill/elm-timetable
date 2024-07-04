@@ -20,15 +20,10 @@ import TypedSvg.Types exposing (AnchorAlignment(..), DominantBaseline(..), Paint
 
 type alias Timetable =
     List
-        { from : Spacetime
-        , to : Spacetime
+        { from : Station
+        , to : Station
+        , links : List { from : Time.Posix, to : Time.Posix }
         }
-
-
-type alias Spacetime =
-    { station : Station
-    , time : Time.Posix
-    }
 
 
 type alias Station =
@@ -67,47 +62,122 @@ main =
 init : flags -> ( Model, Cmd msg )
 init _ =
     ( { timetable =
-            [ { from =
-                    { station = "Villach Hbf"
-                    , time = fromStringUnsafe "16:49"
-                    }
-              , to =
-                    { station = "Udine"
-                    , time = fromStringUnsafe "18:16"
-                    }
-              }
-            , { from =
-                    { station = "Villach Hbf"
-                    , time = fromStringUnsafe "19:29"
-                    }
-              , to =
-                    { station = "Udine"
-                    , time = fromStringUnsafe "21:13"
-                    }
-              }
-            , { from =
-                    { station = "München Hbf"
-                    , time = fromStringUnsafe "12:17"
-                    }
-              , to =
-                    { station = "Villach Hbf"
-                    , time = fromStringUnsafe "16:44"
-                    }
-              }
-            , { from =
-                    { station = "München Hbf"
-                    , time = fromStringUnsafe "14:17"
-                    }
-              , to =
-                    { station = "Villach Hbf"
-                    , time = fromStringUnsafe "18:44"
-                    }
-              }
-            ]
+            if False then
+                villachToUdine
+
+            else
+                munchenToZoetermeer
       , mode = ViewSimple
       }
     , Cmd.none
     )
+
+
+villachToUdine : Timetable
+villachToUdine =
+    [ { from = "Villach Hbf"
+      , to = "Udine"
+      , links =
+            [ { from = fromStringUnsafe "16:49"
+              , to = fromStringUnsafe "18:16"
+              }
+            , { from = fromStringUnsafe "19:29"
+              , to = fromStringUnsafe "21:13"
+              }
+            ]
+      }
+    , { from = "München Hbf"
+      , to = "Villach Hbf"
+      , links =
+            [ { from = fromStringUnsafe "12:17"
+              , to = fromStringUnsafe "16:44"
+              }
+            , { from = fromStringUnsafe "14:17"
+              , to = fromStringUnsafe "18:44"
+              }
+            ]
+      }
+    ]
+
+
+munchenToZoetermeer : Timetable
+munchenToZoetermeer =
+    [ { from = "München Hbf"
+      , to = "Kassel-Wilhelmshöhe"
+      , links =
+            [ { from = fromStringUnsafe "09:09"
+              , to = fromStringUnsafe "12:34"
+              }
+            ]
+      }
+    , { from = "Kassel-Wilhelmshöhe"
+      , to = "Hamm(West)Hbf"
+      , links =
+            [ { from = fromStringUnsafe "13:03"
+              , to = fromStringUnsafe "14:52"
+              }
+            ]
+      }
+    , { from = "Hamm(West)Hbf"
+      , to = "Rheine"
+      , links =
+            [ { from = fromStringUnsafe "14:59"
+              , to = fromStringUnsafe "15:51"
+              }
+            ]
+      }
+    , { from = "Rheine"
+      , to = "Amersfoort Centraal"
+      , links =
+            [ { from = fromStringUnsafe "15:36"
+              , to = fromStringUnsafe "17:24"
+              }
+            ]
+      }
+    , { from = "Amersfoort Centraal"
+      , to = "Gouda"
+      , links =
+            [ { from = fromStringUnsafe "18:40"
+              , to = fromStringUnsafe "19:16"
+              }
+            ]
+      }
+    , { from = "Gouda"
+      , to = "Zoetermeer"
+      , links =
+            [ { from = fromStringUnsafe "17:35"
+              , to = fromStringUnsafe "17:49"
+              }
+            , { from = fromStringUnsafe "19:20"
+              , to = fromStringUnsafe "19:34"
+              }
+            ]
+      }
+    , { from = "München Hbf"
+      , to = "Düsseldorf Hbf"
+      , links =
+            [ { from = fromStringUnsafe "09:43"
+              , to = fromStringUnsafe "14:39"
+              }
+            ]
+      }
+    , { from = "Düsseldorf Hbf"
+      , to = "Utrecht Centraal"
+      , links =
+            [ { from = fromStringUnsafe "15:11"
+              , to = fromStringUnsafe "16:59"
+              }
+            ]
+      }
+    , { from = "Utrecht Centraal"
+      , to = "Gouda"
+      , links =
+            [ { from = fromStringUnsafe "17:13"
+              , to = fromStringUnsafe "17:31"
+              }
+            ]
+      }
+    ]
 
 
 fromStringUnsafe : String -> Time.Posix
@@ -132,11 +202,11 @@ viewSimple model =
     let
         fullWidth : number
         fullWidth =
-            500
+            1000
 
         namesWidth : number
         namesWidth =
-            100
+            150
 
         tableHorizontalMargin : number
         tableHorizontalMargin =
@@ -150,8 +220,9 @@ viewSimple model =
         timesHeight =
             100
 
+        fullHeight : Float
         fullHeight =
-            timesHeight + lineHeight * toFloat (Dict.size stations - 1)
+            timesHeight * 2 + lineHeight * toFloat (Dict.size stations - 1)
 
         liftTime :
             (Int -> Int -> Int)
@@ -170,7 +241,8 @@ viewSimple model =
                         |> Time.millisToPosix
 
         addStation :
-            Spacetime
+            Station
+            -> Time.Posix
             -> Event
             ->
                 Dict
@@ -186,7 +258,7 @@ viewSimple model =
                     , max : Time.Posix
                     , events : Dict Int Event
                     }
-        addStation { station, time } event dict =
+        addStation station time event dict =
             let
                 new =
                     case Dict.get station dict of
@@ -206,25 +278,62 @@ viewSimple model =
             in
             Dict.insert station new dict
 
-        { stations, minTime, maxTime } =
+        times : List ( Time.Posix, Time.Posix )
+        times =
+            model.timetable
+                |> List.concatMap
+                    (\{ links } ->
+                        List.map
+                            (\{ from, to } ->
+                                ( from, to )
+                            )
+                            links
+                    )
+
+        { minTime, maxTime } =
+            List.foldl
+                (\( from, to ) acc ->
+                    { minTime =
+                        Just <| liftTime min acc.minTime from
+                    , maxTime =
+                        Just <| liftTime max acc.maxTime to
+                    }
+                )
+                { minTime = Nothing
+                , maxTime = Nothing
+                }
+                times
+
+        stations :
+            Dict
+                Station
+                { min : Time.Posix
+                , max : Time.Posix
+                , events : Dict Int Event
+                }
+        stations =
             model.timetable
                 |> List.foldl
-                    (\{ from, to } acc ->
-                        { minTime =
-                            Just <| liftTime min acc.minTime from.time
-                        , maxTime =
-                            Just <| liftTime max acc.maxTime to.time
-                        , stations =
-                            acc.stations
-                                |> addStation from Departure
-                                |> addStation to Arrival
-                        }
+                    (\{ from, to, links } acc ->
+                        links
+                            |> List.foldl
+                                (\link iacc ->
+                                    iacc
+                                        |> addStation from link.from Departure
+                                        |> addStation to link.to Arrival
+                                )
+                                acc
                     )
-                    { minTime = Nothing
-                    , maxTime = Nothing
-                    , stations = Dict.empty
-                    }
+                    Dict.empty
 
+        sortedStations :
+            List
+                ( Station
+                , { events : Dict Int Event
+                  , min : Time.Posix
+                  , max : Time.Posix
+                  }
+                )
         sortedStations =
             stations
                 |> Dict.toList
@@ -233,20 +342,24 @@ viewSimple model =
                         ( Time.posixToMillis min, -(Time.posixToMillis max) )
                     )
 
+        stationPositions : Dict Station Int
         stationPositions =
             sortedStations
                 |> List.indexedMap
                     (\i ( name, _ ) -> ( name, timesHeight + i * lineHeight ))
                 |> Dict.fromList
 
+        stationsViews : List (Svg msg)
         stationsViews =
             sortedStations
                 |> List.map
                     (\( name, { events } ) ->
                         let
+                            stationY : Float
                             stationY =
                                 stationToY name
 
+                            waitLines : List (Svg msg)
                             waitLines =
                                 let
                                     go queue acc =
@@ -256,6 +369,7 @@ viewSimple model =
 
                                             ( at, _ ) :: tail ->
                                                 let
+                                                    nextDeparture : Maybe Int
                                                     nextDeparture =
                                                         List.Extra.findMap
                                                             (\( dep, kind ) ->
@@ -276,6 +390,7 @@ viewSimple model =
                                                             duration =
                                                                 Duration.milliseconds (toFloat (dep - at))
 
+                                                            minString : String
                                                             minString =
                                                                 Duration.inMinutes duration
                                                                     |> floor
@@ -335,31 +450,38 @@ viewSimple model =
                     -- This never happens but we're going to force a mislayout if the assumptions are wrong
                     namesWidth / 2
 
+        stationToY : Station -> Float
         stationToY station =
             Dict.get station stationPositions
                 |> Maybe.withDefault -1
                 |> toFloat
 
+        linksViews : List (Svg msg)
         linksViews =
             model.timetable
-                |> List.map
-                    (\{ from, to } ->
-                        line
-                            [ class [ "link" ]
-                            , x1 <| timeToX from.time
-                            , x2 <| timeToX to.time
-                            , y1 <| stationToY from.station
-                            , y2 <| stationToY to.station
-                            ]
-                            []
+                |> List.concatMap
+                    (\{ from, to, links } ->
+                        links
+                            |> List.map
+                                (\link ->
+                                    line
+                                        [ class [ "link" ]
+                                        , x1 <| timeToX link.from
+                                        , x2 <| timeToX link.to
+                                        , y1 <| stationToY from
+                                        , y2 <| stationToY to
+                                        ]
+                                        []
+                                )
                     )
 
+        timesViews : List (Svg msg)
         timesViews =
-            model.timetable
+            times
                 |> List.concatMap
-                    (\{ from, to } ->
-                        [ Time.posixToMillis from.time
-                        , Time.posixToMillis to.time
+                    (\( from, to ) ->
+                        [ Time.posixToMillis from
+                        , Time.posixToMillis to
                         ]
                     )
                 |> Set.fromList
@@ -382,29 +504,35 @@ viewSimple model =
                                     , x1 0
                                     , x2 0
                                     , y1 (timesHeight - pushUp)
-                                    , y2 fullHeight
+                                    , y2 (fullHeight - timesHeight + pushUp)
                                     ]
                                     []
 
-                            label : Svg msg
+                            label : List (Svg msg)
                             label =
-                                text_
-                                    [ textAnchor AnchorStart
-                                    , transform
-                                        [ Translate 5 (timesHeight - pushUp)
-                                        , Rotate 90 0 0
-                                        ]
-                                    ]
-                                    [ [ Time.toHour Time.utc time
-                                            |> String.fromInt
-                                            |> String.padLeft 2 ' '
-                                      , Time.toMinute Time.utc time
-                                            |> String.fromInt
-                                            |> String.padLeft 2 '0'
-                                      ]
-                                        |> String.join ":"
-                                        |> text
-                                    ]
+                                let
+                                    inner anchor transformation =
+                                        text_
+                                            [ textAnchor anchor
+                                            , transform
+                                                [ Translate 5 transformation
+                                                , Rotate 90 0 0
+                                                ]
+                                            ]
+                                            [ [ Time.toHour Time.utc time
+                                                    |> String.fromInt
+                                                    |> String.padLeft 2 ' '
+                                              , Time.toMinute Time.utc time
+                                                    |> String.fromInt
+                                                    |> String.padLeft 2 '0'
+                                              ]
+                                                |> String.join ":"
+                                                |> text
+                                            ]
+                                in
+                                [ inner AnchorStart (timesHeight - pushUp)
+                                , inner AnchorEnd (fullHeight - timesHeight + pushUp)
+                                ]
 
                             pushUp =
                                 case last of
@@ -424,9 +552,7 @@ viewSimple model =
                             next =
                                 g
                                     [ transform [ Translate timeX 0 ] ]
-                                    [ label
-                                    , vline
-                                    ]
+                                    (vline :: label)
                         in
                         ( Just time, next :: acc )
                     )
