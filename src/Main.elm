@@ -16,26 +16,7 @@ import TypedSvg.Attributes exposing (class, stroke, textAnchor, transform, viewB
 import TypedSvg.Attributes.InPx exposing (x1, x2, y, y1, y2)
 import TypedSvg.Core exposing (Svg, text)
 import TypedSvg.Types exposing (AnchorAlignment(..), DominantBaseline(..), Paint(..), Transform(..))
-import Types exposing (Station, Timetable)
-
-
-type Event
-    = Arrival
-    | Departure
-
-
-type alias Model =
-    { timetable : Timetable
-    , mode : ViewMode
-    }
-
-
-type ViewMode
-    = ViewSimple
-
-
-type Msg
-    = ViewMode ViewMode
+import Types exposing (Event(..), Model, Msg(..), Station, ViewMode(..))
 
 
 main : Program () Model Msg

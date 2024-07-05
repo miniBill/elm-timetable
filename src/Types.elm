@@ -1,6 +1,16 @@
-module Types exposing (Station, Timetable)
+module Types exposing (Event(..), Model, Msg(..), Station, Timetable, ViewMode(..))
 
 import Time
+
+
+type alias Model =
+    { timetable : Timetable
+    , mode : ViewMode
+    }
+
+
+type ViewMode
+    = ViewSimple
 
 
 type alias Timetable =
@@ -13,3 +23,12 @@ type alias Timetable =
 
 type alias Station =
     String
+
+
+type Event
+    = Arrival
+    | Departure
+
+
+type Msg
+    = ViewMode ViewMode

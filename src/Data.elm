@@ -1,8 +1,14 @@
-module Data exposing (fromStringUnsafe, munchenToZoetermeer, villachToUdine)
+module Data exposing (feeds, fromStringUnsafe, munchenToZoetermeer, villachToUdine)
 
 import Iso8601
 import Time
 import Types exposing (Timetable)
+
+
+feeds : List String
+feeds =
+    [ "de"
+    ]
 
 
 villachToUdine : Timetable
