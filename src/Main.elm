@@ -2,13 +2,16 @@ module Main exposing (main)
 
 import Browser
 import Color
+import Csv.Decode
 import Data
 import Dict exposing (Dict)
 import Duration exposing (Duration)
 import Html exposing (Html)
 import Html.Attributes
+import Http
 import List.Extra
 import Quantity
+import RemoteData
 import Set
 import Time
 import TypedSvg exposing (g, line, svg, text_, title)
@@ -16,7 +19,9 @@ import TypedSvg.Attributes exposing (class, stroke, textAnchor, transform, viewB
 import TypedSvg.Attributes.InPx exposing (x1, x2, y, y1, y2)
 import TypedSvg.Core exposing (Svg, text)
 import TypedSvg.Types exposing (AnchorAlignment(..), DominantBaseline(..), Paint(..), Transform(..))
-import Types exposing (Event(..), Model, Msg(..), Station, ViewMode(..))
+import Types exposing (Feed, LocationType(..), Model, Msg(..), OEvent(..), OStation, OViewMode(..), Stop)
+import Url exposing (Url)
+import Url.Builder
 
 
 main : Program () Model Msg
@@ -29,25 +34,166 @@ main =
         }
 
 
-init : flags -> ( Model, Cmd msg )
+init : flags -> ( Model, Cmd Msg )
 init _ =
     ( { timetable =
-            if False then
+            if True then
                 Data.villachToUdine
 
             else
                 Data.munchenToZoetermeer
       , mode = ViewSimple
+      , stops = RemoteData.Loading
       }
-    , Cmd.none
+    , Data.feeds
+        |> List.map
+            (\feed ->
+                getCSV (GotStops feed) feed "stops.txt" stopsDecoder
+            )
+        |> Cmd.batch
     )
+
+
+getCSV : (Result Http.Error (List a) -> msg) -> String -> String -> Csv.Decode.Decoder a -> Cmd msg
+getCSV toMsg feed filename decoder =
+    Http.request
+        { method = "GET"
+        , headers = []
+        , url = Url.Builder.absolute [ "feeds", feed, filename ] []
+        , timeout = Nothing
+        , tracker = Nothing
+        , body = Http.emptyBody
+        , expect =
+            Http.expectString
+                (\got ->
+                    got
+                        |> Result.andThen
+                            (\res ->
+                                Csv.Decode.decodeCsv Csv.Decode.FieldNamesFromFirstRow decoder res
+                                    |> Result.mapError (\err -> Http.BadBody (Debug.toString err))
+                            )
+                        |> toMsg
+                )
+        }
+
+
+stopsDecoder : Csv.Decode.Decoder Stop
+stopsDecoder =
+    Csv.Decode.succeed Stop
+        |> required "stop_id" Csv.Decode.string
+        |> optional "stop_code" Csv.Decode.string
+        |> optional "stop_name" Csv.Decode.string
+        |> optional "tts_stop_name" Csv.Decode.string
+        |> optional "stop_desc" Csv.Decode.string
+        |> optional "stop_lat" Csv.Decode.float
+        |> optional "stop_lon" Csv.Decode.float
+        |> optional "zone_id" Csv.Decode.string
+        |> optional "stop_url" urlParser
+        |> required "location_type" (parsed Types.parseLocationType)
+        |> optional "parent_station" Csv.Decode.string
+        |> optional "stop_timezone" Csv.Decode.string
+        |> optional "wheelchair_boarding" (parsed Types.parseWheelchairBoarding)
+        |> optional "level_id" Csv.Decode.string
+        |> optional "platform_code" Csv.Decode.string
+
+
+parsed : (String -> Maybe a) -> Csv.Decode.Decoder a
+parsed validation =
+    Csv.Decode.string
+        |> Csv.Decode.andThen
+            (\raw ->
+                case validation raw of
+                    Just url ->
+                        Csv.Decode.succeed url
+
+                    Nothing ->
+                        Csv.Decode.fail "Failed to parse"
+            )
+
+
+urlParser : Csv.Decode.Decoder Url
+urlParser =
+    parsed Url.fromString
+
+
+required :
+    String
+    -> Csv.Decode.Decoder a
+    -> Csv.Decode.Decoder (a -> b)
+    -> Csv.Decode.Decoder b
+required name decoder original =
+    Csv.Decode.pipeline (Csv.Decode.field name decoder) original
+
+
+optional :
+    String
+    -> Csv.Decode.Decoder a
+    -> Csv.Decode.Decoder (Maybe a -> b)
+    -> Csv.Decode.Decoder b
+optional name decoder original =
+    Csv.Decode.pipeline
+        (Csv.Decode.string
+            |> Csv.Decode.optionalField name
+            |> Csv.Decode.andThen
+                (\orig ->
+                    case orig of
+                        Nothing ->
+                            Csv.Decode.succeed Nothing
+
+                        Just s ->
+                            if String.isEmpty s then
+                                Csv.Decode.succeed Nothing
+
+                            else
+                                Csv.Decode.map Just decoder
+                )
+        )
+        original
 
 
 view : Model -> Html Msg
 view model =
-    case model.mode of
-        ViewSimple ->
-            viewSimple model
+    Html.div []
+        [ case model.mode of
+            ViewSimple ->
+                viewSimple model
+        , Html.div
+            [ Html.Attributes.style "border" "1px solid black"
+            , Html.Attributes.style "padding" "8px"
+            ]
+          <|
+            case model.stops of
+                RemoteData.Error e ->
+                    [ Html.text (Debug.toString e) ]
+
+                RemoteData.NotAsked ->
+                    [ Html.text "Not asked" ]
+
+                RemoteData.Loading ->
+                    [ Html.text "Loading..." ]
+
+                RemoteData.Loaded stops ->
+                    List.map viewStops (Dict.toList stops)
+        ]
+
+
+viewStops : ( Feed, List Stop ) -> Html msg
+viewStops ( feed, stops ) =
+    let
+        viewStop : Stop -> Html msg
+        viewStop stop =
+            Html.text (Debug.toString stop)
+    in
+    Html.div []
+        [ Html.text feed
+        , stops
+            |> List.take 20
+            |> List.map viewStop
+            |> Html.div
+                [ Html.Attributes.style "border" "1px solid black"
+                , Html.Attributes.style "padding" "8px"
+                ]
+        ]
 
 
 viewSimple : Model -> Html msg
@@ -74,22 +220,22 @@ viewSimple model =
                         |> Time.millisToPosix
 
         addStation :
-            Station
+            OStation
             -> Time.Posix
-            -> Event
+            -> OEvent
             ->
                 Dict
-                    Station
+                    OStation
                     { min : Time.Posix
                     , max : Time.Posix
-                    , events : Dict Int Event
+                    , events : Dict Int OEvent
                     }
             ->
                 Dict
-                    Station
+                    OStation
                     { min : Time.Posix
                     , max : Time.Posix
-                    , events : Dict Int Event
+                    , events : Dict Int OEvent
                     }
         addStation station time event dict =
             let
@@ -162,8 +308,8 @@ viewSimple model =
 
         sortedStations :
             List
-                ( Station
-                , { events : Dict Int Event
+                ( OStation
+                , { events : Dict Int OEvent
                   , min : Time.Posix
                   , max : Time.Posix
                   }
@@ -176,7 +322,7 @@ viewSimple model =
                         ( Time.posixToMillis min, -(Time.posixToMillis max) )
                     )
 
-        stationPositions : Dict Station Int
+        stationPositions : Dict OStation Int
         stationPositions =
             sortedStations
                 |> List.indexedMap
@@ -189,7 +335,7 @@ viewSimple model =
                 (viewStation timeRange stationPositions)
                 sortedStations
 
-        stationToY : Station -> Float
+        stationToY : OStation -> Float
         stationToY station =
             Dict.get station stationPositions
                 |> Maybe.withDefault -1
@@ -384,8 +530,8 @@ timeToX { minTime, maxTime } time =
 
 viewStation :
     { minTime : Maybe Time.Posix, maxTime : Maybe Time.Posix }
-    -> Dict Station Int
-    -> ( Station, { events : Dict Int Event, min : Time.Posix, max : Time.Posix } )
+    -> Dict OStation Int
+    -> ( OStation, { events : Dict Int OEvent, min : Time.Posix, max : Time.Posix } )
     -> Svg msg
 viewStation timeRange stationPositions ( name, { events } ) =
     let
@@ -485,8 +631,24 @@ waitTimeToColor f =
 update : Msg -> Model -> ( Model, Cmd msg )
 update msg model =
     case msg of
-        ViewMode mode ->
+        OViewMode mode ->
             ( { model | mode = mode }, Cmd.none )
+
+        GotStops _ (Err e) ->
+            ( { model | stops = RemoteData.Error e }, Cmd.none )
+
+        GotStops feed (Ok res) ->
+            let
+                existing : Dict Feed (List Stop)
+                existing =
+                    case model.stops of
+                        RemoteData.Loaded stops ->
+                            stops
+
+                        _ ->
+                            Dict.empty
+            in
+            ( { model | stops = RemoteData.Loaded (Dict.insert feed res existing) }, Cmd.none )
 
 
 subscriptions : model -> Sub msg
