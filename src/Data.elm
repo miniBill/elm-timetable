@@ -2,7 +2,7 @@ module Data exposing (feeds, fromStringUnsafe, munchenToZoetermeer, villachToUdi
 
 import Iso8601
 import Time
-import Types exposing (Timetable)
+import Types exposing (OTimetable)
 
 
 feeds : List String
@@ -11,7 +11,7 @@ feeds =
     ]
 
 
-villachToUdine : Timetable
+villachToUdine : OTimetable
 villachToUdine =
     [ { from = "Villach Hbf"
       , to = "Udine"
@@ -38,7 +38,7 @@ villachToUdine =
     ]
 
 
-munchenToZoetermeer : Timetable
+munchenToZoetermeer : OTimetable
 munchenToZoetermeer =
     [ { from = "München Hbf"
       , to = "Hannover Hbf"

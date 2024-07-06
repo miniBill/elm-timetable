@@ -286,10 +286,10 @@ viewSimple model =
 
         stations :
             Dict
-                Station
+                OStation
                 { min : Time.Posix
                 , max : Time.Posix
-                , events : Dict Int Event
+                , events : Dict Int OEvent
                 }
         stations =
             model.timetable
