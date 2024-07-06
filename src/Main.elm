@@ -11,6 +11,7 @@ import Html.Attributes
 import Html.Events
 import Http
 import List.Extra
+import Maybe.Extra
 import Quantity
 import RemoteData
 import Set
@@ -78,12 +79,7 @@ getCSV toMsg feed filename decoder =
                                 Csv.Decode.decodeCsv Csv.Decode.FieldNamesFromFirstRow decoder res
                                     |> Result.mapError
                                         (\err ->
-                                            case err of
-                                                Csv.Decode.DecodingErrors decodingErrs ->
-                                                    Http.BadBody (Debug.toString (List.take 10 decodingErrs))
-
-                                                _ ->
-                                                    Http.BadBody (Debug.toString err)
+                                            Http.BadBody (Debug.toString err)
                                         )
                             )
                         |> toMsg
@@ -146,21 +142,10 @@ optional :
     -> Csv.Decode.Decoder b
 optional name decoder original =
     Csv.Decode.pipeline
-        (Csv.Decode.string
+        (decoder
+            |> Csv.Decode.blank
             |> Csv.Decode.optionalField name
-            |> Csv.Decode.andThen
-                (\orig ->
-                    case orig of
-                        Nothing ->
-                            Csv.Decode.succeed Nothing
-
-                        Just s ->
-                            if String.isEmpty s then
-                                Csv.Decode.succeed Nothing
-
-                            else
-                                Csv.Decode.map Just decoder
-                )
+            |> Csv.Decode.map Maybe.Extra.join
         )
         original
 

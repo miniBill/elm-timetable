@@ -1,5 +1,5 @@
 module Csv.Decode exposing
-    ( Decoder, string, int, float, blank
+    ( Decoder, string, int, float, blank, fromString
     , column, field, optionalColumn, optionalField
     , FieldNames(..), decodeCsv, decodeCustom, Error(..), DecodingError(..), errorToString, Column(..), Problem(..)
     , map, map2, map3, into, pipeline
@@ -65,7 +65,7 @@ that takes more arguments.
 
 ## Basic Decoders
 
-@docs Decoder, string, int, float, blank
+@docs Decoder, string, int, float, blank, fromString
 
 
 ## Finding Values
@@ -106,7 +106,7 @@ type Decoder a
          -> ResolvedNames
          -> Int
          -> List String
-         -> Result (List DecodingError) a
+         -> Result DecodingError a
         )
 
 
@@ -121,15 +121,15 @@ fromString convert =
     Decoder <|
         \location { names } rowNum row ->
             let
-                error : Problem -> Result (List DecodingError) a
+                error : Problem -> Result DecodingError a
                 error problem =
                     Err
-                        [ FieldDecodingError
+                        (FieldDecodingError
                             { row = rowNum
                             , column = locationToColumn names location
                             , problem = problem
                             }
-                        ]
+                        )
             in
             case location of
                 Column_ colNum ->
@@ -161,7 +161,7 @@ fromString convert =
                                     error (FieldNotFound name)
 
                         Nothing ->
-                            Err [ FieldNotProvided name ]
+                            Err (FieldNotProvided name)
 
                 OnlyColumn_ ->
                     case row of
@@ -422,7 +422,7 @@ availableFields =
                     )
 
             else
-                Err [ NoFieldNamesProvided ]
+                Err NoFieldNamesProvided
         )
 
 
@@ -517,29 +517,23 @@ applyDecoder fieldNames (Decoder decode) allRows =
             rows
                 |> List.foldl
                     (\row ( soFar, rowNum ) ->
-                        ( case decode defaultLocation resolvedNames rowNum row of
-                            Ok val ->
-                                case soFar of
-                                    Ok values ->
+                        ( case soFar of
+                            Ok values ->
+                                case decode defaultLocation resolvedNames rowNum row of
+                                    Ok val ->
                                         Ok (val :: values)
 
-                                    Err errs ->
-                                        Err errs
+                                    Err err ->
+                                        Err (DecodingErrors err)
 
                             Err err ->
-                                case soFar of
-                                    Ok _ ->
-                                        Err [ err ]
-
-                                    Err errs ->
-                                        Err (err :: errs)
+                                Err err
                         , rowNum + 1
                         )
                     )
                     ( Ok [], firstRowNumber )
                 |> Tuple.first
                 |> Result.map List.reverse
-                |> Result.mapError (DecodingErrors << List.concat << List.reverse)
         )
         (getFieldNames fieldNames allRows)
 
@@ -563,7 +557,7 @@ Some more detail:
 type Error
     = ParsingError Parser.Problem
     | NoFieldNamesOnFirstRow
-    | DecodingErrors (List DecodingError)
+    | DecodingErrors DecodingError
 
 
 {-| Errors when decoding can either be:
@@ -833,7 +827,7 @@ errorToString error =
                         >> dedupeHelp [] []
                         >> List.sortBy (\{ startRow } -> startRow)
             in
-            case dedupeErrs errs of
+            case dedupeErrs [ errs ] of
                 [] ->
                     "Something went wrong, but I got an blank error list so I don't know what it was. Please open an issue!"
 
@@ -880,18 +874,17 @@ map2 : (a -> b -> c) -> Decoder a -> Decoder b -> Decoder c
 map2 transform (Decoder decodeA) (Decoder decodeB) =
     Decoder
         (\location fieldNames rowNum row ->
-            case ( decodeA location fieldNames rowNum row, decodeB location fieldNames rowNum row ) of
-                ( Ok a, Ok b ) ->
-                    Ok (transform a b)
+            case decodeA location fieldNames rowNum row of
+                Ok a ->
+                    case decodeB location fieldNames rowNum row of
+                        Ok b ->
+                            Ok (transform a b)
 
-                ( Err a, Err b ) ->
-                    Err (a ++ b)
+                        Err b ->
+                            Err b
 
-                ( Err a, _ ) ->
+                Err a ->
                     Err a
-
-                ( _, Err b ) ->
-                    Err b
         )
 
 
@@ -913,33 +906,22 @@ map3 transform (Decoder decodeA) (Decoder decodeB) (Decoder decodeC) =
     Decoder
         (\location fieldNames rowNum row ->
             case
-                ( decodeA location fieldNames rowNum row
-                , decodeB location fieldNames rowNum row
-                , decodeC location fieldNames rowNum row
-                )
+                decodeA location fieldNames rowNum row
             of
-                ( Ok a, Ok b, Ok c ) ->
-                    Ok (transform a b c)
+                Ok a ->
+                    case decodeB location fieldNames rowNum row of
+                        Ok b ->
+                            case decodeC location fieldNames rowNum row of
+                                Ok c ->
+                                    Ok (transform a b c)
 
-                ( Err a, Err b, Err c ) ->
-                    Err (a ++ b ++ c)
+                                Err c ->
+                                    Err c
 
-                ( Err a, Err b, _ ) ->
-                    Err (a ++ b)
+                        Err b ->
+                            Err b
 
-                ( _, Err b, Err c ) ->
-                    Err (b ++ c)
-
-                ( Err a, _, Err c ) ->
-                    Err (a ++ c)
-
-                ( _, _, Err c ) ->
-                    Err c
-
-                ( _, Err b, _ ) ->
-                    Err b
-
-                ( Err a, _, _ ) ->
+                Err a ->
                     Err a
         )
 
@@ -973,15 +955,28 @@ Now you can decode pets like this:
 
 -}
 into : (a -> b) -> Decoder (a -> b)
-into =
-    succeed
+into f =
+    succeed f
 
 
 {-| See [`into`](#into).
 -}
 pipeline : Decoder a -> Decoder (a -> b) -> Decoder b
-pipeline =
-    map2 (\value fn -> fn value)
+pipeline (Decoder decodeA) (Decoder decodeB) =
+    Decoder
+        (\location fieldNames rowNum row ->
+            case decodeB location fieldNames rowNum row of
+                Ok b ->
+                    case decodeA location fieldNames rowNum row of
+                        Ok a ->
+                            Ok (b a)
+
+                        Err a ->
+                            Err a
+
+                Err b ->
+                    Err b
+        )
 
 
 
@@ -1026,16 +1021,8 @@ recover (Decoder first) (Decoder second) =
                 Ok value ->
                     Ok value
 
-                Err errs ->
-                    case second location fieldNames rowNum row of
-                        Ok value ->
-                            Ok value
-
-                        Err [ OneOfDecodingError _ problems ] ->
-                            Err [ OneOfDecodingError rowNum (errs ++ problems) ]
-
-                        Err problems ->
-                            Err [ OneOfDecodingError rowNum (errs ++ problems) ]
+                Err _ ->
+                    second location fieldNames rowNum row
 
 
 {-| Decode some value _and then_ make a decoding decision based on the
@@ -1093,12 +1080,12 @@ fail message =
     Decoder
         (\location { names } rowNum _ ->
             Err
-                [ FieldDecodingError
+                (FieldDecodingError
                     { row = rowNum
                     , column = locationToColumn names location
                     , problem = Failure message
                     }
-                ]
+                )
         )
 
 
