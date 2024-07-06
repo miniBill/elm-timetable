@@ -135,3 +135,4 @@ type OEvent
 type Msg
     = OViewMode OViewMode
     | GotStops Feed (Result Http.Error (List Stop))
+    | Reload

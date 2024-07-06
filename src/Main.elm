@@ -8,6 +8,7 @@ import Dict exposing (Dict)
 import Duration exposing (Duration)
 import Html exposing (Html)
 import Html.Attributes
+import Html.Events
 import Http
 import List.Extra
 import Quantity
@@ -45,13 +46,18 @@ init _ =
       , mode = ViewSimple
       , stops = RemoteData.Loading
       }
-    , Data.feeds
+    , loadStops
+    )
+
+
+loadStops : Cmd Msg
+loadStops =
+    Data.feeds
         |> List.map
             (\feed ->
                 getCSV (GotStops feed) feed "stops.txt" stopsDecoder
             )
         |> Cmd.batch
-    )
 
 
 getCSV : (Result Http.Error (List a) -> msg) -> String -> String -> Csv.Decode.Decoder a -> Cmd msg
@@ -70,7 +76,15 @@ getCSV toMsg feed filename decoder =
                         |> Result.andThen
                             (\res ->
                                 Csv.Decode.decodeCsv Csv.Decode.FieldNamesFromFirstRow decoder res
-                                    |> Result.mapError (\err -> Http.BadBody (Debug.toString err))
+                                    |> Result.mapError
+                                        (\err ->
+                                            case err of
+                                                Csv.Decode.DecodingErrors decodingErrs ->
+                                                    Http.BadBody (Debug.toString (List.take 10 decodingErrs))
+
+                                                _ ->
+                                                    Http.BadBody (Debug.toString err)
+                                        )
                             )
                         |> toMsg
                 )
@@ -157,6 +171,9 @@ view model =
         [ case model.mode of
             ViewSimple ->
                 viewSimple model
+        , Html.button
+            [ Html.Events.onClick Reload ]
+            [ Html.text "Reload" ]
         , Html.div
             [ Html.Attributes.style "border" "1px solid black"
             , Html.Attributes.style "padding" "8px"
@@ -628,7 +645,7 @@ waitTimeToColor f =
         Color.green
 
 
-update : Msg -> Model -> ( Model, Cmd msg )
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         OViewMode mode ->
@@ -649,6 +666,9 @@ update msg model =
                             Dict.empty
             in
             ( { model | stops = RemoteData.Loaded (Dict.insert feed res existing) }, Cmd.none )
+
+        Reload ->
+            ( model, loadStops )
 
 
 subscriptions : model -> Sub msg
