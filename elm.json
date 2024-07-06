@@ -1,12 +1,12 @@
 {
     "type": "application",
     "source-directories": [
-        "src"
+        "src",
+        "vendored/BrianHicks/elm-csv/4.0.1/src"
     ],
     "elm-version": "0.19.1",
     "dependencies": {
         "direct": {
-            "BrianHicks/elm-csv": "4.0.1",
             "avh4/elm-color": "1.0.0",
             "elm/browser": "1.0.2",
             "elm/core": "1.0.3",

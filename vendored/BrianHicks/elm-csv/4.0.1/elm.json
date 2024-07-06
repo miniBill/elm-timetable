@@ -1,0 +1,20 @@
+{
+    "type": "package",
+    "name": "BrianHicks/elm-csv",
+    "summary": "Decode CSV in the most boring way possible.",
+    "license": "BSD-3-Clause",
+    "version": "4.0.1",
+    "exposed-modules": [
+        "Csv.Decode",
+        "Csv.Encode",
+        "Csv.Parser"
+    ],
+    "elm-version": "0.19.0 <= v < 0.20.0",
+    "dependencies": {
+        "elm/core": "1.0.2 <= v < 2.0.0"
+    },
+    "test-dependencies": {
+        "elm-explorations/test": "2.0.0 <= v < 3.0.0",
+        "rtfeldman/elm-hex": "1.0.0 <= v < 2.0.0"
+    }
+}
