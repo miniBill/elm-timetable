@@ -10,6 +10,7 @@ import Html exposing (Html)
 import Html.Attributes
 import Html.Events
 import Http
+import Length
 import List.Extra
 import Maybe.Extra
 import Quantity
@@ -21,7 +22,7 @@ import TypedSvg.Attributes exposing (class, stroke, textAnchor, transform, viewB
 import TypedSvg.Attributes.InPx exposing (x1, x2, y, y1, y2)
 import TypedSvg.Core exposing (Svg, text)
 import TypedSvg.Types exposing (AnchorAlignment(..), DominantBaseline(..), Paint(..), Transform(..))
-import Types exposing (Feed, Id, LocationType(..), Model, Msg(..), OEvent(..), OStation, OViewMode(..), Stop)
+import Types exposing (Feed, Id, LocationType(..), Model, Msg(..), OEvent(..), OStation, OViewMode(..), Pathway, Stop)
 import Url exposing (Url)
 import Url.Builder
 
@@ -46,31 +47,50 @@ init _ =
                 Data.munchenToZoetermeer
       , mode = ViewSimple
       , stops = RemoteData.Loading
+      , pathways = RemoteData.Loading
       }
-    , loadStops
+    , loadData
     )
 
 
-loadStops : Cmd Msg
-loadStops =
+loadData : Cmd Msg
+loadData =
     Data.feeds
-        |> List.map
+        |> List.concatMap
             (\feed ->
-                getCSV
-                    (\raw ->
-                        raw
-                            |> Result.map
-                                (List.foldl
-                                    (\stop acc -> Dict.insert stop.id stop acc)
-                                    Dict.empty
-                                )
-                            |> GotStops feed
-                    )
-                    feed
-                    "stops.txt"
-                    stopsDecoder
+                [ getCSVId GotStops feed "stops.txt" stopsDecoder
+                , getCSVId GotPathways feed "pathways.txt" pathwayDecoder
+                ]
             )
         |> Cmd.batch
+
+
+getCSVId :
+    (String -> Result Http.Error (Dict Id { a | id : Id }) -> msg)
+    -> String
+    -> String
+    -> Csv.Decode.Decoder { a | id : Id }
+    -> Cmd msg
+getCSVId toMsg feed filename decoder =
+    getCSV
+        (\raw ->
+            raw
+                |> Result.map toDictFromId
+                |> toMsg feed
+        )
+        feed
+        filename
+        decoder
+
+
+toDictFromId :
+    List { a | id : Id }
+    -> Dict Id { a | id : Id }
+toDictFromId list =
+    List.foldl
+        (\stop acc -> Dict.insert stop.id stop acc)
+        Dict.empty
+        list
 
 
 getCSV : (Result Http.Error (List a) -> msg) -> String -> String -> Csv.Decode.Decoder a -> Cmd msg
@@ -117,6 +137,36 @@ stopsDecoder =
         |> optional "wheelchair_boarding" (parsed Types.parseWheelchairBoarding)
         |> optional "level_id" Csv.Decode.string
         |> optional "platform_code" Csv.Decode.string
+
+
+pathwayDecoder : Csv.Decode.Decoder Pathway
+pathwayDecoder =
+    Csv.Decode.succeed Pathway
+        |> required "pathway_id" Csv.Decode.string
+        |> required "from_stop_id" Csv.Decode.string
+        |> required "to_stop_id" Csv.Decode.string
+        |> required "pathway_mode" (parsed Types.parsePathwayMode)
+        |> required "is_bidirectional"
+            (parsed
+                (\i ->
+                    case i of
+                        "0" ->
+                            Just False
+
+                        "1" ->
+                            Just True
+
+                        _ ->
+                            Nothing
+                )
+            )
+        |> optional "length" (Csv.Decode.map Length.meters Csv.Decode.float)
+        |> optional "traversal_time" (Csv.Decode.map Duration.seconds Csv.Decode.float)
+        |> optional "stair_count" Csv.Decode.int
+        |> optional "max_slope" Csv.Decode.float
+        |> optional "min_width" (Csv.Decode.map Length.meters Csv.Decode.float)
+        |> optional "signposted_as" Csv.Decode.string
+        |> optional "reversed_signposted_as" Csv.Decode.string
 
 
 parsed : (String -> Maybe a) -> Csv.Decode.Decoder a
@@ -717,8 +767,21 @@ update msg model =
             in
             ( { model | stops = RemoteData.Loaded (Dict.insert feed res existing) }, Cmd.none )
 
+        GotPathways feed (Ok res) ->
+            let
+                existing : Dict Feed (Dict Id Pathway)
+                existing =
+                    case model.pathways of
+                        RemoteData.Loaded pathways ->
+                            pathways
+
+                        _ ->
+                            Dict.empty
+            in
+            ( { model | pathways = RemoteData.Loaded (Dict.insert feed res existing) }, Cmd.none )
+
         Reload ->
-            ( model, loadStops )
+            ( model, loadData )
 
 
 subscriptions : model -> Sub msg
