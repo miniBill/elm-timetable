@@ -3,9 +3,11 @@ module Main exposing (main)
 import Browser
 import Color
 import Csv.Decode
+import Dagre.Attributes
 import Data
 import Dict exposing (Dict)
 import Duration exposing (Duration)
+import Graph
 import Html exposing (Html)
 import Html.Attributes
 import Html.Events
@@ -15,6 +17,10 @@ import List.Extra
 import Maybe.Extra
 import Quantity
 import RemoteData
+import Render
+import Render.StandardDrawers
+import Render.StandardDrawers.Attributes
+import Render.StandardDrawers.Types
 import Set exposing (Set)
 import Time
 import TypedSvg exposing (g, line, svg, text_, title)
@@ -295,7 +301,7 @@ viewFeed ( feed, ( stops, pathways ) ) =
                 |> List.filter
                     (\walkway ->
                         Set.member walkway.from_stop_id stopIds
-                            && Set.member walkway.to_stop_id stopIds
+                            || Set.member walkway.to_stop_id stopIds
                     )
     in
     Html.div
@@ -391,6 +397,67 @@ viewPathways stops filteredPathways =
             ]
                 |> List.map (\cell -> Html.td [] [ Html.text cell ])
                 |> Html.tr []
+
+        stopIds : List Id
+        stopIds =
+            filteredPathways
+                |> List.concatMap
+                    (\pathway ->
+                        [ pathway.from_stop_id
+                        , pathway.to_stop_id
+                        ]
+                    )
+                |> Set.fromList
+                |> Set.toList
+
+        stopIdToNodeId : Dict Id Int
+        stopIdToNodeId =
+            stopIds
+                |> List.indexedMap (\i id -> ( id, i ))
+                |> Dict.fromList
+
+        graph : Graph.Graph Id ()
+        graph =
+            let
+                edges : List (Graph.Edge ())
+                edges =
+                    filteredPathways
+                        |> List.concatMap
+                            (\pathway ->
+                                case
+                                    ( Dict.get pathway.from_stop_id stopIdToNodeId
+                                    , Dict.get pathway.to_stop_id stopIdToNodeId
+                                    )
+                                of
+                                    ( Just fromId, Just toId ) ->
+                                        if pathway.is_bidirectional then
+                                            [ { from = fromId
+                                              , to = toId
+                                              , label = ()
+                                              }
+                                            , { from = toId
+                                              , to = fromId
+                                              , label = ()
+                                              }
+                                            ]
+
+                                        else
+                                            [ { from = fromId
+                                              , to = toId
+                                              , label = ()
+                                              }
+                                            ]
+
+                                    _ ->
+                                        []
+                            )
+
+                nodes : List (Graph.Node String)
+                nodes =
+                    stopIds
+                        |> List.indexedMap (\i id -> { id = i, label = id })
+            in
+            Graph.fromNodesAndEdges nodes edges
     in
     Html.div []
         [ filteredPathways
@@ -407,6 +474,39 @@ viewPathways stops filteredPathways =
                 [ Html.Attributes.style "border" "1px solid black"
                 , Html.Attributes.style "padding" "8px"
                 ]
+        , Render.draw
+            [ Dagre.Attributes.rankDir Dagre.Attributes.LR
+
+            -- , Dagre.Attributes.widthDict
+            --     (stopIds
+            --         |> List.map
+            --             (\id ->
+            --                 ( Dict.get id stopIdToNodeId
+            --                     |> Maybe.withDefault -1
+            --                 , (10 * String.length (stop id))
+            --                     |> toFloat
+            --                 )
+            --             )
+            --         |> Dict.fromList
+            --     )
+            , Dagre.Attributes.width 300
+            ]
+            [ Render.nodeDrawer
+                (Render.StandardDrawers.svgDrawNode
+                    [ Render.StandardDrawers.Attributes.title (\{ label } -> stop label)
+                    , Render.StandardDrawers.Attributes.label (\{ label } -> stop label)
+                    ]
+                )
+            , Render.edgeDrawer
+                (Render.StandardDrawers.svgDrawEdge
+                    [ Render.StandardDrawers.Attributes.arrowHead
+                        Render.StandardDrawers.Types.Vee
+                    , Render.StandardDrawers.Attributes.strokeWidth (\_ -> 4)
+                    ]
+                )
+            , Render.style "width: 200%;"
+            ]
+            graph
         ]
 
 
