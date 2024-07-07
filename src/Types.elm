@@ -10,7 +10,7 @@ import Url exposing (Url)
 type alias Model =
     { timetable : OTimetable
     , mode : OViewMode
-    , stops : RemoteData (Dict Feed (List Stop))
+    , stops : RemoteData (Dict Feed (Dict Id Stop))
     }
 
 
@@ -134,5 +134,5 @@ type OEvent
 
 type Msg
     = OViewMode OViewMode
-    | GotStops Feed (Result Http.Error (List Stop))
+    | GotStops Feed (Result Http.Error (Dict Id Stop))
     | Reload

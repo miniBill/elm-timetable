@@ -21,7 +21,7 @@ import TypedSvg.Attributes exposing (class, stroke, textAnchor, transform, viewB
 import TypedSvg.Attributes.InPx exposing (x1, x2, y, y1, y2)
 import TypedSvg.Core exposing (Svg, text)
 import TypedSvg.Types exposing (AnchorAlignment(..), DominantBaseline(..), Paint(..), Transform(..))
-import Types exposing (Feed, LocationType(..), Model, Msg(..), OEvent(..), OStation, OViewMode(..), Stop)
+import Types exposing (Feed, Id, LocationType(..), Model, Msg(..), OEvent(..), OStation, OViewMode(..), Stop)
 import Url exposing (Url)
 import Url.Builder
 
@@ -56,7 +56,19 @@ loadStops =
     Data.feeds
         |> List.map
             (\feed ->
-                getCSV (GotStops feed) feed "stops.txt" stopsDecoder
+                getCSV
+                    (\raw ->
+                        raw
+                            |> Result.map
+                                (List.foldl
+                                    (\stop acc -> Dict.insert stop.id stop acc)
+                                    Dict.empty
+                                )
+                            |> GotStops feed
+                    )
+                    feed
+                    "stops.txt"
+                    stopsDecoder
             )
         |> Cmd.batch
 
@@ -179,19 +191,72 @@ view model =
         ]
 
 
-viewStops : ( Feed, List Stop ) -> Html msg
+viewStops : ( Feed, Dict Id Stop ) -> Html msg
 viewStops ( feed, stops ) =
     let
+        mfloat x =
+            x
+                |> Maybe.map String.fromFloat
+                |> Maybe.withDefault "---"
+
         viewStop : Stop -> Html msg
         viewStop stop =
-            Html.text (Debug.toString stop)
+            [ stop.id
+            , Maybe.withDefault "---" stop.code
+            , Maybe.withDefault "---" stop.name
+            , Maybe.withDefault "---" stop.tts_name
+            , Maybe.withDefault "---" stop.description
+            , mfloat stop.lat
+            , mfloat stop.lon
+            , Maybe.withDefault "---" stop.zone_id
+            , Maybe.withDefault "---" <| Maybe.map Url.toString stop.url
+            , Debug.toString stop.location_type
+            , Maybe.withDefault "---" stop.parent_station
+            , Maybe.withDefault "---" stop.timezone
+            , Maybe.withDefault "---" <| Maybe.map Debug.toString stop.wheelchair_boarding
+            , Maybe.withDefault "---" stop.level_id
+            , Maybe.withDefault "---" stop.platform_code
+            ]
+                |> List.map (\cell -> Html.td [] [ Html.text cell ])
+                |> Html.tr []
     in
     Html.div []
         [ Html.text feed
         , stops
-            |> List.take 20
+            |> Dict.values
+            |> List.filter
+                (\stop ->
+                    (Just "München Hbf" == stop.name)
+                        -- String.contains "Isartor" defaulted
+                        || List.member stop.id
+                            [ "de:09162:6:40:81"
+                            , "de:09162:6_G"
+                            ]
+                        || (stop.parent_station == Just "de:09162:6_G")
+                )
+            |> List.take 50
             |> List.map viewStop
-            |> Html.div
+            |> (::)
+                ([ "id"
+                 , "code"
+                 , "name"
+                 , "tts_name"
+                 , "description"
+                 , "lat"
+                 , "lon"
+                 , "zone_id"
+                 , "url"
+                 , "location_type"
+                 , "parent_station"
+                 , "timezone"
+                 , "wheelchair_boarding"
+                 , "level_id"
+                 , "platform_code"
+                 ]
+                    |> List.map (\col -> Html.th [] [ Html.text col ])
+                    |> Html.tr []
+                )
+            |> Html.table
                 [ Html.Attributes.style "border" "1px solid black"
                 , Html.Attributes.style "padding" "8px"
                 ]
@@ -641,7 +706,7 @@ update msg model =
 
         GotStops feed (Ok res) ->
             let
-                existing : Dict Feed (List Stop)
+                existing : Dict Feed (Dict Id Stop)
                 existing =
                     case model.stops of
                         RemoteData.Loaded stops ->
