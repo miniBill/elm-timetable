@@ -280,13 +280,13 @@ viewFeed ( feed, ( stops, pathways ) ) =
                 |> Dict.values
                 |> List.filter
                     (\stop ->
-                        (Just "München Hbf" == stop.name)
-                            -- String.contains "Isartor" defaulted
-                            || List.member stop.id
-                                [ "de:09162:6:40:81"
-                                , "de:09162:6_G"
-                                ]
-                            || (stop.parent_station == Just "de:09162:6_G")
+                        Just "München Hbf" == stop.name
+                     -- String.contains "Isartor" defaulted
+                     -- || List.member stop.id
+                     --     [ "de:09162:6:40:81"
+                     --     , "de:09162:6_G"
+                     --     ]
+                     -- || (stop.parent_station == Just "de:09162:6_G")
                     )
                 |> List.take 50
 
@@ -301,7 +301,7 @@ viewFeed ( feed, ( stops, pathways ) ) =
                 |> List.filter
                     (\walkway ->
                         Set.member walkway.from_stop_id stopIds
-                            || Set.member walkway.to_stop_id stopIds
+                            && Set.member walkway.to_stop_id stopIds
                     )
     in
     Html.div
