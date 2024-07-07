@@ -15,14 +15,14 @@ import List.Extra
 import Maybe.Extra
 import Quantity
 import RemoteData
-import Set
+import Set exposing (Set)
 import Time
 import TypedSvg exposing (g, line, svg, text_, title)
 import TypedSvg.Attributes exposing (class, stroke, textAnchor, transform, viewBox)
 import TypedSvg.Attributes.InPx exposing (x1, x2, y, y1, y2)
 import TypedSvg.Core exposing (Svg, text)
 import TypedSvg.Types exposing (AnchorAlignment(..), DominantBaseline(..), Paint(..), Transform(..))
-import Types exposing (Feed, Id, LocationType(..), Model, Msg(..), OEvent(..), OStation, OViewMode(..), Pathway, Stop)
+import Types exposing (Feed, Id, LocationType(..), Model, Msg(..), OEvent(..), OStation, OViewMode(..), Pathway, PathwayMode(..), Stop)
 import Url exposing (Url)
 import Url.Builder
 
@@ -237,13 +237,82 @@ view model =
                     [ Html.text "Loading..." ]
 
                 RemoteData.Loaded stops ->
-                    List.map viewStops (Dict.toList stops)
+                    case model.pathways of
+                        RemoteData.Error e ->
+                            [ Html.text (Debug.toString e) ]
+
+                        RemoteData.NotAsked ->
+                            [ Html.text "Not asked" ]
+
+                        RemoteData.Loading ->
+                            [ Html.text "Loading..." ]
+
+                        RemoteData.Loaded pathways ->
+                            Dict.merge
+                                (\_ _ acc -> acc)
+                                (\k stop pathway acc ->
+                                    Dict.insert
+                                        k
+                                        ( stop, pathway )
+                                        acc
+                                )
+                                (\_ _ acc -> acc)
+                                stops
+                                pathways
+                                Dict.empty
+                                |> Dict.toList
+                                |> List.map viewFeed
         ]
 
 
-viewStops : ( Feed, Dict Id Stop ) -> Html msg
-viewStops ( feed, stops ) =
+viewFeed : ( Feed, ( Dict Id Stop, Dict Id Pathway ) ) -> Html msg
+viewFeed ( feed, ( stops, pathways ) ) =
     let
+        filteredStops : List Stop
+        filteredStops =
+            stops
+                |> Dict.values
+                |> List.filter
+                    (\stop ->
+                        (Just "München Hbf" == stop.name)
+                            -- String.contains "Isartor" defaulted
+                            || List.member stop.id
+                                [ "de:09162:6:40:81"
+                                , "de:09162:6_G"
+                                ]
+                            || (stop.parent_station == Just "de:09162:6_G")
+                    )
+                |> List.take 50
+
+        stopIds : Set Id
+        stopIds =
+            Set.fromList (List.map .id filteredStops)
+
+        filteredPathways : List Pathway
+        filteredPathways =
+            pathways
+                |> Dict.values
+                |> List.filter
+                    (\walkway ->
+                        Set.member walkway.from_stop_id stopIds
+                            && Set.member walkway.to_stop_id stopIds
+                    )
+    in
+    Html.div
+        [ Html.Attributes.style "display" "flex"
+        , Html.Attributes.style "flex-direction" "column"
+        , Html.Attributes.style "gap" "8px"
+        ]
+        [ Html.text feed
+        , viewStops filteredStops
+        , viewPathways stops filteredPathways
+        ]
+
+
+viewStops : List Stop -> Html msg
+viewStops filteredStops =
+    let
+        mfloat : Maybe Float -> String
         mfloat x =
             x
                 |> Maybe.map String.fromFloat
@@ -270,38 +339,66 @@ viewStops ( feed, stops ) =
                 |> List.map (\cell -> Html.td [] [ Html.text cell ])
                 |> Html.tr []
     in
+    filteredStops
+        |> List.map viewStop
+        |> (::)
+            ([ "id"
+             , "code"
+             , "name"
+             , "tts_name"
+             , "description"
+             , "lat"
+             , "lon"
+             , "zone_id"
+             , "url"
+             , "location_type"
+             , "parent_station"
+             , "timezone"
+             , "wheelchair_boarding"
+             , "level_id"
+             , "platform_code"
+             ]
+                |> List.map (\col -> Html.th [] [ Html.text col ])
+                |> Html.tr []
+            )
+        |> Html.table
+            [ Html.Attributes.style "border" "1px solid black"
+            , Html.Attributes.style "padding" "8px"
+            ]
+
+
+viewPathways : Dict Id Stop -> List Pathway -> Html msg
+viewPathways stops filteredPathways =
+    let
+        stop : Id -> String
+        stop id =
+            case Dict.get id stops of
+                Nothing ->
+                    id
+
+                Just found ->
+                    [ found.name
+                    , found.description
+                    ]
+                        |> List.filterMap identity
+                        |> String.join " - "
+
+        viewPathway : Pathway -> Html msg
+        viewPathway pathway =
+            [ pathway.id
+            , stop pathway.from_stop_id
+            , stop pathway.to_stop_id
+            ]
+                |> List.map (\cell -> Html.td [] [ Html.text cell ])
+                |> Html.tr []
+    in
     Html.div []
-        [ Html.text feed
-        , stops
-            |> Dict.values
-            |> List.filter
-                (\stop ->
-                    (Just "München Hbf" == stop.name)
-                        -- String.contains "Isartor" defaulted
-                        || List.member stop.id
-                            [ "de:09162:6:40:81"
-                            , "de:09162:6_G"
-                            ]
-                        || (stop.parent_station == Just "de:09162:6_G")
-                )
-            |> List.take 50
-            |> List.map viewStop
+        [ filteredPathways
+            |> List.map viewPathway
             |> (::)
                 ([ "id"
-                 , "code"
-                 , "name"
-                 , "tts_name"
-                 , "description"
-                 , "lat"
-                 , "lon"
-                 , "zone_id"
-                 , "url"
-                 , "location_type"
-                 , "parent_station"
-                 , "timezone"
-                 , "wheelchair_boarding"
-                 , "level_id"
-                 , "platform_code"
+                 , "from"
+                 , "to"
                  ]
                     |> List.map (\col -> Html.th [] [ Html.text col ])
                     |> Html.tr []
@@ -766,6 +863,9 @@ update msg model =
                             Dict.empty
             in
             ( { model | stops = RemoteData.Loaded (Dict.insert feed res existing) }, Cmd.none )
+
+        GotPathways _ (Err e) ->
+            ( { model | pathways = RemoteData.Error e }, Cmd.none )
 
         GotPathways feed (Ok res) ->
             let
