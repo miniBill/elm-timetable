@@ -12,9 +12,7 @@ import Html exposing (Html)
 import Html.Attributes
 import Html.Events
 import Http
-import Length
 import List.Extra
-import Maybe.Extra
 import Quantity
 import RemoteData
 import Render
@@ -30,7 +28,6 @@ import TypedSvg.Attributes.InPx exposing (x1, x2, y, y1, y2)
 import TypedSvg.Core exposing (Svg, text)
 import TypedSvg.Types exposing (AnchorAlignment(..), DominantBaseline(..), Paint(..), Transform(..))
 import Types exposing (Feed, Id, LocationType(..), Model, Msg(..), OEvent(..), OStation, OViewMode(..), Pathway, PathwayMode(..), Stop)
-import Url exposing (Url)
 import Url.Builder
 
 
@@ -46,12 +43,7 @@ main =
 
 init : flags -> ( Model, Cmd Msg )
 init _ =
-    ( { timetable =
-            if True then
-                Data.villachToUdine
-
-            else
-                Data.munchenToZoetermeer
+    ( { timetable = Data.villachToUdine
       , mode = ViewSimple
       , stops = RemoteData.Loading
       , pathways = RemoteData.Loading
@@ -65,8 +57,8 @@ loadData =
     Data.feeds
         |> List.concatMap
             (\feed ->
-                [ getCSVId GotStops feed "stops.txt" stopsDecoder
-                , getCSVId GotPathways feed "pathways.txt" pathwayDecoder
+                [ getCSVId GotStops feed "stops.txt" Data.stopsDecoder
+                , getCSVId GotPathways feed "pathways.txt" Data.pathwayDecoder
                 ]
             )
         |> Cmd.batch
@@ -131,99 +123,6 @@ getCSV toMsg feed filename decoder =
                         |> toMsg
                 )
         }
-
-
-stopsDecoder : Csv.Decode.Decoder Stop
-stopsDecoder =
-    Csv.Decode.succeed Stop
-        |> required "stop_id" Csv.Decode.string
-        |> optional "stop_code" Csv.Decode.string
-        |> optional "stop_name" Csv.Decode.string
-        |> optional "tts_stop_name" Csv.Decode.string
-        |> optional "stop_desc" Csv.Decode.string
-        |> optional "stop_lat" Csv.Decode.float
-        |> optional "stop_lon" Csv.Decode.float
-        |> optional "zone_id" Csv.Decode.string
-        |> optional "stop_url" urlParser
-        |> required "location_type" (parsed Types.parseLocationType)
-        |> optional "parent_station" Csv.Decode.string
-        |> optional "stop_timezone" Csv.Decode.string
-        |> optional "wheelchair_boarding" (parsed Types.parseWheelchairBoarding)
-        |> optional "level_id" Csv.Decode.string
-        |> optional "platform_code" Csv.Decode.string
-
-
-pathwayDecoder : Csv.Decode.Decoder Pathway
-pathwayDecoder =
-    Csv.Decode.succeed Pathway
-        |> required "pathway_id" Csv.Decode.string
-        |> required "from_stop_id" Csv.Decode.string
-        |> required "to_stop_id" Csv.Decode.string
-        |> required "pathway_mode" (parsed Types.parsePathwayMode)
-        |> required "is_bidirectional"
-            (parsed
-                (\i ->
-                    case i of
-                        "0" ->
-                            Just False
-
-                        "1" ->
-                            Just True
-
-                        _ ->
-                            Nothing
-                )
-            )
-        |> optional "length" (Csv.Decode.map Length.meters Csv.Decode.float)
-        |> optional "traversal_time" (Csv.Decode.map Duration.seconds Csv.Decode.float)
-        |> optional "stair_count" Csv.Decode.int
-        |> optional "max_slope" Csv.Decode.float
-        |> optional "min_width" (Csv.Decode.map Length.meters Csv.Decode.float)
-        |> optional "signposted_as" Csv.Decode.string
-        |> optional "reversed_signposted_as" Csv.Decode.string
-
-
-parsed : (String -> Maybe a) -> Csv.Decode.Decoder a
-parsed validation =
-    Csv.Decode.string
-        |> Csv.Decode.andThen
-            (\raw ->
-                case validation raw of
-                    Just url ->
-                        Csv.Decode.succeed url
-
-                    Nothing ->
-                        Csv.Decode.fail "Failed to parse"
-            )
-
-
-urlParser : Csv.Decode.Decoder Url
-urlParser =
-    parsed Url.fromString
-
-
-required :
-    String
-    -> Csv.Decode.Decoder a
-    -> Csv.Decode.Decoder (a -> b)
-    -> Csv.Decode.Decoder b
-required name decoder original =
-    Csv.Decode.pipeline (Csv.Decode.field name decoder) original
-
-
-optional :
-    String
-    -> Csv.Decode.Decoder a
-    -> Csv.Decode.Decoder (Maybe a -> b)
-    -> Csv.Decode.Decoder b
-optional name decoder original =
-    Csv.Decode.pipeline
-        (decoder
-            |> Csv.Decode.blank
-            |> Csv.Decode.optionalField name
-            |> Csv.Decode.map Maybe.Extra.join
-        )
-        original
 
 
 view : Model -> Html Msg
@@ -337,120 +236,6 @@ viewFeed ( feed, ( stops, pathways ) ) =
         , viewStops stops filteredStops
         , viewPathways stops filteredPathways
         ]
-
-
-pathfinder : Dict Id Stop -> Dict Id Pathway -> Html msg
-pathfinder stops pathways =
-    pathfind
-        stops
-        pathways
-        (unsafeGet "de:09162:100:22:22" stops)
-        (unsafeGet "de:09162:100:22:25" stops)
-        |> Debug.toString
-        |> Html.text
-        |> List.singleton
-        |> Html.div []
-
-
-unsafeGet : comparable -> Dict comparable a -> a
-unsafeGet key dict =
-    case Dict.get key dict of
-        Just v ->
-            v
-
-        Nothing ->
-            Debug.todo "branch 'Nothing' not implemented"
-
-
-pathfind :
-    Dict Id Stop
-    -> Dict Id Pathway
-    -> Stop
-    -> Stop
-    -> Maybe (List String)
-pathfind stops pathways from to =
-    let
-        distance : ( Float, Float ) -> ( Float, Float ) -> Float
-        distance ( flon, flat ) ( tlon, tlat ) =
-            -- Fast approximation for close points
-            (flon - tlon) ^ 2 + (flat - tlat) ^ 2
-
-        stopCoords : Stop -> ( Float, Float )
-        stopCoords stop =
-            ( Maybe.withDefault 0 stop.lon
-            , Maybe.withDefault 0 stop.lat
-            )
-
-        getPathwaysFrom : Stop -> List { to : Stop, pathway : Pathway }
-        getPathwaysFrom a =
-            pathways
-                |> Dict.foldl
-                    (\_ pathway acc ->
-                        case
-                            ( Dict.get pathway.from_stop_id stops
-                            , Dict.get pathway.to_stop_id stops
-                            )
-                        of
-                            ( Just pathFrom, Just pathTo ) ->
-                                let
-                                    withStraight =
-                                        if pathFrom == a then
-                                            { pathway = pathway
-                                            , to = pathTo
-                                            }
-                                                :: acc
-
-                                        else
-                                            acc
-                                in
-                                if pathTo == a && pathway.is_bidirectional then
-                                    { pathway = pathway
-                                    , to = pathFrom
-                                    }
-                                        :: withStraight
-
-                                else
-                                    withStraight
-
-                            _ ->
-                                acc
-                    )
-                    []
-                |> List.sortBy
-                    (\candidate ->
-                        distance
-                            (stopCoords candidate.to)
-                            (stopCoords to)
-                    )
-
-        go :
-            Dict Id (List { to : Stop, pathway : Pathway })
-            -> Stop
-            -> Set String
-            -> Maybe (List a)
-        go cache a visited =
-            if Set.member a.id visited then
-                Nothing
-
-            else if a == to then
-                Just []
-
-            else
-                case Dict.get a.id cache of
-                    Nothing ->
-                        go
-                            (Dict.insert a.id (getPathwaysFrom a) cache)
-                            a
-                            visited
-
-                    Just options ->
-                        options
-                            |> List.Extra.findMap
-                                (\pathway ->
-                                    go cache pathway.to (Set.insert pathway.to.id visited)
-                                )
-    in
-    go Dict.empty from Set.empty
 
 
 viewStops : Dict Id Stop -> List Stop -> Html msg
