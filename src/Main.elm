@@ -8,7 +8,7 @@ import Data
 import Dict exposing (Dict)
 import Dict.Extra
 import Duration exposing (Duration)
-import GTFS exposing (Feed, Id, LocationType(..), Pathway, PathwayMode(..), Stop, StopTime, Time, Trip)
+import GTFS exposing (Feed, Id, Pathway, Stop, StopTime, Time, Trip)
 import Graph
 import Html exposing (Html)
 import Html.Attributes
@@ -27,7 +27,7 @@ import TypedSvg exposing (g, line, svg, text_, title)
 import TypedSvg.Attributes exposing (class, stroke, textAnchor, transform, viewBox)
 import TypedSvg.Attributes.InPx exposing (x1, x2, y, y1, y2)
 import TypedSvg.Core exposing (Svg, text)
-import TypedSvg.Types exposing (AnchorAlignment(..), DominantBaseline(..), Paint(..), Transform(..))
+import TypedSvg.Types exposing (AnchorAlignment(..), Paint(..), Transform(..))
 import Types exposing (Event(..), Model, Msg(..), Station, Timetable, ViewMode(..))
 import Url.Builder
 
@@ -97,49 +97,38 @@ rebuildTimetable model =
                         |> Dict.values
                         |> List.concatMap
                             (\trip ->
-                                let
-                                    converted :
-                                        List
-                                            { from : Id
-                                            , to : Id
-                                            , departure : Time
-                                            , arrival : Time
-                                            }
-                                    converted =
-                                        trip
-                                            |> List.filterMap
-                                                (\stopTime ->
-                                                    Maybe.map3
-                                                        (\stop_id departure_time arrival_time ->
-                                                            { stop_id = stop_id
-                                                            , departure_time = departure_time
-                                                            , arrival_time = arrival_time
-                                                            }
-                                                        )
-                                                        stopTime.stop_id
-                                                        stopTime.departure_time
-                                                        stopTime.arrival_time
+                                trip
+                                    |> List.filterMap
+                                        (\stopTime ->
+                                            Maybe.map3
+                                                (\stop_id departure_time arrival_time ->
+                                                    { stop_id = stop_id
+                                                    , departure_time = departure_time
+                                                    , arrival_time = arrival_time
+                                                    }
                                                 )
-                                            |> List.foldl
-                                                (\stopTime ( last, acc ) ->
-                                                    case last of
-                                                        Nothing ->
-                                                            ( Just stopTime, acc )
+                                                stopTime.stop_id
+                                                stopTime.departure_time
+                                                stopTime.arrival_time
+                                        )
+                                    |> List.foldl
+                                        (\stopTime ( last, acc ) ->
+                                            case last of
+                                                Nothing ->
+                                                    ( Just stopTime, acc )
 
-                                                        Just previous ->
-                                                            ( Just stopTime
-                                                            , { from = stopName previous
-                                                              , to = stopName stopTime
-                                                              , departure = previous.departure_time
-                                                              , arrival = stopTime.arrival_time
-                                                              }
-                                                                :: acc
-                                                            )
-                                                )
-                                                ( Nothing, [] )
-                                            |> Tuple.second
-                                in
-                                converted
+                                                Just previous ->
+                                                    ( Just stopTime
+                                                    , { from = stopName previous
+                                                      , to = stopName stopTime
+                                                      , departure = previous.departure_time
+                                                      , arrival = stopTime.arrival_time
+                                                      }
+                                                        :: acc
+                                                    )
+                                        )
+                                        ( Nothing, [] )
+                                    |> Tuple.second
                             )
                         |> Dict.Extra.groupBy (\{ from, to } -> ( from, to ))
                         |> Dict.toList
@@ -367,15 +356,21 @@ viewFeed ( feed, ( ( stopTimes, trips ), ( stops, pathways ) ) ) =
         filteredStops =
             filterStops stops
 
-        -- filteredPathways : List Pathway
-        -- filteredPathways =
-        --     pathways
-        --         |> Dict.values
-        --         |> List.filter
-        --             (\walkway ->
-        --                 Set.member walkway.from_stop_id stopIds
-        --                     && Set.member walkway.to_stop_id stopIds
-        --             )
+        stopIds =
+            filteredStops
+                |> List.map .id
+                |> Set.fromList
+
+        filteredPathways : List Pathway
+        filteredPathways =
+            pathways
+                |> Dict.values
+                |> List.filter
+                    (\walkway ->
+                        Set.member walkway.from_stop_id stopIds
+                            && Set.member walkway.to_stop_id stopIds
+                    )
+
         filteredStopTimes =
             filterStopTimes trips filteredStops stopTimes
     in
@@ -388,8 +383,11 @@ viewFeed ( feed, ( ( stopTimes, trips ), ( stops, pathways ) ) ) =
 
         -- , pathfinder stops pathways
         , viewStops stops filteredStops
+        , if False then
+            viewPathways stops filteredPathways
 
-        -- , viewPathways stops filteredPathways
+          else
+            Html.text ""
         , filteredStopTimes
             |> Dict.values
             |> List.filterMap
@@ -442,7 +440,7 @@ filterStopTimes trips filteredStops stopTimes =
         |> Dict.Extra.groupBy (\stopTime -> stopTime.trip_id)
         |> Dict.toList
         |> Dict.Extra.groupBy
-            (\( trip_id, block ) ->
+            (\( trip_id, _ ) ->
                 case Dict.get trip_id trips of
                     Nothing ->
                         ( trip_id, "" )
@@ -1025,8 +1023,7 @@ viewSimple model =
                         ]
                     )
                 |> Set.fromList
-                |> Set.toList
-                |> List.foldr
+                |> Set.foldr
                     (\t ( last, acc ) ->
                         let
                             time : Time

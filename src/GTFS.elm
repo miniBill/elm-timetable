@@ -1,4 +1,4 @@
-module GTFS exposing (Accessibility(..), Feed, Id, Latitude, LocationType(..), Longitude, Pathway, PathwayMode(..), Stop, StopTime, Time, Timezone, Trip, accessibilityDecoder, id, locationTypeParser, optional, parsed, pathwayDecoder, pathwayModeDecoder, required, stopDecoder, stopTimeDecoder, timeDecoder, timeParser, timeToString, tripDecoder, urlDecoder)
+module GTFS exposing (Accessibility(..), Feed, Id, Latitude, LocationType(..), Longitude, Pathway, PathwayMode(..), PickupDropOffType, Stop, StopTime, Time, Timezone, Trip, pathwayDecoder, stopDecoder, stopTimeDecoder, timeToString, tripDecoder)
 
 import Angle exposing (Angle)
 import Csv.Decode

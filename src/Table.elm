@@ -1,4 +1,4 @@
-module Table exposing (angle, bool, cell, debug, duration, float, int, length, maybe, seconds, string, time, url)
+module Table exposing (angle, bool, debug, duration, float, int, length, maybe, seconds, string, time, url)
 
 import Angle exposing (Angle)
 import Duration exposing (Seconds)

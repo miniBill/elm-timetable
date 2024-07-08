@@ -1,12 +1,7 @@
 module Data exposing
     ( feeds
-    , fromStringUnsafe
       -- , villachToUdine
     )
-
-import Iso8601
-import Time
-import Types exposing (Timetable)
 
 
 feeds : List String
@@ -43,13 +38,10 @@ feeds =
 --             ]
 --       }
 --     ]
-
-
-fromStringUnsafe : String -> Time.Posix
-fromStringUnsafe hourAndMinutes =
-    case Iso8601.toTime <| "2024-07-09T" ++ hourAndMinutes ++ ":00" of
-        Ok t ->
-            t
-
-        Err _ ->
-            Debug.todo <| "Failed to parse " ++ hourAndMinutes
+-- fromStringUnsafe : String -> Time.Posix
+-- fromStringUnsafe hourAndMinutes =
+--     case Iso8601.toTime <| "2024-07-09T" ++ hourAndMinutes ++ ":00" of
+--         Ok t ->
+--             t
+--         Err _ ->
+--             Debug.todo <| "Failed to parse " ++ hourAndMinutes
