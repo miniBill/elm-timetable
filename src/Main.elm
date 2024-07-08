@@ -240,11 +240,15 @@ viewFeed ( feed, ( stopTimes, stops, pathways ) ) =
                             --     , "de:09162:6:40:81"
                             --     , "de:09162:6_G"
                             ]
-                     -- || List.member stop.parent_station
-                     --     [ Just "Pde:09162:100" -- München Hbf
-                     --     -- , Just "Pde:09162:10" -- München Pasing
-                     --     -- , Just "de:09162:6_G"
-                     --     ]
+                            || List.member stop.parent_station
+                                [ --  Just "Pde:09162:100" -- München Hbf
+                                  -- , Just "Pde:09162:10" -- München Pasing
+                                  -- , Just "de:09162:6_G"
+                                  Just "Pde:09162:100" -- München Hbf - ÖBB
+                                , Just "Pit:22095:7049" -- Udine - ÖBB
+                                , Just "Pat:42:3654" -- Villach Hbf - ÖBB
+                                , Just "Pat:45:50002" -- Salzburg Hbf - ÖBB
+                                ]
                     )
                 |> List.take 50
 
@@ -262,6 +266,12 @@ viewFeed ( feed, ( stopTimes, stops, pathways ) ) =
                             && Set.member walkway.to_stop_id stopIds
                     )
 
+        upsert k v dict =
+            Dict.insert
+                k
+                (v :: Maybe.withDefault [] (Dict.get k dict))
+                dict
+
         filteredStopTimes =
             stopTimes
                 |> List.filter
@@ -273,6 +283,8 @@ viewFeed ( feed, ( stopTimes, stops, pathways ) ) =
                             Nothing ->
                                 False
                     )
+                |> List.sortBy (\stopTime -> ( stopTime.trip_id, -stopTime.stop_sequence ))
+                |> List.foldl (\e acc -> upsert e.trip_id e acc) Dict.empty
     in
     Html.div
         [ Html.Attributes.style "display" "flex"
@@ -283,8 +295,19 @@ viewFeed ( feed, ( stopTimes, stops, pathways ) ) =
 
         -- , pathfinder stops pathways
         , viewStops stops filteredStops
-        , viewPathways stops filteredPathways
-        , viewStopTimes stops filteredStopTimes
+
+        -- , viewPathways stops filteredPathways
+        , filteredStopTimes
+            |> Dict.values
+            |> List.filterMap
+                (\tripStops ->
+                    if List.length tripStops < 2 then
+                        Nothing
+
+                    else
+                        Just (viewStopTimes stops tripStops)
+                )
+            |> Html.div []
         ]
 
 
@@ -531,24 +554,24 @@ viewStopTimes stops filteredStopTimes =
 
         viewStopTime : StopTime -> Html msg
         viewStopTime stopTime =
-            [ Table.debug stopTime.trip_id
-            , Table.debug stopTime.arrival_time
-            , Table.debug stopTime.departure_time
+            [ Table.string stopTime.trip_id
+            , Table.maybe Table.time stopTime.arrival_time
+            , Table.maybe Table.time stopTime.departure_time
             , Table.maybe Table.string (Maybe.map stop stopTime.stop_id)
-            , Table.debug stopTime.location_group_id
-            , Table.debug stopTime.location_id
-            , Table.debug stopTime.stop_sequence
+            , Table.maybe Table.string stopTime.location_group_id
+            , Table.maybe Table.string stopTime.location_id
+            , Table.int stopTime.stop_sequence
             , Table.maybe Table.string stopTime.stop_headsign
-            , Table.debug stopTime.start_pickup_drop_off_window
-            , Table.debug stopTime.end_pickup_drop_off_window
-            , Table.debug stopTime.pickup_type
-            , Table.debug stopTime.drop_off_type
-            , Table.debug stopTime.continuous_pickup
-            , Table.debug stopTime.continuous_drop_off
-            , Table.debug stopTime.shape_dist_traveled
-            , Table.debug stopTime.timepoint
-            , Table.debug stopTime.pickup_booking_rule_id
-            , Table.debug stopTime.drop_off_booking_rule_id
+            , Table.maybe Table.time stopTime.start_pickup_drop_off_window
+            , Table.maybe Table.time stopTime.end_pickup_drop_off_window
+            , Table.maybe Table.debug stopTime.pickup_type
+            , Table.maybe Table.debug stopTime.drop_off_type
+            , Table.maybe Table.debug stopTime.continuous_pickup
+            , Table.maybe Table.debug stopTime.continuous_drop_off
+            , Table.maybe Table.float stopTime.shape_dist_traveled
+            , Table.maybe Table.bool stopTime.timepoint
+            , Table.maybe Table.string stopTime.pickup_booking_rule_id
+            , Table.maybe Table.string stopTime.drop_off_booking_rule_id
             ]
                 |> Html.tr []
     in

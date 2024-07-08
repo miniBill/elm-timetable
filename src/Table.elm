@@ -1,8 +1,9 @@
-module Table exposing (angle, cell, debug, duration, float, int, length, maybe, seconds, string, url)
+module Table exposing (angle, bool, cell, debug, duration, float, int, length, maybe, seconds, string, time, url)
 
 import Angle exposing (Angle)
 import Duration exposing (Seconds)
 import Float.Extra
+import GTFS exposing (Time)
 import Html exposing (Attribute, Html)
 import Html.Attributes exposing (style)
 import Length
@@ -67,6 +68,17 @@ duration l =
             (String.fromFloat s ++ "\"")
 
 
+bool : Bool -> Html msg
+bool b =
+    string
+        (if b then
+            "True"
+
+         else
+            "False"
+        )
+
+
 float : Float -> Html msg
 float f =
     cell
@@ -94,3 +106,35 @@ url v =
 debug : a -> Html msg
 debug v =
     string (Debug.toString v)
+
+
+time : Time -> Html msg
+time t =
+    let
+        fromStartOfDay : Int
+        fromStartOfDay =
+            12 * 60 * 60 + Quantity.unwrap t
+
+        allMinutes : Int
+        allMinutes =
+            fromStartOfDay // 60
+
+        hour : Int
+        hour =
+            allMinutes // 60
+
+        minute : Int
+        minute =
+            modBy 60 allMinutes
+
+        second : Int
+        second =
+            modBy 60 fromStartOfDay
+
+        pad : Int -> String
+        pad x =
+            x
+                |> String.fromInt
+                |> String.padLeft 2 '0'
+    in
+    string (pad hour ++ ":" ++ pad minute ++ ":" ++ pad second)
