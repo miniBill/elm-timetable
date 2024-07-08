@@ -7,7 +7,8 @@ import Types exposing (OTimetable)
 
 feeds : List String
 feeds =
-    [ "de"
+    [ --  "de" ,
+      "oebb-2024"
     ]
 
 

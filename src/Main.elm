@@ -288,13 +288,27 @@ viewFeed ( feed, ( stops, pathways ) ) =
                 |> Dict.values
                 |> List.filter
                     (\stop ->
-                        Just "München Hbf" == stop.name
-                     -- String.contains "Isartor" defaulted
-                     -- || List.member stop.id
-                     --     [ "de:09162:6:40:81"
-                     --     , "de:09162:6_G"
-                     --     ]
-                     -- || (stop.parent_station == Just "de:09162:6_G")
+                        let
+                            defaulted : String
+                            defaulted =
+                                Maybe.withDefault "" stop.name
+                        in
+                        List.member defaulted
+                            [ "München Hbf"
+                            , "München Hauptbahnhof"
+                            ]
+                            -- || String.contains "Isartor" defaulted
+                            -- || List.member stop.id
+                            --     [ "Pde:09162:10" -- Pasing
+                            --     , "de:09162:6:40:81"
+                            --     , "de:09162:6_G"
+                            --     ]
+                            || List.member stop.parent_station
+                                [ Just "Pde:09162:100" -- München Hbf
+
+                                -- , Just "Pde:09162:10" -- München Pasing
+                                -- , Just "de:09162:6_G"
+                                ]
                     )
                 |> List.take 50
 
@@ -318,8 +332,9 @@ viewFeed ( feed, ( stops, pathways ) ) =
         , Html.Attributes.style "gap" "8px"
         ]
         [ Html.text feed
-        , pathfinder stops pathways
-        , viewStops filteredStops
+
+        -- , pathfinder stops pathways
+        , viewStops stops filteredStops
         , viewPathways stops filteredPathways
         ]
 
@@ -438,9 +453,23 @@ pathfind stops pathways from to =
     go Dict.empty from Set.empty
 
 
-viewStops : List Stop -> Html msg
-viewStops filteredStops =
+viewStops : Dict Id Stop -> List Stop -> Html msg
+viewStops stops filteredStops =
     let
+        stopName : Id -> String
+        stopName id =
+            case Dict.get id stops of
+                Nothing ->
+                    id
+
+                Just found ->
+                    [ found.name
+                    , found.description
+                    , Maybe.map (\n -> "(" ++ n ++ ")") found.platform_code
+                    ]
+                        |> List.filterMap identity
+                        |> String.join " - "
+
         viewStop : Stop -> Html msg
         viewStop stop =
             [ Table.string stop.id
@@ -453,7 +482,7 @@ viewStops filteredStops =
             , Table.maybe Table.string stop.zone_id
             , Table.maybe Table.url stop.url
             , Table.debug stop.location_type
-            , Table.maybe Table.string stop.parent_station
+            , Table.maybe (Table.string << stopName) stop.parent_station
             , Table.maybe Table.string stop.timezone
             , Table.maybe Table.debug stop.wheelchair_boarding
             , Table.maybe Table.string stop.level_id
