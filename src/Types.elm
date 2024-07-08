@@ -98,7 +98,7 @@ type alias Pathway =
     { id : Id
     , from_stop_id : Id
     , to_stop_id : Id
-    , pathway_mode : PathwayMode
+    , mode : PathwayMode
     , is_bidirectional : Bool
     , length : Maybe Length
     , traversal_time : Maybe Duration

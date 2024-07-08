@@ -22,6 +22,7 @@ import Render.StandardDrawers
 import Render.StandardDrawers.Attributes
 import Render.StandardDrawers.Types
 import Set exposing (Set)
+import Table
 import Time
 import TypedSvg exposing (g, line, svg, text_, title)
 import TypedSvg.Attributes exposing (class, stroke, textAnchor, transform, viewBox)
@@ -440,31 +441,24 @@ pathfind stops pathways from to =
 viewStops : List Stop -> Html msg
 viewStops filteredStops =
     let
-        mfloat : Maybe Float -> String
-        mfloat x =
-            x
-                |> Maybe.map String.fromFloat
-                |> Maybe.withDefault "---"
-
         viewStop : Stop -> Html msg
         viewStop stop =
-            [ stop.id
-            , Maybe.withDefault "---" stop.code
-            , Maybe.withDefault "---" stop.name
-            , Maybe.withDefault "---" stop.tts_name
-            , Maybe.withDefault "---" stop.description
-            , mfloat stop.lat
-            , mfloat stop.lon
-            , Maybe.withDefault "---" stop.zone_id
-            , Maybe.withDefault "---" <| Maybe.map Url.toString stop.url
-            , Debug.toString stop.location_type
-            , Maybe.withDefault "---" stop.parent_station
-            , Maybe.withDefault "---" stop.timezone
-            , Maybe.withDefault "---" <| Maybe.map Debug.toString stop.wheelchair_boarding
-            , Maybe.withDefault "---" stop.level_id
-            , Maybe.withDefault "---" stop.platform_code
+            [ Table.string stop.id
+            , Table.maybe Table.string stop.code
+            , Table.maybe Table.string stop.name
+            , Table.maybe Table.string stop.tts_name
+            , Table.maybe Table.string stop.description
+            , Table.maybe Table.float stop.lat
+            , Table.maybe Table.float stop.lon
+            , Table.maybe Table.string stop.zone_id
+            , Table.maybe Table.url stop.url
+            , Table.debug stop.location_type
+            , Table.maybe Table.string stop.parent_station
+            , Table.maybe Table.string stop.timezone
+            , Table.maybe Table.debug stop.wheelchair_boarding
+            , Table.maybe Table.string stop.level_id
+            , Table.maybe Table.string stop.platform_code
             ]
-                |> List.map (\cell -> Html.td [] [ Html.text cell ])
                 |> Html.tr []
     in
     filteredStops
@@ -507,18 +501,10 @@ viewPathways stops filteredPathways =
                 Just found ->
                     [ found.name
                     , found.description
+                    , Maybe.map (\n -> "(" ++ n ++ ")") found.platform_code
                     ]
                         |> List.filterMap identity
                         |> String.join " - "
-
-        viewPathway : Pathway -> Html msg
-        viewPathway pathway =
-            [ pathway.id
-            , stop pathway.from_stop_id
-            , stop pathway.to_stop_id
-            ]
-                |> List.map (\cell -> Html.td [] [ Html.text cell ])
-                |> Html.tr []
 
         stopIds : List Id
         stopIds =
@@ -580,6 +566,23 @@ viewPathways stops filteredPathways =
                         |> List.indexedMap (\i id -> { id = i, label = id })
             in
             Graph.fromNodesAndEdges nodes edges
+
+        viewPathway : Pathway -> Html msg
+        viewPathway pathway =
+            [ Table.string pathway.id
+            , Table.string (stop pathway.from_stop_id)
+            , Table.string (stop pathway.to_stop_id)
+            , Table.debug pathway.mode
+            , Table.debug pathway.is_bidirectional
+            , Table.maybe Table.length pathway.length
+            , Table.maybe Table.duration pathway.traversal_time
+            , Table.maybe Table.int pathway.stair_count
+            , Table.maybe Table.float pathway.max_slope
+            , Table.maybe Table.length pathway.min_width
+            , Table.maybe Table.string pathway.signposted_as
+            , Table.maybe Table.string pathway.reversed_signposted_as
+            ]
+                |> Html.tr []
     in
     Html.div []
         [ filteredPathways
@@ -588,6 +591,15 @@ viewPathways stops filteredPathways =
                 ([ "id"
                  , "from"
                  , "to"
+                 , "mode"
+                 , "is_bidirectional"
+                 , "length"
+                 , "traversal_time"
+                 , "stair_count"
+                 , "max_slope"
+                 , "min_width"
+                 , "signposted_as"
+                 , "reversed_signposted_as"
                  ]
                     |> List.map (\col -> Html.th [] [ Html.text col ])
                     |> Html.tr []
