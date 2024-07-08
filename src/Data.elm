@@ -1,8 +1,12 @@
-module Data exposing (feeds, fromStringUnsafe, villachToUdine)
+module Data exposing
+    ( feeds
+    , fromStringUnsafe
+      -- , villachToUdine
+    )
 
 import Iso8601
 import Time
-import Types exposing (OTimetable)
+import Types exposing (Timetable)
 
 
 feeds : List String
@@ -12,31 +16,32 @@ feeds =
     ]
 
 
-villachToUdine : OTimetable
-villachToUdine =
-    [ { from = "Villach Hbf"
-      , to = "Udine"
-      , links =
-            [ { from = fromStringUnsafe "16:49"
-              , to = fromStringUnsafe "18:16"
-              }
-            , { from = fromStringUnsafe "19:29"
-              , to = fromStringUnsafe "21:13"
-              }
-            ]
-      }
-    , { from = "München Hbf"
-      , to = "Villach Hbf"
-      , links =
-            [ { from = fromStringUnsafe "12:17"
-              , to = fromStringUnsafe "16:44"
-              }
-            , { from = fromStringUnsafe "14:17"
-              , to = fromStringUnsafe "18:44"
-              }
-            ]
-      }
-    ]
+
+-- villachToUdine : Timetable
+-- villachToUdine =
+--     [ { from = "Villach Hbf"
+--       , to = "Udine"
+--       , links =
+--             [ { from = fromStringUnsafe "16:49"
+--               , to = fromStringUnsafe "18:16"
+--               }
+--             , { from = fromStringUnsafe "19:29"
+--               , to = fromStringUnsafe "21:13"
+--               }
+--             ]
+--       }
+--     , { from = "München Hbf"
+--       , to = "Villach Hbf"
+--       , links =
+--             [ { from = fromStringUnsafe "12:17"
+--               , to = fromStringUnsafe "16:44"
+--               }
+--             , { from = fromStringUnsafe "14:17"
+--               , to = fromStringUnsafe "18:44"
+--               }
+--             ]
+--       }
+--     ]
 
 
 fromStringUnsafe : String -> Time.Posix

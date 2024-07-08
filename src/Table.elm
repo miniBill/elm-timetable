@@ -110,31 +110,4 @@ debug v =
 
 time : Time -> Html msg
 time t =
-    let
-        fromStartOfDay : Int
-        fromStartOfDay =
-            12 * 60 * 60 + Quantity.unwrap t
-
-        allMinutes : Int
-        allMinutes =
-            fromStartOfDay // 60
-
-        hour : Int
-        hour =
-            allMinutes // 60
-
-        minute : Int
-        minute =
-            modBy 60 allMinutes
-
-        second : Int
-        second =
-            modBy 60 fromStartOfDay
-
-        pad : Int -> String
-        pad x =
-            x
-                |> String.fromInt
-                |> String.padLeft 2 '0'
-    in
-    string (pad hour ++ ":" ++ pad minute ++ ":" ++ pad second)
+    string (GTFS.timeToString t)

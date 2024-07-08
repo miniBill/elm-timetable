@@ -1,4 +1,4 @@
-module GTFS exposing (Accessibility(..), Feed, Id, Latitude, LocationType(..), Longitude, Pathway, PathwayMode(..), Stop, StopTime, Time, Timezone, Trip, accessibilityDecoder, id, locationTypeParser, optional, parsed, pathwayDecoder, pathwayModeDecoder, required, stopDecoder, stopTimeDecoder, timeDecoder, timeParser, tripDecoder, urlDecoder)
+module GTFS exposing (Accessibility(..), Feed, Id, Latitude, LocationType(..), Longitude, Pathway, PathwayMode(..), Stop, StopTime, Time, Timezone, Trip, accessibilityDecoder, id, locationTypeParser, optional, parsed, pathwayDecoder, pathwayModeDecoder, required, stopDecoder, stopTimeDecoder, timeDecoder, timeParser, timeToString, tripDecoder, urlDecoder)
 
 import Angle exposing (Angle)
 import Csv.Decode
@@ -401,6 +401,38 @@ timeInnerParser =
         |= int
         |. Parser.symbol ":"
         |= int
+
+
+timeToString : Time -> String
+timeToString t =
+    let
+        fromStartOfDay : Int
+        fromStartOfDay =
+            12 * 60 * 60 + Quantity.unwrap t
+
+        allMinutes : Int
+        allMinutes =
+            fromStartOfDay // 60
+
+        hour : Int
+        hour =
+            allMinutes // 60
+
+        minute : Int
+        minute =
+            modBy 60 allMinutes
+
+        second : Int
+        second =
+            modBy 60 fromStartOfDay
+
+        pad : Int -> String
+        pad x =
+            x
+                |> String.fromInt
+                |> String.padLeft 2 '0'
+    in
+    pad hour ++ ":" ++ pad minute ++ ":" ++ pad second
 
 
 boolDecoder : Csv.Decode.Decoder Bool

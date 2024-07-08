@@ -6,8 +6,9 @@ import Csv.Decode
 import Dagre.Attributes
 import Data
 import Dict exposing (Dict)
+import Dict.Extra
 import Duration exposing (Duration)
-import GTFS exposing (Feed, Id, LocationType(..), Pathway, PathwayMode(..), Stop, StopTime, Trip)
+import GTFS exposing (Feed, Id, LocationType(..), Pathway, PathwayMode(..), Stop, StopTime, Time, Trip)
 import Graph
 import Html exposing (Html)
 import Html.Attributes
@@ -22,13 +23,12 @@ import Render.StandardDrawers.Attributes
 import Render.StandardDrawers.Types
 import Set exposing (Set)
 import Table
-import Time
 import TypedSvg exposing (g, line, svg, text_, title)
 import TypedSvg.Attributes exposing (class, stroke, textAnchor, transform, viewBox)
 import TypedSvg.Attributes.InPx exposing (x1, x2, y, y1, y2)
 import TypedSvg.Core exposing (Svg, text)
 import TypedSvg.Types exposing (AnchorAlignment(..), DominantBaseline(..), Paint(..), Transform(..))
-import Types exposing (Model, Msg(..), OEvent(..), OStation, OViewMode(..))
+import Types exposing (Event(..), Model, Msg(..), Station, Timetable, ViewMode(..))
 import Url.Builder
 
 
@@ -37,14 +37,118 @@ main =
     Browser.element
         { init = init
         , view = view
-        , update = update
+        , update =
+            \msg model ->
+                let
+                    ( newModel, cmd ) =
+                        update msg model
+                in
+                ( rebuildTimetable newModel, cmd )
         , subscriptions = subscriptions
         }
 
 
+rebuildTimetable : Model -> Model
+rebuildTimetable model =
+    case
+        ( RemoteData.map (Dict.get "oebb-2024") model.trips
+        , RemoteData.map (Dict.get "oebb-2024") model.stopTimes
+        , RemoteData.map (Dict.get "oebb-2024") model.stops
+        )
+    of
+        ( RemoteData.Loaded (Just trips), RemoteData.Loaded (Just stopTimes), RemoteData.Loaded (Just stops) ) ->
+            let
+                filteredStops : List Stop
+                filteredStops =
+                    filterStops stops
+
+                filteredStopTimes : Dict Id (List StopTime)
+                filteredStopTimes =
+                    filterStopTimes filteredStops stopTimes
+
+                stopName stopTime =
+                    case Dict.get stopTime.stop_id stops of
+                        Nothing ->
+                            stopTime.stop_id
+
+                        Just stop ->
+                            case stop.parent_station of
+                                Nothing ->
+                                    Maybe.withDefault stopTime.stop_id stop.name
+
+                                Just parent_id ->
+                                    case Dict.get parent_id stops of
+                                        Nothing ->
+                                            Maybe.withDefault stopTime.stop_id stop.name
+
+                                        Just parent ->
+                                            Maybe.withDefault (Maybe.withDefault stopTime.stop_id stop.name) parent.name
+
+                timetable : Timetable
+                timetable =
+                    filteredStopTimes
+                        |> Dict.values
+                        |> List.concatMap
+                            (\trip ->
+                                trip
+                                    |> List.filterMap
+                                        (\stopTime ->
+                                            Maybe.map3
+                                                (\stop_id departure_time arrival_time ->
+                                                    { stop_id = stop_id
+                                                    , departure_time = departure_time
+                                                    , arrival_time = arrival_time
+                                                    }
+                                                )
+                                                stopTime.stop_id
+                                                stopTime.departure_time
+                                                stopTime.arrival_time
+                                        )
+                                    |> List.foldl
+                                        (\stopTime ( last, acc ) ->
+                                            case last of
+                                                Nothing ->
+                                                    ( Just stopTime, acc )
+
+                                                Just previous ->
+                                                    ( Just stopTime
+                                                    , { from = stopName previous
+                                                      , to = stopName stopTime
+                                                      , departure = previous.departure_time
+                                                      , arrival = stopTime.arrival_time
+                                                      }
+                                                        :: acc
+                                                    )
+                                        )
+                                        ( Nothing, [] )
+                                    |> Tuple.second
+                            )
+                        |> Dict.Extra.groupBy (\{ from, to } -> ( from, to ))
+                        |> Dict.toList
+                        |> List.map
+                            (\( ( from, to ), links ) ->
+                                { from = from
+                                , to = to
+                                , links =
+                                    links
+                                        |> List.map
+                                            (\{ departure, arrival } ->
+                                                { from = departure
+                                                , to = arrival
+                                                }
+                                            )
+                                }
+                            )
+            in
+            { model | timetable = timetable }
+
+        _ ->
+            model
+
+
 init : flags -> ( Model, Cmd Msg )
 init _ =
-    ( { timetable = Data.villachToUdine
+    ( { timetable = [] -- Data.villachToUdine
       , mode = ViewSimple
       , stops = RemoteData.Loading
       , pathways = RemoteData.Loading
@@ -243,97 +347,19 @@ viewFeed ( feed, ( ( stopTimes, trips ), ( stops, pathways ) ) ) =
     let
         filteredStops : List Stop
         filteredStops =
-            stops
-                |> Dict.values
-                |> List.filter
-                    (\stop ->
-                        -- let
-                        --     defaulted : String
-                        --     defaulted =
-                        --         Maybe.withDefault "" stop.name
-                        -- in
-                        -- List.member defaulted
-                        --     [ "München Hbf"
-                        --     , "München Hauptbahnhof"
-                        --     ]
-                        -- || String.contains "Isartor" defaulted
-                        List.member stop.id
-                            [ "Pde:09162:100" -- München Hbf - ÖBB
-                            , "Pit:22095:7049" -- Udine - ÖBB
-                            , "Pat:42:3654" -- Villach Hbf - ÖBB
-                            , "Pat:45:50002" -- Salzburg Hbf - ÖBB
-                            , "Pde:09162:5" -- München Ost - ÖBB
-                            , "Pit:22095:7068" -- Tarvisio - ÖBB
+            filterStops stops
 
-                            -- "Pde:09162:10" -- Pasing
-                            --     , "de:09162:6:40:81"
-                            --     , "de:09162:6_G"
-                            ]
-                            || List.member stop.parent_station
-                                [ --  Just "Pde:09162:100" -- München Hbf
-                                  -- , Just "Pde:09162:10" -- München Pasing
-                                  -- , Just "de:09162:6_G"
-                                  Just "Pde:09162:100" -- München Hbf - ÖBB
-                                , Just "Pit:22095:7049" -- Udine - ÖBB
-                                , Just "Pat:42:3654" -- Villach Hbf - ÖBB
-                                , Just "Pat:45:50002" -- Salzburg Hbf - ÖBB
-                                , Just "Pde:09162:5" -- München Ost - ÖBB
-                                , Just "Pit:22095:7068" -- Tarvisio - ÖBB
-                                ]
-                    )
-                |> List.take 1000
-
-        stopIds : Set Id
-        stopIds =
-            Set.fromList (List.map .id filteredStops)
-
-        filteredPathways : List Pathway
-        filteredPathways =
-            pathways
-                |> Dict.values
-                |> List.filter
-                    (\walkway ->
-                        Set.member walkway.from_stop_id stopIds
-                            && Set.member walkway.to_stop_id stopIds
-                    )
-
-        upsert k v dict =
-            Dict.insert
-                k
-                (v :: Maybe.withDefault [] (Dict.get k dict))
-                dict
-
-        filteredTripIds =
-            trips
-                |> Dict.values
-                |> List.filterMap
-                    (\trip ->
-                        if
-                            trip.short_name
-                                == Just "NJ 236"
-                            -- || trip.short_name
-                            -- == Just "RJ 133"
-                        then
-                            Just trip.id
-
-                        else
-                            Nothing
-                    )
-                |> Set.fromList
-
+        -- filteredPathways : List Pathway
+        -- filteredPathways =
+        --     pathways
+        --         |> Dict.values
+        --         |> List.filter
+        --             (\walkway ->
+        --                 Set.member walkway.from_stop_id stopIds
+        --                     && Set.member walkway.to_stop_id stopIds
+        --             )
         filteredStopTimes =
-            stopTimes
-                |> List.filter
-                    (\stopTime ->
-                        Set.member stopTime.trip_id filteredTripIds
-                     -- case stopTime.stop_id of
-                     --     Just id ->
-                     --         Set.member id stopIds
-                     --     Nothing ->
-                     --         False
-                    )
-                |> List.sortBy (\stopTime -> ( stopTime.trip_id, -stopTime.stop_sequence ))
-                |> List.foldl (\e acc -> upsert e.trip_id e acc) Dict.empty
+            filterStopTimes filteredStops stopTimes
     in
     Html.div
         [ Html.Attributes.style "display" "flex"
@@ -358,6 +384,73 @@ viewFeed ( feed, ( ( stopTimes, trips ), ( stops, pathways ) ) ) =
                 )
             |> Html.div []
         ]
+
+
+filterStopTimes : List Stop -> List StopTime -> Dict Id (List StopTime)
+filterStopTimes filteredStops stopTimes =
+    let
+        stopIds : Set Id
+        stopIds =
+            Set.fromList (List.map .id filteredStops)
+    in
+    stopTimes
+        |> List.filter
+            (\stopTime ->
+                -- Set.member stopTime.trip_id filteredTripIds
+                case stopTime.stop_id of
+                    Just id ->
+                        Set.member id stopIds
+
+                    Nothing ->
+                        False
+            )
+        |> Dict.Extra.groupBy (\stopTime -> stopTime.trip_id)
+        |> Dict.map (\_ v -> List.sortBy (\stopTime -> ( stopTime.trip_id, stopTime.stop_sequence )) v)
+
+
+filterStops : Dict Id Stop -> List Stop
+filterStops stops =
+    stops
+        |> Dict.values
+        |> List.filter
+            (\stop ->
+                -- let
+                --     defaulted : String
+                --     defaulted =
+                --         Maybe.withDefault "" stop.name
+                -- in
+                -- List.member defaulted
+                --     [ "München Hbf"
+                --     , "München Hauptbahnhof"
+                --     ]
+                -- || String.contains "Isartor" defaulted
+                List.member stop.id
+                    [ "Pde:09162:100" -- München Hbf - ÖBB
+                    , "Pit:22095:7049" -- Udine - ÖBB
+                    , "Pat:42:3654" -- Villach Hbf - ÖBB
+                    , "Pat:45:50002" -- Salzburg Hbf - ÖBB
+                    , "Pde:09162:5" -- München Ost - ÖBB
+                    , "Pit:22095:7068" -- Tarvisio - ÖBB
+                    , "Pde:09172:42293" -- Freilassing - ÖBB
+
+                    -- "Pde:09162:10" -- Pasing
+                    --     , "de:09162:6:40:81"
+                    --     , "de:09162:6_G"
+                    ]
+                    || List.member stop.parent_station
+                        [ --  Just "Pde:09162:100" -- München Hbf
+                          -- , Just "Pde:09162:10" -- München Pasing
+                          -- , Just "de:09162:6_G"
+                          Just "Pde:09162:100" -- München Hbf - ÖBB
+                        , Just "Pit:22095:7049" -- Udine - ÖBB
+                        , Just "Pat:42:3654" -- Villach Hbf - ÖBB
+                        , Just "Pat:45:50002" -- Salzburg Hbf - ÖBB
+                        , Just "Pde:09162:5" -- München Ost - ÖBB
+                        , Just "Pit:22095:7068" -- Tarvisio - ÖBB
+                        , Just "Pde:09172:42293" -- Freilassing - ÖBB
+                        ]
+            )
+        |> List.take 1000
 
 
 viewStops : Dict Id Stop -> List Stop -> Html msg
@@ -679,38 +772,35 @@ viewSimple model =
             timesHeight * 2 + lineHeight * toFloat (Dict.size stations - 1)
 
         liftTime :
-            (Int -> Int -> Int)
-            -> Maybe Time.Posix
-            -> Time.Posix
-            -> Time.Posix
+            (Time -> Time -> Time)
+            -> Maybe Time
+            -> Time
+            -> Time
         liftTime op acc e =
             case acc of
                 Nothing ->
                     e
 
                 Just v ->
-                    op
-                        (Time.posixToMillis v)
-                        (Time.posixToMillis e)
-                        |> Time.millisToPosix
+                    op v e
 
         addStation :
-            OStation
-            -> Time.Posix
-            -> OEvent
+            Station
+            -> Time
+            -> Event
             ->
                 Dict
-                    OStation
-                    { min : Time.Posix
-                    , max : Time.Posix
-                    , events : Dict Int OEvent
+                    Station
+                    { min : Time
+                    , max : Time
+                    , events : Dict Int Event
                     }
             ->
                 Dict
-                    OStation
-                    { min : Time.Posix
-                    , max : Time.Posix
-                    , events : Dict Int OEvent
+                    Station
+                    { min : Time
+                    , max : Time
+                    , events : Dict Int Event
                     }
         addStation station time event dict =
             let
@@ -720,19 +810,19 @@ viewSimple model =
                             { min = time
                             , max = time
                             , events =
-                                Dict.singleton (Time.posixToMillis time) event
+                                Dict.singleton (Quantity.unwrap time) event
                             }
 
                         Just existing ->
-                            { min = liftTime min (Just existing.min) time
-                            , max = liftTime max (Just existing.max) time
+                            { min = liftTime Quantity.min (Just existing.min) time
+                            , max = liftTime Quantity.max (Just existing.max) time
                             , events =
-                                Dict.insert (Time.posixToMillis time) event existing.events
+                                Dict.insert (Quantity.unwrap time) event existing.events
                             }
             in
             Dict.insert station new dict
 
-        times : List ( Time.Posix, Time.Posix )
+        times : List ( Time, Time )
         times =
             model.timetable
                 |> List.concatMap
@@ -744,14 +834,14 @@ viewSimple model =
                             links
                     )
 
-        timeRange : { minTime : Maybe Time.Posix, maxTime : Maybe Time.Posix }
+        timeRange : { minTime : Maybe Time, maxTime : Maybe Time }
         timeRange =
             List.foldl
                 (\( from, to ) acc ->
                     { minTime =
-                        Just <| liftTime min acc.minTime from
+                        Just <| liftTime Quantity.min acc.minTime from
                     , maxTime =
-                        Just <| liftTime max acc.maxTime to
+                        Just <| liftTime Quantity.max acc.maxTime to
                     }
                 )
                 { minTime = Nothing
@@ -761,10 +851,10 @@ viewSimple model =
 
         stations :
             Dict
-                OStation
-                { min : Time.Posix
-                , max : Time.Posix
-                , events : Dict Int OEvent
+                Station
+                { min : Time
+                , max : Time
+                , events : Dict Int Event
                 }
         stations =
             model.timetable
@@ -783,21 +873,44 @@ viewSimple model =
 
         sortedStations :
             List
-                ( OStation
-                , { events : Dict Int OEvent
-                  , min : Time.Posix
-                  , max : Time.Posix
+                ( Station
+                , { events : Dict Int Event
+                  , min : Time
+                  , max : Time
                   }
                 )
         sortedStations =
             stations
                 |> Dict.toList
                 |> List.sortBy
-                    (\( _, { min, max } ) ->
-                        ( Time.posixToMillis min, -(Time.posixToMillis max) )
+                    (\( station, { min, max } ) ->
+                        if String.contains "Udine" station then
+                            0
+
+                        else if String.contains "Tarvisio" station then
+                            1
+
+                        else if String.contains "Villach" station then
+                            2
+
+                        else if String.contains "Salzburg" station then
+                            3
+
+                        else if String.contains "Freilassing" station then
+                            4
+
+                        else if String.contains "München Ost" station then
+                            5
+
+                        else if String.contains "München Hauptbahnhof" station then
+                            6
+
+                        else
+                            999
+                     -- ( Quantity.unwrap min, -(Quantity.unwrap max) )
                     )
 
-        stationPositions : Dict OStation Int
+        stationPositions : Dict Station Int
         stationPositions =
             sortedStations
                 |> List.indexedMap
@@ -810,7 +923,7 @@ viewSimple model =
                 (viewStation timeRange stationPositions)
                 sortedStations
 
-        stationToY : OStation -> Float
+        stationToY : Station -> Float
         stationToY station =
             Dict.get station stationPositions
                 |> Maybe.withDefault -1
@@ -840,8 +953,8 @@ viewSimple model =
             times
                 |> List.concatMap
                     (\( from, to ) ->
-                        [ Time.posixToMillis from
-                        , Time.posixToMillis to
+                        [ Quantity.unwrap from
+                        , Quantity.unwrap to
                         ]
                     )
                 |> Set.fromList
@@ -849,9 +962,9 @@ viewSimple model =
                 |> List.foldr
                     (\t ( last, acc ) ->
                         let
-                            time : Time.Posix
+                            time : Time
                             time =
-                                Time.millisToPosix t
+                                Quantity.unsafe t
 
                             timeX : Float
                             timeX =
@@ -879,14 +992,8 @@ viewSimple model =
                                                 , Rotate 90 0 0
                                                 ]
                                             ]
-                                            [ [ Time.toHour Time.utc time
-                                                    |> String.fromInt
-                                                    |> String.padLeft 2 ' '
-                                              , Time.toMinute Time.utc time
-                                                    |> String.fromInt
-                                                    |> String.padLeft 2 '0'
-                                              ]
-                                                |> String.join ":"
+                                            [ GTFS.timeToString time
+                                                |> String.left 5
                                                 |> text
                                             ]
                                 in
@@ -901,8 +1008,9 @@ viewSimple model =
 
                                     Just lastTime ->
                                         if
-                                            Duration.from time lastTime
-                                                |> Quantity.greaterThan (Duration.minutes 30)
+                                            Quantity.difference time lastTime
+                                                |> Quantity.greaterThan
+                                                    (Quantity.unsafe (30 * 60))
                                         then
                                             timesHeight / 2
 
@@ -982,10 +1090,10 @@ namesWidth =
 
 
 timeToX :
-    { minTime : Maybe Time.Posix
-    , maxTime : Maybe Time.Posix
+    { minTime : Maybe Time
+    , maxTime : Maybe Time
     }
-    -> Time.Posix
+    -> Time
     -> Float
 timeToX { minTime, maxTime } time =
     case ( minTime, maxTime ) of
@@ -994,9 +1102,9 @@ timeToX { minTime, maxTime } time =
                 + tableHorizontalMargin
                 + (fullWidth - namesWidth - tableHorizontalMargin * 2)
                 * toFloat
-                    (Time.posixToMillis time - Time.posixToMillis min)
+                    (Quantity.unwrap time - Quantity.unwrap min)
                 / toFloat
-                    (Time.posixToMillis max - Time.posixToMillis min)
+                    (Quantity.unwrap max - Quantity.unwrap min)
 
         _ ->
             -- This never happens but we're going to force a mislayout if the assumptions are wrong
@@ -1004,9 +1112,9 @@ timeToX { minTime, maxTime } time =
 
 
 viewStation :
-    { minTime : Maybe Time.Posix, maxTime : Maybe Time.Posix }
-    -> Dict OStation Int
-    -> ( OStation, { events : Dict Int OEvent, min : Time.Posix, max : Time.Posix } )
+    { minTime : Maybe Time, maxTime : Maybe Time }
+    -> Dict Station Int
+    -> ( Station, { events : Dict Int Event, min : Time, max : Time } )
     -> Svg msg
 viewStation timeRange stationPositions ( name, { events } ) =
     let
@@ -1056,8 +1164,8 @@ viewStation timeRange stationPositions ( name, { events } ) =
                                     go tail
                                         (line
                                             [ class [ "wait" ]
-                                            , x1 <| timeToX timeRange (Time.millisToPosix at)
-                                            , x2 <| timeToX timeRange (Time.millisToPosix dep)
+                                            , x1 <| timeToX timeRange (Quantity.unsafe at)
+                                            , x2 <| timeToX timeRange (Quantity.unsafe dep)
                                             , y1 stationY
                                             , y2 stationY
                                             , stroke (Paint (waitTimeToColor duration))

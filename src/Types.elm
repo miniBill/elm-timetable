@@ -1,15 +1,14 @@
-module Types exposing (Model, Msg(..), OEvent(..), OStation, OTimetable, OViewMode(..))
+module Types exposing (Event(..), Model, Msg(..), Station, Timetable, ViewMode(..))
 
 import Dict exposing (Dict)
-import GTFS exposing (Feed, Id, Pathway, Stop, StopTime, Trip)
+import GTFS exposing (Feed, Id, Pathway, Stop, StopTime, Time, Trip)
 import Http
 import RemoteData exposing (RemoteData)
-import Time
 
 
 type alias Model =
-    { timetable : OTimetable
-    , mode : OViewMode
+    { timetable : Timetable
+    , mode : ViewMode
     , stops : RemoteData (Dict Feed (Dict Id Stop))
     , pathways : RemoteData (Dict Feed (Dict Id Pathway))
     , stopTimes : RemoteData (Dict Feed (List StopTime))
@@ -17,29 +16,29 @@ type alias Model =
     }
 
 
-type OViewMode
+type ViewMode
     = ViewSimple
 
 
-type alias OTimetable =
+type alias Timetable =
     List
-        { from : OStation
-        , to : OStation
-        , links : List { from : Time.Posix, to : Time.Posix }
+        { from : Station
+        , to : Station
+        , links : List { from : Time, to : Time }
         }
 
 
-type alias OStation =
+type alias Station =
     String
 
 
-type OEvent
+type Event
     = Arrival
     | Departure
 
 
 type Msg
-    = OViewMode OViewMode
+    = OViewMode ViewMode
     | Reload
     | GotStops Feed (Result Http.Error (Dict Id Stop))
     | GotPathways Feed (Result Http.Error (Dict Id Pathway))
