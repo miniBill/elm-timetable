@@ -7,7 +7,7 @@ import Dagre.Attributes
 import Data
 import Dict exposing (Dict)
 import Duration exposing (Duration)
-import GTFS exposing (Feed, Id, LocationType(..), Pathway, PathwayMode(..), Stop)
+import GTFS exposing (Feed, Id, LocationType(..), Pathway, PathwayMode(..), Stop, StopTime)
 import Graph
 import Html exposing (Html)
 import Html.Attributes
@@ -48,6 +48,7 @@ init _ =
       , mode = ViewSimple
       , stops = RemoteData.Loading
       , pathways = RemoteData.Loading
+      , stopTimes = RemoteData.Loading
       }
     , loadData
     )
@@ -60,6 +61,7 @@ loadData =
             (\feed ->
                 [ getCSVId GotStops feed "stops.txt" GTFS.stopDecoder
                 , getCSVId GotPathways feed "pathways.txt" GTFS.pathwayDecoder
+                , getCSV GotStopTimes feed "stop_times.txt" GTFS.stopTimeDecoder
                 ]
             )
         |> Cmd.batch
@@ -73,7 +75,7 @@ getCSVId :
     -> Cmd msg
 getCSVId toMsg feed filename decoder =
     getCSV
-        (\raw ->
+        (\_ raw ->
             raw
                 |> Result.map toDictFromId
                 |> toMsg feed
@@ -93,7 +95,7 @@ toDictFromId list =
         list
 
 
-getCSV : (Result Http.Error (List a) -> msg) -> String -> String -> Csv.Decode.Decoder a -> Cmd msg
+getCSV : (String -> Result Http.Error (List a) -> msg) -> String -> String -> Csv.Decode.Decoder a -> Cmd msg
 getCSV toMsg feed filename decoder =
     Http.request
         { method = "GET"
@@ -121,7 +123,7 @@ getCSV toMsg feed filename decoder =
                                                 )
                                         )
                             )
-                        |> toMsg
+                        |> toMsg feed
                 )
         }
 
@@ -162,25 +164,55 @@ view model =
                             [ Html.text "Pathways loading..." ]
 
                         RemoteData.Loaded pathways ->
-                            Dict.merge
-                                (\_ _ acc -> acc)
-                                (\k stop pathway acc ->
-                                    Dict.insert
-                                        k
-                                        ( stop, pathway )
-                                        acc
-                                )
-                                (\_ _ acc -> acc)
-                                stops
-                                pathways
-                                Dict.empty
-                                |> Dict.toList
-                                |> List.map viewFeed
+                            case model.stopTimes of
+                                RemoteData.Error e ->
+                                    [ Html.text (Debug.toString e) ]
+
+                                RemoteData.NotAsked ->
+                                    [ Html.text "Stop times not asked" ]
+
+                                RemoteData.Loading ->
+                                    [ Html.text "Stop times loading..." ]
+
+                                RemoteData.Loaded stopTimes ->
+                                    let
+                                        stopsAndPathways :
+                                            Dict
+                                                Feed
+                                                ( Dict Id Stop, Dict Id Pathway )
+                                        stopsAndPathways =
+                                            Dict.merge
+                                                (\_ _ acc -> acc)
+                                                (\k stop pathway acc ->
+                                                    Dict.insert
+                                                        k
+                                                        ( stop, pathway )
+                                                        acc
+                                                )
+                                                (\_ _ acc -> acc)
+                                                stops
+                                                pathways
+                                                Dict.empty
+                                    in
+                                    Dict.merge
+                                        (\_ _ acc -> acc)
+                                        (\k stopTime ( stop, pathway ) acc ->
+                                            Dict.insert
+                                                k
+                                                ( stopTime, stop, pathway )
+                                                acc
+                                        )
+                                        (\_ _ acc -> acc)
+                                        stopTimes
+                                        stopsAndPathways
+                                        Dict.empty
+                                        |> Dict.toList
+                                        |> List.map viewFeed
         ]
 
 
-viewFeed : ( Feed, ( Dict Id Stop, Dict Id Pathway ) ) -> Html msg
-viewFeed ( feed, ( stops, pathways ) ) =
+viewFeed : ( Feed, ( List StopTime, Dict Id Stop, Dict Id Pathway ) ) -> Html msg
+viewFeed ( feed, ( stopTimes, stops, pathways ) ) =
     let
         filteredStops : List Stop
         filteredStops =
@@ -188,27 +220,31 @@ viewFeed ( feed, ( stops, pathways ) ) =
                 |> Dict.values
                 |> List.filter
                     (\stop ->
-                        let
-                            defaulted : String
-                            defaulted =
-                                Maybe.withDefault "" stop.name
-                        in
-                        List.member defaulted
-                            [ "München Hbf"
-                            , "München Hauptbahnhof"
-                            ]
-                            -- || String.contains "Isartor" defaulted
-                            -- || List.member stop.id
-                            --     [ "Pde:09162:10" -- Pasing
+                        -- let
+                        --     defaulted : String
+                        --     defaulted =
+                        --         Maybe.withDefault "" stop.name
+                        -- in
+                        -- List.member defaulted
+                        --     [ "München Hbf"
+                        --     , "München Hauptbahnhof"
+                        --     ]
+                        -- || String.contains "Isartor" defaulted
+                        List.member stop.id
+                            [ "Pde:09162:100" -- München Hbf - ÖBB
+                            , "Pit:22095:7049" -- Udine - ÖBB
+                            , "Pat:42:3654" -- Villach Hbf - ÖBB
+                            , "Pat:45:50002" -- Salzburg Hbf - ÖBB
+
+                            -- "Pde:09162:10" -- Pasing
                             --     , "de:09162:6:40:81"
                             --     , "de:09162:6_G"
-                            --     ]
-                            || List.member stop.parent_station
-                                [ Just "Pde:09162:100" -- München Hbf
-
-                                -- , Just "Pde:09162:10" -- München Pasing
-                                -- , Just "de:09162:6_G"
-                                ]
+                            ]
+                     -- || List.member stop.parent_station
+                     --     [ Just "Pde:09162:100" -- München Hbf
+                     --     -- , Just "Pde:09162:10" -- München Pasing
+                     --     -- , Just "de:09162:6_G"
+                     --     ]
                     )
                 |> List.take 50
 
@@ -225,6 +261,18 @@ viewFeed ( feed, ( stops, pathways ) ) =
                         Set.member walkway.from_stop_id stopIds
                             && Set.member walkway.to_stop_id stopIds
                     )
+
+        filteredStopTimes =
+            stopTimes
+                |> List.filter
+                    (\stopTime ->
+                        case stopTime.stop_id of
+                            Just id ->
+                                Set.member id stopIds
+
+                            Nothing ->
+                                False
+                    )
     in
     Html.div
         [ Html.Attributes.style "display" "flex"
@@ -236,6 +284,7 @@ viewFeed ( feed, ( stops, pathways ) ) =
         -- , pathfinder stops pathways
         , viewStops stops filteredStops
         , viewPathways stops filteredPathways
+        , viewStopTimes stops filteredStopTimes
         ]
 
 
@@ -460,6 +509,79 @@ viewPathways stops filteredPathways =
 
           else
             Html.text ""
+        ]
+
+
+viewStopTimes : Dict Id Stop -> List StopTime -> Html msg
+viewStopTimes stops filteredStopTimes =
+    let
+        stop : Id -> String
+        stop id =
+            case Dict.get id stops of
+                Nothing ->
+                    id
+
+                Just found ->
+                    [ found.name
+                    , found.description
+                    , Maybe.map (\n -> "(" ++ n ++ ")") found.platform_code
+                    ]
+                        |> List.filterMap identity
+                        |> String.join " - "
+
+        viewStopTime : StopTime -> Html msg
+        viewStopTime stopTime =
+            [ Table.debug stopTime.trip_id
+            , Table.debug stopTime.arrival_time
+            , Table.debug stopTime.departure_time
+            , Table.maybe Table.string (Maybe.map stop stopTime.stop_id)
+            , Table.debug stopTime.location_group_id
+            , Table.debug stopTime.location_id
+            , Table.debug stopTime.stop_sequence
+            , Table.maybe Table.string stopTime.stop_headsign
+            , Table.debug stopTime.start_pickup_drop_off_window
+            , Table.debug stopTime.end_pickup_drop_off_window
+            , Table.debug stopTime.pickup_type
+            , Table.debug stopTime.drop_off_type
+            , Table.debug stopTime.continuous_pickup
+            , Table.debug stopTime.continuous_drop_off
+            , Table.debug stopTime.shape_dist_traveled
+            , Table.debug stopTime.timepoint
+            , Table.debug stopTime.pickup_booking_rule_id
+            , Table.debug stopTime.drop_off_booking_rule_id
+            ]
+                |> Html.tr []
+    in
+    Html.div []
+        [ filteredStopTimes
+            |> List.map viewStopTime
+            |> (::)
+                ([ "trip_id"
+                 , "arrival_time"
+                 , "departure_time"
+                 , "stop_id"
+                 , "location_group_id"
+                 , "location_id"
+                 , "stop_sequence"
+                 , "stop_headsign"
+                 , "start_pickup_drop_off_window"
+                 , "end_pickup_drop_off_window"
+                 , "pickup_type"
+                 , "drop_off_type"
+                 , "continuous_pickup"
+                 , "continuous_drop_off"
+                 , "shape_dist_traveled"
+                 , "timepoint"
+                 , "pickup_booking_rule_id"
+                 , "drop_off_booking_rule_id"
+                 ]
+                    |> List.map (\col -> Html.th [] [ Html.text col ])
+                    |> Html.tr []
+                )
+            |> Html.table
+                [ Html.Attributes.style "border" "1px solid black"
+                , Html.Attributes.style "padding" "8px"
+                ]
         ]
 
 
@@ -932,6 +1054,22 @@ update msg model =
                             Dict.empty
             in
             ( { model | pathways = RemoteData.Loaded (Dict.insert feed res existing) }, Cmd.none )
+
+        GotStopTimes _ (Err e) ->
+            ( { model | stopTimes = RemoteData.Error e }, Cmd.none )
+
+        GotStopTimes feed (Ok res) ->
+            let
+                existing : Dict Feed (List StopTime)
+                existing =
+                    case model.stopTimes of
+                        RemoteData.Loaded stopTimes ->
+                            stopTimes
+
+                        _ ->
+                            Dict.empty
+            in
+            ( { model | stopTimes = RemoteData.Loaded (Dict.insert feed res existing) }, Cmd.none )
 
         Reload ->
             ( model, loadData )

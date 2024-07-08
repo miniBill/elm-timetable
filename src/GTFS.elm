@@ -367,6 +367,21 @@ timeInnerParser =
         noon : Int
         noon =
             12 * 60 * 60
+
+        int =
+            (Parser.chompIf Char.isDigit
+                |. Parser.chompWhile Char.isDigit
+            )
+                |> Parser.getChompedString
+                |> Parser.andThen
+                    (\r ->
+                        case String.toInt r of
+                            Just i ->
+                                Parser.succeed i
+
+                            Nothing ->
+                                Parser.problem (r ++ " is not a valid number")
+                    )
     in
     Parser.succeed
         (\h m s ->
@@ -381,11 +396,11 @@ timeInnerParser =
             in
             Quantity.unsafe offset
         )
-        |= Parser.int
+        |= int
         |. Parser.symbol ":"
-        |= Parser.int
+        |= int
         |. Parser.symbol ":"
-        |= Parser.int
+        |= int
 
 
 boolDecoder : Csv.Decode.Decoder Bool
