@@ -51,21 +51,28 @@ main =
 rebuildTimetable : Model -> Model
 rebuildTimetable model =
     case
-        ( RemoteData.map (Dict.get "oebb-2024") model.trips
-        , RemoteData.map (Dict.get "oebb-2024") model.stopTimes
-        , RemoteData.map (Dict.get "oebb-2024") model.stops
-        )
+        RemoteData.map3
+            (\t st s ->
+                ( t |> Dict.values |> List.foldl Dict.union Dict.empty
+                , st |> Dict.values |> List.concat
+                , s |> Dict.values |> List.foldl Dict.union Dict.empty
+                )
+            )
+            model.trips
+            model.stopTimes
+            model.stops
     of
-        ( RemoteData.Loaded (Just trips), RemoteData.Loaded (Just stopTimes), RemoteData.Loaded (Just stops) ) ->
+        RemoteData.Loaded ( trips, stopTimes, stops ) ->
             let
                 filteredStops : List Stop
                 filteredStops =
                     filterStops stops
 
-                filteredStopTimes : Dict Id (List StopTime)
+                filteredStopTimes : Dict ( Id, Id ) (List StopTime)
                 filteredStopTimes =
-                    filterStopTimes filteredStops stopTimes
+                    filterStopTimes trips filteredStops stopTimes
 
+                stopName : { a | stop_id : Id } -> Id
                 stopName stopTime =
                     case Dict.get stopTime.stop_id stops of
                         Nothing ->
@@ -90,38 +97,49 @@ rebuildTimetable model =
                         |> Dict.values
                         |> List.concatMap
                             (\trip ->
-                                trip
-                                    |> List.filterMap
-                                        (\stopTime ->
-                                            Maybe.map3
-                                                (\stop_id departure_time arrival_time ->
-                                                    { stop_id = stop_id
-                                                    , departure_time = departure_time
-                                                    , arrival_time = arrival_time
-                                                    }
+                                let
+                                    converted :
+                                        List
+                                            { from : Id
+                                            , to : Id
+                                            , departure : Time
+                                            , arrival : Time
+                                            }
+                                    converted =
+                                        trip
+                                            |> List.filterMap
+                                                (\stopTime ->
+                                                    Maybe.map3
+                                                        (\stop_id departure_time arrival_time ->
+                                                            { stop_id = stop_id
+                                                            , departure_time = departure_time
+                                                            , arrival_time = arrival_time
+                                                            }
+                                                        )
+                                                        stopTime.stop_id
+                                                        stopTime.departure_time
+                                                        stopTime.arrival_time
                                                 )
-                                                stopTime.stop_id
-                                                stopTime.departure_time
-                                                stopTime.arrival_time
-                                        )
-                                    |> List.foldl
-                                        (\stopTime ( last, acc ) ->
-                                            case last of
-                                                Nothing ->
-                                                    ( Just stopTime, acc )
+                                            |> List.foldl
+                                                (\stopTime ( last, acc ) ->
+                                                    case last of
+                                                        Nothing ->
+                                                            ( Just stopTime, acc )
 
-                                                Just previous ->
-                                                    ( Just stopTime
-                                                    , { from = stopName previous
-                                                      , to = stopName stopTime
-                                                      , departure = previous.departure_time
-                                                      , arrival = stopTime.arrival_time
-                                                      }
-                                                        :: acc
-                                                    )
-                                        )
-                                        ( Nothing, [] )
-                                    |> Tuple.second
+                                                        Just previous ->
+                                                            ( Just stopTime
+                                                            , { from = stopName previous
+                                                              , to = stopName stopTime
+                                                              , departure = previous.departure_time
+                                                              , arrival = stopTime.arrival_time
+                                                              }
+                                                                :: acc
+                                                            )
+                                                )
+                                                ( Nothing, [] )
+                                            |> Tuple.second
+                                in
+                                converted
                             )
                         |> Dict.Extra.groupBy (\{ from, to } -> ( from, to ))
                         |> Dict.toList
@@ -359,7 +377,7 @@ viewFeed ( feed, ( ( stopTimes, trips ), ( stops, pathways ) ) ) =
         --                     && Set.member walkway.to_stop_id stopIds
         --             )
         filteredStopTimes =
-            filterStopTimes filteredStops stopTimes
+            filterStopTimes trips filteredStops stopTimes
     in
     Html.div
         [ Html.Attributes.style "display" "flex"
@@ -386,26 +404,71 @@ viewFeed ( feed, ( ( stopTimes, trips ), ( stops, pathways ) ) ) =
         ]
 
 
-filterStopTimes : List Stop -> List StopTime -> Dict Id (List StopTime)
-filterStopTimes filteredStops stopTimes =
+filterStopTimes : Dict Id Trip -> List Stop -> List StopTime -> Dict ( Id, Id ) (List StopTime)
+filterStopTimes trips filteredStops stopTimes =
     let
         stopIds : Set Id
         stopIds =
-            Set.fromList (List.map .id filteredStops)
+            Set.fromList (List.map (\stop -> stop.id) filteredStops)
     in
     stopTimes
         |> List.filter
             (\stopTime ->
-                -- Set.member stopTime.trip_id filteredTripIds
-                case stopTime.stop_id of
-                    Just id ->
-                        Set.member id stopIds
-
+                case Dict.get stopTime.trip_id trips of
                     Nothing ->
                         False
+
+                    Just trip ->
+                        let
+                            defaulted : String
+                            defaulted =
+                                Maybe.withDefault "" trip.short_name
+                        in
+                        if
+                            String.startsWith "S " defaulted
+                                || String.startsWith "NJ " defaulted
+                                || String.startsWith "EN " defaulted
+                        then
+                            False
+
+                        else
+                            case stopTime.stop_id of
+                                Just id ->
+                                    Set.member id stopIds
+
+                                Nothing ->
+                                    False
             )
         |> Dict.Extra.groupBy (\stopTime -> stopTime.trip_id)
-        |> Dict.map (\_ v -> List.sortBy (\stopTime -> ( stopTime.trip_id, stopTime.stop_sequence )) v)
+        |> Dict.toList
+        |> Dict.Extra.groupBy
+            (\( trip_id, block ) ->
+                case Dict.get trip_id trips of
+                    Nothing ->
+                        ( trip_id, "" )
+
+                    Just trip ->
+                        case trip.block_id of
+                            Just id ->
+                                ( trip.route_id, id )
+
+                            Nothing ->
+                                ( trip_id, "" )
+            )
+        |> Dict.map
+            (\_ v ->
+                v
+                    |> List.concatMap Tuple.second
+                    |> List.sortBy
+                        (\stopTime ->
+                            case stopTime.arrival_time of
+                                Nothing ->
+                                    stopTime.stop_sequence
+
+                                Just arrival ->
+                                    Quantity.unwrap arrival
+                        )
+            )
 
 
 filterStops : Dict Id Stop -> List Stop
@@ -429,7 +492,8 @@ filterStops stops =
                     , "Pit:22095:7049" -- Udine - ÖBB
                     , "Pat:42:3654" -- Villach Hbf - ÖBB
                     , "Pat:45:50002" -- Salzburg Hbf - ÖBB
-                    , "Pde:09162:5" -- München Ost - ÖBB
+
+                    -- , "Pde:09162:5" -- München Ost - ÖBB
                     , "Pit:22095:7068" -- Tarvisio - ÖBB
                     , "Pde:09172:42293" -- Freilassing - ÖBB
 
@@ -445,7 +509,8 @@ filterStops stops =
                         , Just "Pit:22095:7049" -- Udine - ÖBB
                         , Just "Pat:42:3654" -- Villach Hbf - ÖBB
                         , Just "Pat:45:50002" -- Salzburg Hbf - ÖBB
-                        , Just "Pde:09162:5" -- München Ost - ÖBB
+
+                        -- , Just "Pde:09162:5" -- München Ost - ÖBB
                         , Just "Pit:22095:7068" -- Tarvisio - ÖBB
                         , Just "Pde:09172:42293" -- Freilassing - ÖBB
                         ]
@@ -690,6 +755,7 @@ viewStopTimes stops trips filteredStopTimes =
                 Just found ->
                     [ found.short_name
                     , found.block_id
+                    , Just id
                     ]
                         |> List.filterMap identity
                         |> String.join " - "
@@ -909,6 +975,7 @@ viewSimple model =
                             999
                      -- ( Quantity.unwrap min, -(Quantity.unwrap max) )
                     )
+                |> List.reverse
 
         stationPositions : Dict Station Int
         stationPositions =

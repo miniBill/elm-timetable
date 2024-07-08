@@ -13,6 +13,7 @@ feeds : List String
 feeds =
     [ --  "de" ,
       "oebb-2024"
+    , "micotra-2024"
     ]
 
 

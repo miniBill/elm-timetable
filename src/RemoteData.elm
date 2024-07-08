@@ -1,4 +1,4 @@
-module RemoteData exposing (RemoteData(..), map)
+module RemoteData exposing (RemoteData(..), map, map3)
 
 import Http
 
@@ -24,3 +24,46 @@ map f x =
 
         Loaded l ->
             Loaded (f l)
+
+
+map3 :
+    (a -> b -> c -> d)
+    -> RemoteData a
+    -> RemoteData b
+    -> RemoteData c
+    -> RemoteData d
+map3 f a b c =
+    case a of
+        NotAsked ->
+            NotAsked
+
+        Loading ->
+            Loading
+
+        Error e ->
+            Error e
+
+        Loaded la ->
+            case b of
+                NotAsked ->
+                    NotAsked
+
+                Loading ->
+                    Loading
+
+                Error e ->
+                    Error e
+
+                Loaded lb ->
+                    case c of
+                        NotAsked ->
+                            NotAsked
+
+                        Loading ->
+                            Loading
+
+                        Error e ->
+                            Error e
+
+                        Loaded lc ->
+                            Loaded (f la lb lc)
