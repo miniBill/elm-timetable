@@ -1,10 +1,12 @@
-module Table exposing (cell, debug, duration, float, int, length, maybe, string, url)
+module Table exposing (angle, cell, debug, duration, float, int, length, maybe, seconds, string, url)
 
-import Duration
+import Angle exposing (Angle)
+import Duration exposing (Seconds)
 import Float.Extra
 import Html exposing (Attribute, Html)
 import Html.Attributes exposing (style)
 import Length
+import Quantity exposing (Quantity)
 import Url exposing (Url)
 
 
@@ -26,6 +28,11 @@ maybe f x =
 string : String -> Html msg
 string s =
     cell [] s
+
+
+angle : Angle -> Html msg
+angle a =
+    float (Angle.inDegrees a)
 
 
 length : Length.Length -> Html msg
@@ -65,6 +72,11 @@ float f =
     cell
         [ style "text-align" "right" ]
         (String.fromFloat f)
+
+
+seconds : Quantity Int Seconds -> Html msg
+seconds f =
+    duration (Duration.seconds (toFloat (Quantity.unwrap f)))
 
 
 int : Int -> Html msg

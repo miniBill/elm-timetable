@@ -7,6 +7,7 @@ import Dagre.Attributes
 import Data
 import Dict exposing (Dict)
 import Duration exposing (Duration)
+import GTFS exposing (Feed, Id, LocationType(..), Pathway, PathwayMode(..), Stop)
 import Graph
 import Html exposing (Html)
 import Html.Attributes
@@ -27,7 +28,7 @@ import TypedSvg.Attributes exposing (class, stroke, textAnchor, transform, viewB
 import TypedSvg.Attributes.InPx exposing (x1, x2, y, y1, y2)
 import TypedSvg.Core exposing (Svg, text)
 import TypedSvg.Types exposing (AnchorAlignment(..), DominantBaseline(..), Paint(..), Transform(..))
-import Types exposing (Feed, Id, LocationType(..), Model, Msg(..), OEvent(..), OStation, OViewMode(..), Pathway, PathwayMode(..), Stop)
+import Types exposing (Model, Msg(..), OEvent(..), OStation, OViewMode(..))
 import Url.Builder
 
 
@@ -57,8 +58,8 @@ loadData =
     Data.feeds
         |> List.concatMap
             (\feed ->
-                [ getCSVId GotStops feed "stops.txt" Data.stopsDecoder
-                , getCSVId GotPathways feed "pathways.txt" Data.pathwayDecoder
+                [ getCSVId GotStops feed "stops.txt" GTFS.stopDecoder
+                , getCSVId GotPathways feed "pathways.txt" GTFS.pathwayDecoder
                 ]
             )
         |> Cmd.batch
@@ -262,8 +263,8 @@ viewStops stops filteredStops =
             , Table.maybe Table.string stop.name
             , Table.maybe Table.string stop.tts_name
             , Table.maybe Table.string stop.description
-            , Table.maybe Table.float stop.lat
-            , Table.maybe Table.float stop.lon
+            , Table.maybe Table.angle stop.lat
+            , Table.maybe Table.angle stop.lon
             , Table.maybe Table.string stop.zone_id
             , Table.maybe Table.url stop.url
             , Table.debug stop.location_type
@@ -389,7 +390,7 @@ viewPathways stops filteredPathways =
             , Table.debug pathway.mode
             , Table.debug pathway.is_bidirectional
             , Table.maybe Table.length pathway.length
-            , Table.maybe Table.duration pathway.traversal_time
+            , Table.maybe Table.seconds pathway.traversal_time
             , Table.maybe Table.int pathway.stair_count
             , Table.maybe Table.float pathway.max_slope
             , Table.maybe Table.length pathway.min_width

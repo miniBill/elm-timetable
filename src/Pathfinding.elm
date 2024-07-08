@@ -1,7 +1,7 @@
-module Pathfinding exposing (..)
+module Pathfinding exposing (pathfind, pathfind2)
 
 import Dict exposing (Dict)
-import Types exposing (Id, Pathway, Stop)
+import GTFS exposing (Id, Pathway, Stop, StopTime, Trip)
 
 
 pathfind :
