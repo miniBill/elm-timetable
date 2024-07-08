@@ -39,6 +39,113 @@ type alias Time =
     Quantity Int Seconds
 
 
+
+-------------------
+-- Feed decoders --
+-------------------
+
+
+type alias StopTime =
+    { trip_id : Id
+    , arrival_time : Maybe Time
+    , departure_time : Maybe Time
+    , stop_id : Maybe Id
+    , location_group_id : Maybe Id
+    , location_id : Maybe Id
+    , stop_sequence : Int
+    , stop_headsign : Maybe String
+    , start_pickup_drop_off_window : Maybe Time
+    , end_pickup_drop_off_window : Maybe Time
+    }
+
+
+stopTimeDecoder : Csv.Decode.Decoder StopTime
+stopTimeDecoder =
+    Csv.Decode.succeed StopTime
+        |> required "trip_id" id
+        |> optional "arrival_time" timeDecoder
+        |> optional "departure_time" timeDecoder
+        |> optional "stop_id" id
+        |> optional "location_group_id" id
+        |> optional "location_id" id
+        |> required "stop_sequence" Csv.Decode.int
+        |> optional "stop_headsign" Csv.Decode.string
+        |> optional "start_pickup_drop_off_window" timeDecoder
+        |> optional "end_pickup_drop_off_window" timeDecoder
+
+
+type alias Stop =
+    { id : Id
+    , code : Maybe String
+    , name : Maybe String
+    , tts_name : Maybe String
+    , description : Maybe String
+    , lat : Maybe Latitude
+    , lon : Maybe Longitude
+    , zone_id : Maybe Id
+    , url : Maybe Url
+    , location_type : LocationType
+    , parent_station : Maybe Id
+    , timezone : Maybe Timezone
+    , wheelchair_boarding : Maybe WheelchairBoarding
+    , level_id : Maybe Id
+    , platform_code : Maybe String
+    }
+
+
+stopDecoder : Csv.Decode.Decoder Stop
+stopDecoder =
+    Csv.Decode.succeed Stop
+        |> required "stop_id" id
+        |> optional "stop_code" Csv.Decode.string
+        |> optional "stop_name" Csv.Decode.string
+        |> optional "tts_stop_name" Csv.Decode.string
+        |> optional "stop_desc" Csv.Decode.string
+        |> optional "stop_lat" angleDecoder
+        |> optional "stop_lon" angleDecoder
+        |> optional "zone_id" id
+        |> optional "stop_url" urlDecoder
+        |> required "location_type" locationTypeDecoder
+        |> optional "parent_station" id
+        |> optional "stop_timezone" Csv.Decode.string
+        |> optional "wheelchair_boarding" weelchairBoardingDecoder
+        |> optional "level_id" id
+        |> optional "platform_code" Csv.Decode.string
+
+
+type alias Pathway =
+    { id : Id
+    , from_stop_id : Id
+    , to_stop_id : Id
+    , mode : PathwayMode
+    , is_bidirectional : Bool
+    , length : Maybe Length
+    , traversal_time : Maybe (Quantity Int Seconds)
+    , stair_count : Maybe Int
+    , max_slope : Maybe Float
+    , min_width : Maybe Length
+    , signposted_as : Maybe String
+    , reversed_signposted_as : Maybe String
+    }
+
+
+pathwayDecoder : Csv.Decode.Decoder Pathway
+pathwayDecoder =
+    Csv.Decode.succeed Pathway
+        |> required "pathway_id" id
+        |> required "from_stop_id" id
+        |> required "to_stop_id" id
+        |> required "pathway_mode" pathwayModeDecoder
+        |> required "is_bidirectional" boolDecoder
+        |> optional "length" length
+        |> optional "traversal_time" (Csv.Decode.map Quantity.unsafe Csv.Decode.int)
+        |> optional "stair_count" Csv.Decode.int
+        |> optional "max_slope" Csv.Decode.float
+        |> optional "min_width" length
+        |> optional "signposted_as" Csv.Decode.string
+        |> optional "reversed_signposted_as" Csv.Decode.string
+
+
 type LocationType
     = StopPlatform
     | Station
@@ -150,23 +257,10 @@ pathwayModeParser input =
             Nothing
 
 
-type alias StopTime =
-    { trip_id : Id
-    , arrival_time : Maybe Time
-    , departure_time : Maybe Time
-    , stop_id : Maybe Id
-    , location_group_id : Maybe Id
-    }
 
-
-stopTimeDecoder : Csv.Decode.Decoder StopTime
-stopTimeDecoder =
-    Csv.Decode.succeed StopTime
-        |> required "trip_id" id
-        |> optional "arrival_time" timeDecoder
-        |> optional "departure_time" timeDecoder
-        |> optional "stop_id" id
-        |> optional "location_group_id" id
+--------------------
+-- Basic decoders --
+--------------------
 
 
 id : Csv.Decode.Decoder Id
@@ -189,18 +283,18 @@ timeParser input =
 timeInnerParser : Parser Time
 timeInnerParser =
     let
-        noon : number
+        noon : Int
         noon =
             12 * 60 * 60
     in
     Parser.succeed
         (\h m s ->
             let
-                raw : number
+                raw : Int
                 raw =
                     h * 3600 + m * 60 + s
 
-                offset : number
+                offset : Int
                 offset =
                     raw - noon
             in
@@ -211,78 +305,6 @@ timeInnerParser =
         |= Parser.int
         |. Parser.symbol ":"
         |= Parser.int
-
-
-type alias Stop =
-    { id : Id
-    , code : Maybe String
-    , name : Maybe String
-    , tts_name : Maybe String
-    , description : Maybe String
-    , lat : Maybe Latitude
-    , lon : Maybe Longitude
-    , zone_id : Maybe Id
-    , url : Maybe Url
-    , location_type : LocationType
-    , parent_station : Maybe Id
-    , timezone : Maybe Timezone
-    , wheelchair_boarding : Maybe WheelchairBoarding
-    , level_id : Maybe Id
-    , platform_code : Maybe String
-    }
-
-
-stopDecoder : Csv.Decode.Decoder Stop
-stopDecoder =
-    Csv.Decode.succeed Stop
-        |> required "stop_id" id
-        |> optional "stop_code" Csv.Decode.string
-        |> optional "stop_name" Csv.Decode.string
-        |> optional "tts_stop_name" Csv.Decode.string
-        |> optional "stop_desc" Csv.Decode.string
-        |> optional "stop_lat" angleDecoder
-        |> optional "stop_lon" angleDecoder
-        |> optional "zone_id" id
-        |> optional "stop_url" urlDecoder
-        |> required "location_type" locationTypeDecoder
-        |> optional "parent_station" id
-        |> optional "stop_timezone" Csv.Decode.string
-        |> optional "wheelchair_boarding" weelchairBoardingDecoder
-        |> optional "level_id" id
-        |> optional "platform_code" Csv.Decode.string
-
-
-type alias Pathway =
-    { id : Id
-    , from_stop_id : Id
-    , to_stop_id : Id
-    , mode : PathwayMode
-    , is_bidirectional : Bool
-    , length : Maybe Length
-    , traversal_time : Maybe (Quantity Int Seconds)
-    , stair_count : Maybe Int
-    , max_slope : Maybe Float
-    , min_width : Maybe Length
-    , signposted_as : Maybe String
-    , reversed_signposted_as : Maybe String
-    }
-
-
-pathwayDecoder : Csv.Decode.Decoder Pathway
-pathwayDecoder =
-    Csv.Decode.succeed Pathway
-        |> required "pathway_id" id
-        |> required "from_stop_id" id
-        |> required "to_stop_id" id
-        |> required "pathway_mode" pathwayModeDecoder
-        |> required "is_bidirectional" boolDecoder
-        |> optional "length" length
-        |> optional "traversal_time" (Csv.Decode.map Quantity.unsafe Csv.Decode.int)
-        |> optional "stair_count" Csv.Decode.int
-        |> optional "max_slope" Csv.Decode.float
-        |> optional "min_width" length
-        |> optional "signposted_as" Csv.Decode.string
-        |> optional "reversed_signposted_as" Csv.Decode.string
 
 
 boolDecoder : Csv.Decode.Decoder Bool
