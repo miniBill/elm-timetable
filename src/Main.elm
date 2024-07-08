@@ -7,7 +7,7 @@ import Dagre.Attributes
 import Data
 import Dict exposing (Dict)
 import Duration exposing (Duration)
-import GTFS exposing (Feed, Id, LocationType(..), Pathway, PathwayMode(..), Stop, StopTime)
+import GTFS exposing (Feed, Id, LocationType(..), Pathway, PathwayMode(..), Stop, StopTime, Trip)
 import Graph
 import Html exposing (Html)
 import Html.Attributes
@@ -49,6 +49,7 @@ init _ =
       , stops = RemoteData.Loading
       , pathways = RemoteData.Loading
       , stopTimes = RemoteData.Loading
+      , trips = RemoteData.Loading
       }
     , loadData
     )
@@ -62,6 +63,7 @@ loadData =
                 [ getCSVId GotStops feed "stops.txt" GTFS.stopDecoder
                 , getCSVId GotPathways feed "pathways.txt" GTFS.pathwayDecoder
                 , getCSV GotStopTimes feed "stop_times.txt" GTFS.stopTimeDecoder
+                , getCSVId GotTrips feed "trips.txt" GTFS.tripDecoder
                 ]
             )
         |> Cmd.batch
@@ -175,44 +177,69 @@ view model =
                                     [ Html.text "Stop times loading..." ]
 
                                 RemoteData.Loaded stopTimes ->
-                                    let
-                                        stopsAndPathways :
-                                            Dict
-                                                Feed
-                                                ( Dict Id Stop, Dict Id Pathway )
-                                        stopsAndPathways =
+                                    case model.trips of
+                                        RemoteData.Error e ->
+                                            [ Html.text (Debug.toString e) ]
+
+                                        RemoteData.NotAsked ->
+                                            [ Html.text "trips not asked" ]
+
+                                        RemoteData.Loading ->
+                                            [ Html.text "trips loading..." ]
+
+                                        RemoteData.Loaded trips ->
+                                            let
+                                                stopsAndPathways :
+                                                    Dict
+                                                        Feed
+                                                        ( Dict Id Stop, Dict Id Pathway )
+                                                stopsAndPathways =
+                                                    Dict.merge
+                                                        (\_ _ acc -> acc)
+                                                        (\k stop pathway acc ->
+                                                            Dict.insert
+                                                                k
+                                                                ( stop, pathway )
+                                                                acc
+                                                        )
+                                                        (\_ _ acc -> acc)
+                                                        stops
+                                                        pathways
+                                                        Dict.empty
+
+                                                stopTimesAndTrips =
+                                                    Dict.merge
+                                                        (\_ _ acc -> acc)
+                                                        (\k stopTime trip acc ->
+                                                            Dict.insert
+                                                                k
+                                                                ( stopTime, trip )
+                                                                acc
+                                                        )
+                                                        (\_ _ acc -> acc)
+                                                        stopTimes
+                                                        trips
+                                                        Dict.empty
+                                            in
                                             Dict.merge
                                                 (\_ _ acc -> acc)
-                                                (\k stop pathway acc ->
+                                                (\k l r acc ->
                                                     Dict.insert
                                                         k
-                                                        ( stop, pathway )
+                                                        ( l, r )
                                                         acc
                                                 )
                                                 (\_ _ acc -> acc)
-                                                stops
-                                                pathways
+                                                stopTimesAndTrips
+                                                stopsAndPathways
                                                 Dict.empty
-                                    in
-                                    Dict.merge
-                                        (\_ _ acc -> acc)
-                                        (\k stopTime ( stop, pathway ) acc ->
-                                            Dict.insert
-                                                k
-                                                ( stopTime, stop, pathway )
-                                                acc
-                                        )
-                                        (\_ _ acc -> acc)
-                                        stopTimes
-                                        stopsAndPathways
-                                        Dict.empty
-                                        |> Dict.toList
-                                        |> List.map viewFeed
+                                                |> Dict.toList
+                                                |> List.map viewFeed
         ]
 
 
-viewFeed : ( Feed, ( List StopTime, Dict Id Stop, Dict Id Pathway ) ) -> Html msg
-viewFeed ( feed, ( stopTimes, stops, pathways ) ) =
+viewFeed : ( Feed, ( ( List StopTime, Dict Id Trip ), ( Dict Id Stop, Dict Id Pathway ) ) ) -> Html msg
+viewFeed ( feed, ( ( stopTimes, trips ), ( stops, pathways ) ) ) =
     let
         filteredStops : List Stop
         filteredStops =
@@ -235,6 +262,7 @@ viewFeed ( feed, ( stopTimes, stops, pathways ) ) =
                             , "Pit:22095:7049" -- Udine - ÖBB
                             , "Pat:42:3654" -- Villach Hbf - ÖBB
                             , "Pat:45:50002" -- Salzburg Hbf - ÖBB
+                            , "Pde:09162:5" -- München Ost - ÖBB
 
                             -- "Pde:09162:10" -- Pasing
                             --     , "de:09162:6:40:81"
@@ -248,9 +276,10 @@ viewFeed ( feed, ( stopTimes, stops, pathways ) ) =
                                 , Just "Pit:22095:7049" -- Udine - ÖBB
                                 , Just "Pat:42:3654" -- Villach Hbf - ÖBB
                                 , Just "Pat:45:50002" -- Salzburg Hbf - ÖBB
+                                , Just "Pde:09162:5" -- München Ost - ÖBB
                                 ]
                     )
-                |> List.take 50
+                |> List.take 1000
 
         stopIds : Set Id
         stopIds =
@@ -272,16 +301,34 @@ viewFeed ( feed, ( stopTimes, stops, pathways ) ) =
                 (v :: Maybe.withDefault [] (Dict.get k dict))
                 dict
 
+        filteredTripIds =
+            trips
+                |> Dict.values
+                |> List.filterMap
+                    (\trip ->
+                        if
+                            trip.short_name
+                                == Just "NJ 236"
+                            -- || trip.short_name
+                            -- == Just "RJ 133"
+                        then
+                            Just trip.id
+
+                        else
+                            Nothing
+                    )
+                |> Set.fromList
+
         filteredStopTimes =
             stopTimes
                 |> List.filter
                     (\stopTime ->
-                        case stopTime.stop_id of
-                            Just id ->
-                                Set.member id stopIds
-
-                            Nothing ->
-                                False
+                        Set.member stopTime.trip_id filteredTripIds
+                     -- case stopTime.stop_id of
+                     --     Just id ->
+                     --         Set.member id stopIds
+                     --     Nothing ->
+                     --         False
                     )
                 |> List.sortBy (\stopTime -> ( stopTime.trip_id, -stopTime.stop_sequence ))
                 |> List.foldl (\e acc -> upsert e.trip_id e acc) Dict.empty
@@ -305,7 +352,7 @@ viewFeed ( feed, ( stopTimes, stops, pathways ) ) =
                         Nothing
 
                     else
-                        Just (viewStopTimes stops tripStops)
+                        Just (viewStopTimes stops trips tripStops)
                 )
             |> Html.div []
         ]
@@ -535,9 +582,22 @@ viewPathways stops filteredPathways =
         ]
 
 
-viewStopTimes : Dict Id Stop -> List StopTime -> Html msg
-viewStopTimes stops filteredStopTimes =
+viewStopTimes : Dict Id Stop -> Dict Id Trip -> List StopTime -> Html msg
+viewStopTimes stops trips filteredStopTimes =
     let
+        trip : Id -> String
+        trip id =
+            case Dict.get id trips of
+                Nothing ->
+                    id
+
+                Just found ->
+                    [ found.short_name
+                    , found.block_id
+                    ]
+                        |> List.filterMap identity
+                        |> String.join " - "
+
         stop : Id -> String
         stop id =
             case Dict.get id stops of
@@ -554,7 +614,7 @@ viewStopTimes stops filteredStopTimes =
 
         viewStopTime : StopTime -> Html msg
         viewStopTime stopTime =
-            [ Table.string stopTime.trip_id
+            [ Table.string (trip stopTime.trip_id)
             , Table.maybe Table.time stopTime.arrival_time
             , Table.maybe Table.time stopTime.departure_time
             , Table.maybe Table.string (Maybe.map stop stopTime.stop_id)
@@ -1077,6 +1137,22 @@ update msg model =
                             Dict.empty
             in
             ( { model | pathways = RemoteData.Loaded (Dict.insert feed res existing) }, Cmd.none )
+
+        GotTrips _ (Err e) ->
+            ( { model | trips = RemoteData.Error e }, Cmd.none )
+
+        GotTrips feed (Ok res) ->
+            let
+                existing : Dict Feed (Dict Id Trip)
+                existing =
+                    case model.trips of
+                        RemoteData.Loaded trips ->
+                            trips
+
+                        _ ->
+                            Dict.empty
+            in
+            ( { model | trips = RemoteData.Loaded (Dict.insert feed res existing) }, Cmd.none )
 
         GotStopTimes _ (Err e) ->
             ( { model | stopTimes = RemoteData.Error e }, Cmd.none )
