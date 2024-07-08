@@ -244,10 +244,10 @@ view model =
                     [ Html.text (Debug.toString e) ]
 
                 RemoteData.NotAsked ->
-                    [ Html.text "Not asked" ]
+                    [ Html.text "Stops not asked" ]
 
                 RemoteData.Loading ->
-                    [ Html.text "Loading..." ]
+                    [ Html.text "Stops loading..." ]
 
                 RemoteData.Loaded stops ->
                     case model.pathways of
@@ -255,10 +255,10 @@ view model =
                             [ Html.text (Debug.toString e) ]
 
                         RemoteData.NotAsked ->
-                            [ Html.text "Not asked" ]
+                            [ Html.text "Pathways not asked" ]
 
                         RemoteData.Loading ->
-                            [ Html.text "Loading..." ]
+                            [ Html.text "Pathways loading..." ]
 
                         RemoteData.Loaded pathways ->
                             Dict.merge
