@@ -56,6 +56,16 @@ type alias StopTime =
     , stop_headsign : Maybe String
     , start_pickup_drop_off_window : Maybe Time
     , end_pickup_drop_off_window : Maybe Time
+    , pickup_type : Maybe PickupDropOffType
+    , drop_off_type : Maybe PickupDropOffType
+    , continuous_pickup : Maybe PickupDropOffType
+    , continuous_drop_off : Maybe PickupDropOffType
+    , shape_dist_traveled : Maybe Float
+
+    -- False for approximate, True or Nothing for exact
+    , timepoint : Maybe Bool
+    , pickup_booking_rule_id : Maybe Id
+    , drop_off_booking_rule_id : Maybe Id
     }
 
 
@@ -72,6 +82,48 @@ stopTimeDecoder =
         |> optional "stop_headsign" Csv.Decode.string
         |> optional "start_pickup_drop_off_window" timeDecoder
         |> optional "end_pickup_drop_off_window" timeDecoder
+        |> optional "pickup_type" pickupDropOffTypeDecoder
+        |> optional "drop_off_type" pickupDropOffTypeDecoder
+        |> optional "continuous_pickup" pickupDropOffTypeDecoder
+        |> optional "continuous_drop_off" pickupDropOffTypeDecoder
+        |> optional "shape_dist_traveled" Csv.Decode.float
+        |> optional "timepoint" boolDecoder
+        |> optional "pickup_booking_rule_id" id
+        |> optional "drop_off_booking_rule_id" id
+
+
+type PickupDropOffType
+    = RegularlyScheduled
+    | NoPickupDropOff
+    | PhoneAgency
+    | CoordinateWithDriver
+
+
+pickupDropOffTypeDecoder : Csv.Decode.Decoder PickupDropOffType
+pickupDropOffTypeDecoder =
+    parsed pickupDropOffTypeParser
+
+
+pickupDropOffTypeParser : String -> Maybe PickupDropOffType
+pickupDropOffTypeParser input =
+    case input of
+        "" ->
+            Just RegularlyScheduled
+
+        "0" ->
+            Just RegularlyScheduled
+
+        "1" ->
+            Just NoPickupDropOff
+
+        "2" ->
+            Just PhoneAgency
+
+        "3" ->
+            Just CoordinateWithDriver
+
+        _ ->
+            Nothing
 
 
 type alias Stop =
