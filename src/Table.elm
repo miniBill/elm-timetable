@@ -2,14 +2,15 @@ module Table exposing (cell, debug, duration, float, int, length, maybe, string,
 
 import Duration
 import Float.Extra
-import Html exposing (Html)
+import Html exposing (Attribute, Html)
+import Html.Attributes exposing (style)
 import Length
 import Url exposing (Url)
 
 
-cell : String -> Html msg
-cell s =
-    Html.td [] [ Html.text s ]
+cell : List (Attribute msg) -> String -> Html msg
+cell attrs s =
+    Html.td attrs [ Html.text s ]
 
 
 maybe : (a -> Html msg) -> Maybe a -> Html msg
@@ -19,17 +20,17 @@ maybe f x =
             f v
 
         Nothing ->
-            cell "---"
+            string "---"
 
 
 string : String -> Html msg
 string s =
-    cell s
+    cell [] s
 
 
 length : Length.Length -> Html msg
 length l =
-    cell (String.fromFloat (Length.inMeters l) ++ "m")
+    string (String.fromFloat (Length.inMeters l) ++ "m")
 
 
 duration : Duration.Duration -> Html msg
@@ -46,6 +47,7 @@ duration l =
     in
     if m > 0 then
         cell
+            [ style "text-align" "right" ]
             (String.fromInt m
                 ++ "' "
                 ++ String.fromFloat s
@@ -53,24 +55,30 @@ duration l =
             )
 
     else
-        cell (String.fromFloat s ++ "\"")
+        cell
+            [ style "text-align" "right" ]
+            (String.fromFloat s ++ "\"")
 
 
 float : Float -> Html msg
 float f =
-    cell (String.fromFloat f)
+    cell
+        [ style "text-align" "right" ]
+        (String.fromFloat f)
 
 
 int : Int -> Html msg
 int f =
-    cell (String.fromInt f)
+    cell
+        [ style "text-align" "right" ]
+        (String.fromInt f)
 
 
 url : Url -> Html msg
 url v =
-    cell (Url.toString v)
+    string (Url.toString v)
 
 
 debug : a -> Html msg
 debug v =
-    cell (Debug.toString v)
+    string (Debug.toString v)
