@@ -263,6 +263,7 @@ viewFeed ( feed, ( ( stopTimes, trips ), ( stops, pathways ) ) ) =
                             , "Pat:42:3654" -- Villach Hbf - ÖBB
                             , "Pat:45:50002" -- Salzburg Hbf - ÖBB
                             , "Pde:09162:5" -- München Ost - ÖBB
+                            , "Pit:22095:7068" -- Tarvisio - ÖBB
 
                             -- "Pde:09162:10" -- Pasing
                             --     , "de:09162:6:40:81"
@@ -277,6 +278,7 @@ viewFeed ( feed, ( ( stopTimes, trips ), ( stops, pathways ) ) ) =
                                 , Just "Pat:42:3654" -- Villach Hbf - ÖBB
                                 , Just "Pat:45:50002" -- Salzburg Hbf - ÖBB
                                 , Just "Pde:09162:5" -- München Ost - ÖBB
+                                , Just "Pit:22095:7068" -- Tarvisio - ÖBB
                                 ]
                     )
                 |> List.take 1000
@@ -396,6 +398,7 @@ viewStops stops filteredStops =
                 |> Html.tr []
     in
     filteredStops
+        |> List.filter (\stop -> stop.parent_station == Nothing)
         |> List.map viewStop
         |> (::)
             ([ "id"
