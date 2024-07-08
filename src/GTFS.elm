@@ -1,4 +1,4 @@
-module GTFS exposing (Feed, Id, Latitude, LocationType(..), Longitude, Pathway, PathwayMode(..), Stop, StopTime, Time, Timezone, WheelchairBoarding(..), id, locationTypeParser, optional, parsed, pathwayDecoder, pathwayModeDecoder, required, stopDecoder, stopTimeDecoder, timeDecoder, timeParser, urlDecoder, weelchairBoardingDecoder)
+module GTFS exposing (Accessibility(..), Feed, Id, Latitude, LocationType(..), Longitude, Pathway, PathwayMode(..), Stop, StopTime, Time, Timezone, Trip, accessibilityDecoder, id, locationTypeParser, optional, parsed, pathwayDecoder, pathwayModeDecoder, required, stopDecoder, stopTimeDecoder, timeDecoder, timeParser, tripDecoder, urlDecoder)
 
 import Angle exposing (Angle)
 import Csv.Decode
@@ -92,6 +92,35 @@ stopTimeDecoder =
         |> optional "drop_off_booking_rule_id" id
 
 
+type alias Trip =
+    { route_id : Id
+    , service_id : Id
+    , id : Id
+    , headsign : Maybe String
+    , short_name : Maybe String
+    , direction_id : Maybe Bool
+    , block_id : Maybe Id
+    , shape_id : Maybe Id
+    , wheelchair_accessible : Maybe Accessibility
+    , bikes_allowed : Maybe Accessibility
+    }
+
+
+tripDecoder : Csv.Decode.Decoder Trip
+tripDecoder =
+    Csv.Decode.succeed Trip
+        |> required "route_id" id
+        |> required "service_id" id
+        |> required "trip_id" id
+        |> optional "trip_headsign" Csv.Decode.string
+        |> optional "trip_short_name" Csv.Decode.string
+        |> optional "direction_id" boolDecoder
+        |> optional "block_id" id
+        |> optional "shape_id" id
+        |> optional "wheelchair_accessible" accessibilityDecoder
+        |> optional "bikes_allowed" accessibilityDecoder
+
+
 type PickupDropOffType
     = RegularlyScheduled
     | NoPickupDropOff
@@ -139,7 +168,7 @@ type alias Stop =
     , location_type : LocationType
     , parent_station : Maybe Id
     , timezone : Maybe Timezone
-    , wheelchair_boarding : Maybe WheelchairBoarding
+    , wheelchair_boarding : Maybe Accessibility
     , level_id : Maybe Id
     , platform_code : Maybe String
     }
@@ -160,7 +189,7 @@ stopDecoder =
         |> required "location_type" locationTypeDecoder
         |> optional "parent_station" id
         |> optional "stop_timezone" Csv.Decode.string
-        |> optional "wheelchair_boarding" weelchairBoardingDecoder
+        |> optional "wheelchair_boarding" accessibilityDecoder
         |> optional "level_id" id
         |> optional "platform_code" Csv.Decode.string
 
@@ -236,31 +265,31 @@ locationTypeParser input =
             Nothing
 
 
-type WheelchairBoarding
-    = NoWheelchairInfo
-    | WheelchairAccessible
-    | NotWheelchairAccessible
+type Accessibility
+    = NoAccessibilityInformation
+    | Accessibly
+    | NotAccessible
 
 
-weelchairBoardingDecoder : Csv.Decode.Decoder WheelchairBoarding
-weelchairBoardingDecoder =
-    parsed weelchairBoardingParser
+accessibilityDecoder : Csv.Decode.Decoder Accessibility
+accessibilityDecoder =
+    parsed accessibilityParser
 
 
-weelchairBoardingParser : String -> Maybe WheelchairBoarding
-weelchairBoardingParser input =
+accessibilityParser : String -> Maybe Accessibility
+accessibilityParser input =
     case input of
         "" ->
-            Just NoWheelchairInfo
+            Just NoAccessibilityInformation
 
         "0" ->
-            Just NoWheelchairInfo
+            Just NoAccessibilityInformation
 
         "1" ->
-            Just WheelchairAccessible
+            Just Accessibly
 
         "2" ->
-            Just NotWheelchairAccessible
+            Just NotAccessible
 
         _ ->
             Nothing
