@@ -117,7 +117,14 @@ getCSV toMsg feed filename decoder =
                                 Csv.Decode.decodeCsv Csv.Decode.FieldNamesFromFirstRow decoder res
                                     |> Result.mapError
                                         (\err ->
-                                            Http.BadBody (Debug.toString err)
+                                            Http.BadBody
+                                                ("While decoding "
+                                                    ++ feed
+                                                    ++ "/"
+                                                    ++ filename
+                                                    ++ ", "
+                                                    ++ Csv.Decode.errorToString err
+                                                )
                                         )
                             )
                         |> toMsg
