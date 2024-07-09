@@ -4,11 +4,11 @@ import Browser
 import Color
 import Csv.Decode
 import Dagre.Attributes
-import Date
+import Date exposing (Date)
 import Dict exposing (Dict)
 import Dict.Extra
 import Duration exposing (Duration)
-import GTFS exposing (Calendar, Feed, Id, Pathway, Stop, StopTime, Time, Trip)
+import GTFS exposing (Calendar, CalendarDate, Feed, Id, Pathway, Stop, StopTime, Time, Trip)
 import Graph
 import Html exposing (Html)
 import Html.Attributes
@@ -52,11 +52,12 @@ main =
 rebuildTimetable : Model -> Model
 rebuildTimetable model =
     case
-        RemoteData.map4
-            (\t st s c ->
+        RemoteData.map5
+            (\t st cd s c ->
                 ( ( t |> Dict.values |> List.foldl Dict.union Dict.empty
                   , st |> Dict.values |> List.concat
                   )
+                , cd |> Dict.values |> List.foldl Dict.union Dict.empty
                 , ( s |> Dict.values |> List.foldl Dict.union Dict.empty
                   , c |> Dict.values |> List.foldl Dict.union Dict.empty
                   )
@@ -64,10 +65,11 @@ rebuildTimetable model =
             )
             model.trips
             model.stopTimes
+            model.calendarDates
             model.stops
             model.calendars
     of
-        RemoteData.Loaded ( ( trips, stopTimes ), ( stops, calendars ) ) ->
+        RemoteData.Loaded ( ( trips, stopTimes ), calendarDates, ( stops, calendars ) ) ->
             let
                 filteredStops : List Stop
                 filteredStops =
@@ -75,7 +77,7 @@ rebuildTimetable model =
 
                 filteredTrips : Dict Id Trip
                 filteredTrips =
-                    filterTrips calendars trips
+                    filterTrips calendarDates calendars trips
 
                 filteredStopTimes : Dict ( Id, Id ) (List StopTime)
                 filteredStopTimes =
@@ -162,23 +164,29 @@ rebuildTimetable model =
             model
 
 
-filterTrips : Dict Id Calendar -> Dict Id Trip -> Dict Id Trip
-filterTrips calendars trips =
+filterTrips : Dict ( Id, Int ) CalendarDate -> Dict Id Calendar -> Dict Id Trip -> Dict Id Trip
+filterTrips calendarDates calendars trips =
     trips
         |> Dict.filter
             (\_ trip ->
-                case Dict.get trip.service_id calendars of
-                    Nothing ->
-                        False
+                let
+                    today : Date
+                    today =
+                        Date.fromCalendarDate 2024 Time.Jul 9
+                in
+                case Dict.get ( trip.service_id, GTFS.dateToInt today ) calendarDates of
+                    Just { exception_type } ->
+                        exception_type == GTFS.ServiceAdded
 
-                    Just calendar ->
-                        let
-                            today =
-                                Date.fromCalendarDate 2024 Time.Jul 9
-                        in
-                        calendar.tuesday
-                            && (Date.compare calendar.start_date today /= GT)
-                            && (Date.compare calendar.end_date today /= LT)
+                    Nothing ->
+                        case Dict.get trip.service_id calendars of
+                            Nothing ->
+                                False
+
+                            Just calendar ->
+                                calendar.tuesday
+                                    && (Date.compare calendar.start_date today /= GT)
+                                    && (Date.compare calendar.end_date today /= LT)
             )
 
 
@@ -191,6 +199,7 @@ init _ =
       , stopTimes = RemoteData.Loading
       , calendars = RemoteData.Loading
       , trips = RemoteData.Loading
+      , calendarDates = RemoteData.Loading
       }
     , loadData
     )
@@ -209,6 +218,25 @@ loadData =
                 , getCSV GotStopTimes feed "stop_times.txt" GTFS.stopTimeDecoder
                 , getCSVId GotTrips feed "trips.txt" GTFS.tripDecoder
                 , getCSVId GotCalendars feed "calendar.txt" GTFS.calendarDecoder
+                , getCSV
+                    (\_ calendarDates ->
+                        calendarDates
+                            |> Result.map
+                                (List.foldl
+                                    (\calendarDate ->
+                                        Dict.insert
+                                            ( calendarDate.service_id
+                                            , GTFS.dateToInt calendarDate.date
+                                            )
+                                            calendarDate
+                                    )
+                                    Dict.empty
+                                )
+                            |> GotCalendarDates feed
+                    )
+                    feed
+                    "calendar_dates.txt"
+                    GTFS.calendarDateDecoder
                 ]
             )
         |> Cmd.batch
@@ -344,13 +372,25 @@ view model =
                                                     [ Html.text "Calendars loading..." ]
 
                                                 RemoteData.Loaded calendars ->
-                                                    pathways
-                                                        |> mergePair stops
-                                                        |> mergePair calendars
-                                                        |> mergePair trips
-                                                        |> mergePair stopTimes
-                                                        |> Dict.toList
-                                                        |> List.map viewFeed
+                                                    case model.calendarDates of
+                                                        RemoteData.Error e ->
+                                                            [ Html.text (Debug.toString e) ]
+
+                                                        RemoteData.NotAsked ->
+                                                            [ Html.text "Calendar dates not asked" ]
+
+                                                        RemoteData.Loading ->
+                                                            [ Html.text "Calendar dates loading..." ]
+
+                                                        RemoteData.Loaded calendarDates ->
+                                                            pathways
+                                                                |> mergePair stops
+                                                                |> mergePair calendars
+                                                                |> mergePair trips
+                                                                |> mergePair stopTimes
+                                                                |> mergePair calendarDates
+                                                                |> Dict.toList
+                                                                |> List.map viewFeed
         ]
 
 
@@ -373,8 +413,22 @@ mergePair l r =
         Dict.empty
 
 
-viewFeed : ( Feed, ( List StopTime, ( Dict Id Trip, ( Dict Id Calendar, ( Dict Id Stop, Dict Id Pathway ) ) ) ) ) -> Html msg
-viewFeed ( feed, ( stopTimes, ( trips, ( calendars, ( stops, pathways ) ) ) ) ) =
+viewFeed :
+    ( Feed
+    , ( Dict ( Id, Int ) CalendarDate
+      , ( List StopTime
+        , ( Dict Id Trip
+          , ( Dict Id Calendar
+            , ( Dict Id Stop
+              , Dict Id Pathway
+              )
+            )
+          )
+        )
+      )
+    )
+    -> Html msg
+viewFeed ( feed, ( calendarDates, ( stopTimes, ( trips, ( calendars, ( stops, pathways ) ) ) ) ) ) =
     let
         filteredStops : List Stop
         filteredStops =
@@ -397,7 +451,7 @@ viewFeed ( feed, ( stopTimes, ( trips, ( calendars, ( stops, pathways ) ) ) ) ) 
 
         filteredTrips : Dict Id Trip
         filteredTrips =
-            filterTrips calendars trips
+            filterTrips calendarDates calendars trips
 
         filteredStopTimes : Dict ( Id, Id ) (List StopTime)
         filteredStopTimes =
@@ -1324,6 +1378,9 @@ update msg model =
 
         GotCalendars feed res ->
             ( { model | calendars = mergeFeed feed res model.calendars }, Cmd.none )
+
+        GotCalendarDates feed res ->
+            ( { model | calendarDates = mergeFeed feed res model.calendarDates }, Cmd.none )
 
         Reload ->
             ( model, loadData )

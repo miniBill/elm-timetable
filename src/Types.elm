@@ -1,7 +1,7 @@
 module Types exposing (Event(..), Model, Msg(..), Station, Timetable, ViewMode(..))
 
 import Dict exposing (Dict)
-import GTFS exposing (Calendar, Feed, Id, Pathway, Stop, StopTime, Time, Trip)
+import GTFS exposing (Calendar, CalendarDate, Feed, Id, Pathway, Stop, StopTime, Time, Trip)
 import Http
 import RemoteData exposing (RemoteData)
 
@@ -14,6 +14,7 @@ type alias Model =
     , stopTimes : RemoteData (Dict Feed (List StopTime))
     , calendars : RemoteData (Dict Feed (Dict Id Calendar))
     , trips : RemoteData (Dict Feed (Dict Id Trip))
+    , calendarDates : RemoteData (Dict Feed (Dict ( Id, Int ) CalendarDate))
     }
 
 
@@ -46,3 +47,4 @@ type Msg
     | GotStopTimes Feed (Result Http.Error (List StopTime))
     | GotTrips Feed (Result Http.Error (Dict Id Trip))
     | GotCalendars Feed (Result Http.Error (Dict Id Calendar))
+    | GotCalendarDates Feed (Result Http.Error (Dict ( Id, Int ) CalendarDate))

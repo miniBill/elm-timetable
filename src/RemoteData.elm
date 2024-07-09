@@ -1,4 +1,4 @@
-module RemoteData exposing (RemoteData(..), map, map3, map4)
+module RemoteData exposing (RemoteData(..), map, map3, map4, map5)
 
 import Http
 
@@ -114,3 +114,20 @@ map4 f a b c d =
         )
         (map2 Tuple.pair a b)
         (map2 Tuple.pair c d)
+
+
+map5 :
+    (a -> b -> c -> d -> e -> f)
+    -> RemoteData a
+    -> RemoteData b
+    -> RemoteData c
+    -> RemoteData d
+    -> RemoteData e
+    -> RemoteData f
+map5 f a b c d e =
+    map2
+        (\( av, bv ) ( cv, dv, ev ) ->
+            f av bv cv dv ev
+        )
+        (map2 Tuple.pair a b)
+        (map3 (\cv dv ev -> ( cv, dv, ev )) c d e)

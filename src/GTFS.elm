@@ -1,4 +1,4 @@
-module GTFS exposing (Accessibility(..), Calendar, Feed, Id, Latitude, LocationType(..), Longitude, Pathway, PathwayMode(..), PickupDropOffType, Stop, StopTime, Time, Timezone, Trip, calendarDecoder, pathwayDecoder, stopDecoder, stopTimeDecoder, timeToString, tripDecoder)
+module GTFS exposing (Accessibility(..), Calendar, CalendarDate, ExceptionType(..), Feed, Id, Latitude, LocationType(..), Longitude, Pathway, PathwayMode(..), PickupDropOffType, Stop, StopTime, Time, Timezone, Trip, calendarDateDecoder, calendarDecoder, dateToInt, pathwayDecoder, stopDecoder, stopTimeDecoder, timeToString, tripDecoder)
 
 import Angle exposing (Angle)
 import Csv.Decode
@@ -151,27 +151,72 @@ calendarDecoder =
         |> required "end_date" dateDecoder
 
 
+type alias CalendarDate =
+    { service_id : Id
+    , date : Date
+    , exception_type : ExceptionType
+    }
+
+
+calendarDateDecoder : Csv.Decode.Decoder CalendarDate
+calendarDateDecoder =
+    Csv.Decode.succeed CalendarDate
+        |> required "service_id" id
+        |> required "date" dateDecoder
+        |> required "exception_type" exceptionTypeDecoder
+
+
+type ExceptionType
+    = ServiceAdded
+    | ServiceRemoved
+
+
+exceptionTypeDecoder : Csv.Decode.Decoder ExceptionType
+exceptionTypeDecoder =
+    parsed exceptionTypeParser
+
+
+exceptionTypeParser : String -> Maybe ExceptionType
+exceptionTypeParser input =
+    case input of
+        "1" ->
+            Just ServiceAdded
+
+        "2" ->
+            Just ServiceRemoved
+
+        _ ->
+            Nothing
+
+
 dateDecoder : Csv.Decode.Decoder Date
 dateDecoder =
-    parsed
-        (\string ->
-            string
-                |> String.toInt
-                |> Maybe.map
-                    (\raw ->
-                        let
-                            year =
-                                raw // 10000
+    parsed dateParser
 
-                            month =
-                                Date.numberToMonth (modBy 100 (raw // 100))
 
-                            day =
-                                modBy 100 raw
-                        in
-                        Date.fromCalendarDate year month day
-                    )
-        )
+dateParser : String -> Maybe Date
+dateParser string =
+    string
+        |> String.toInt
+        |> Maybe.map
+            (\raw ->
+                let
+                    year =
+                        raw // 10000
+
+                    month =
+                        Date.numberToMonth (modBy 100 (raw // 100))
+
+                    day =
+                        modBy 100 raw
+                in
+                Date.fromCalendarDate year month day
+            )
+
+
+dateToInt : Date -> Int
+dateToInt date =
+    Date.year date * 10000 + Date.monthNumber date * 100 + Date.day date
 
 
 type PickupDropOffType
