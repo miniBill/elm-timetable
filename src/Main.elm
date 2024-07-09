@@ -4,7 +4,6 @@ import Browser
 import Color
 import Csv.Decode
 import Dagre.Attributes
-import Data
 import Dict exposing (Dict)
 import Dict.Extra
 import Duration exposing (Duration)
@@ -155,7 +154,7 @@ rebuildTimetable model =
 
 init : flags -> ( Model, Cmd Msg )
 init _ =
-    ( { timetable = [] -- Data.villachToUdine
+    ( { timetable = []
       , mode = ViewSimple
       , stops = RemoteData.Loading
       , pathways = RemoteData.Loading
@@ -169,7 +168,10 @@ init _ =
 
 loadData : Cmd Msg
 loadData =
-    Data.feeds
+    [ --  "de" ,
+      "oebb-2024"
+    , "micotra-2024"
+    ]
         |> List.concatMap
             (\feed ->
                 [ getCSVId GotStops feed "stops.txt" GTFS.stopDecoder
