@@ -1,4 +1,4 @@
-module RemoteData exposing (RemoteData(..), map, map3)
+module RemoteData exposing (RemoteData(..), map, map3, map4)
 
 import Http
 
@@ -24,6 +24,37 @@ map f x =
 
         Loaded l ->
             Loaded (f l)
+
+
+map2 :
+    (a -> b -> c)
+    -> RemoteData a
+    -> RemoteData b
+    -> RemoteData c
+map2 f a b =
+    case a of
+        NotAsked ->
+            NotAsked
+
+        Loading ->
+            Loading
+
+        Error e ->
+            Error e
+
+        Loaded la ->
+            case b of
+                NotAsked ->
+                    NotAsked
+
+                Loading ->
+                    Loading
+
+                Error e ->
+                    Error e
+
+                Loaded lb ->
+                    Loaded (f la lb)
 
 
 map3 :
@@ -67,3 +98,19 @@ map3 f a b c =
 
                         Loaded lc ->
                             Loaded (f la lb lc)
+
+
+map4 :
+    (a -> b -> c -> d -> e)
+    -> RemoteData a
+    -> RemoteData b
+    -> RemoteData c
+    -> RemoteData d
+    -> RemoteData e
+map4 f a b c d =
+    map2
+        (\( av, bv ) ( cv, dv ) ->
+            f av bv cv dv
+        )
+        (map2 Tuple.pair a b)
+        (map2 Tuple.pair c d)

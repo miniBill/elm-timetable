@@ -4,10 +4,11 @@ import Browser
 import Color
 import Csv.Decode
 import Dagre.Attributes
+import Date
 import Dict exposing (Dict)
 import Dict.Extra
 import Duration exposing (Duration)
-import GTFS exposing (Feed, Id, Pathway, Stop, StopTime, Time, Trip)
+import GTFS exposing (Calendar, Feed, Id, Pathway, Stop, StopTime, Time, Trip)
 import Graph
 import Html exposing (Html)
 import Html.Attributes
@@ -22,6 +23,7 @@ import Render.StandardDrawers.Attributes
 import Render.StandardDrawers.Types
 import Set exposing (Set)
 import Table
+import Time
 import TypedSvg exposing (g, line, svg, text_, title)
 import TypedSvg.Attributes exposing (class, stroke, textAnchor, transform, viewBox)
 import TypedSvg.Attributes.InPx exposing (x1, x2, y, y1, y2)
@@ -50,26 +52,34 @@ main =
 rebuildTimetable : Model -> Model
 rebuildTimetable model =
     case
-        RemoteData.map3
-            (\t st s ->
-                ( t |> Dict.values |> List.foldl Dict.union Dict.empty
-                , st |> Dict.values |> List.concat
-                , s |> Dict.values |> List.foldl Dict.union Dict.empty
+        RemoteData.map4
+            (\t st s c ->
+                ( ( t |> Dict.values |> List.foldl Dict.union Dict.empty
+                  , st |> Dict.values |> List.concat
+                  )
+                , ( s |> Dict.values |> List.foldl Dict.union Dict.empty
+                  , c |> Dict.values |> List.foldl Dict.union Dict.empty
+                  )
                 )
             )
             model.trips
             model.stopTimes
             model.stops
+            model.calendars
     of
-        RemoteData.Loaded ( trips, stopTimes, stops ) ->
+        RemoteData.Loaded ( ( trips, stopTimes ), ( stops, calendars ) ) ->
             let
                 filteredStops : List Stop
                 filteredStops =
                     filterStops stops
 
+                filteredTrips : Dict Id Trip
+                filteredTrips =
+                    filterTrips calendars trips
+
                 filteredStopTimes : Dict ( Id, Id ) (List StopTime)
                 filteredStopTimes =
-                    filterStopTimes trips filteredStops stopTimes
+                    filterStopTimes filteredTrips filteredStops stopTimes
 
                 stopName : { a | stop_id : Id } -> Id
                 stopName stopTime =
@@ -150,6 +160,26 @@ rebuildTimetable model =
 
         _ ->
             model
+
+
+filterTrips : Dict Id Calendar -> Dict Id Trip -> Dict Id Trip
+filterTrips calendars trips =
+    trips
+        |> Dict.filter
+            (\_ trip ->
+                case Dict.get trip.service_id calendars of
+                    Nothing ->
+                        False
+
+                    Just calendar ->
+                        let
+                            today =
+                                Date.fromCalendarDate 2024 Time.Jul 9
+                        in
+                        calendar.tuesday
+                            && (Date.compare calendar.start_date today /= GT)
+                            && (Date.compare calendar.end_date today /= LT)
+            )
 
 
 init : flags -> ( Model, Cmd Msg )
@@ -297,64 +327,54 @@ view model =
                                             [ Html.text (Debug.toString e) ]
 
                                         RemoteData.NotAsked ->
-                                            [ Html.text "trips not asked" ]
+                                            [ Html.text "Trips not asked" ]
 
                                         RemoteData.Loading ->
-                                            [ Html.text "trips loading..." ]
+                                            [ Html.text "Trips loading..." ]
 
                                         RemoteData.Loaded trips ->
-                                            let
-                                                stopsAndPathways :
-                                                    Dict
-                                                        Feed
-                                                        ( Dict Id Stop, Dict Id Pathway )
-                                                stopsAndPathways =
-                                                    Dict.merge
-                                                        (\_ _ acc -> acc)
-                                                        (\k stop pathway acc ->
-                                                            Dict.insert
-                                                                k
-                                                                ( stop, pathway )
-                                                                acc
-                                                        )
-                                                        (\_ _ acc -> acc)
-                                                        stops
-                                                        pathways
-                                                        Dict.empty
+                                            case model.calendars of
+                                                RemoteData.Error e ->
+                                                    [ Html.text (Debug.toString e) ]
 
-                                                stopTimesAndTrips =
-                                                    Dict.merge
-                                                        (\_ _ acc -> acc)
-                                                        (\k stopTime trip acc ->
-                                                            Dict.insert
-                                                                k
-                                                                ( stopTime, trip )
-                                                                acc
-                                                        )
-                                                        (\_ _ acc -> acc)
-                                                        stopTimes
-                                                        trips
-                                                        Dict.empty
-                                            in
-                                            Dict.merge
-                                                (\_ _ acc -> acc)
-                                                (\k l r acc ->
-                                                    Dict.insert
-                                                        k
-                                                        ( l, r )
-                                                        acc
-                                                )
-                                                (\_ _ acc -> acc)
-                                                stopTimesAndTrips
-                                                stopsAndPathways
-                                                Dict.empty
-                                                |> Dict.toList
-                                                |> List.map viewFeed
+                                                RemoteData.NotAsked ->
+                                                    [ Html.text "Calendars not asked" ]
+
+                                                RemoteData.Loading ->
+                                                    [ Html.text "Calendars loading..." ]
+
+                                                RemoteData.Loaded calendars ->
+                                                    pathways
+                                                        |> mergePair stops
+                                                        |> mergePair calendars
+                                                        |> mergePair trips
+                                                        |> mergePair stopTimes
+                                                        |> Dict.toList
+                                                        |> List.map viewFeed
         ]
 
 
-viewFeed : ( Feed, ( ( List StopTime, Dict Id Trip ), ( Dict Id Stop, Dict Id Pathway ) ) ) -> Html msg
-viewFeed ( feed, ( ( stopTimes, trips ), ( stops, pathways ) ) ) =
+mergePair :
+    Dict comparable a
+    -> Dict comparable b
+    -> Dict comparable ( a, b )
+mergePair l r =
+    Dict.merge
+        (\_ _ acc -> acc)
+        (\k le re acc ->
+            Dict.insert
+                k
+                ( le, re )
+                acc
+        )
+        (\_ _ acc -> acc)
+        l
+        r
+        Dict.empty
+
+
+viewFeed : ( Feed, ( List StopTime, ( Dict Id Trip, ( Dict Id Calendar, ( Dict Id Stop, Dict Id Pathway ) ) ) ) ) -> Html msg
+viewFeed ( feed, ( stopTimes, ( trips, ( calendars, ( stops, pathways ) ) ) ) ) =
     let
         filteredStops : List Stop
         filteredStops =
@@ -375,8 +395,13 @@ viewFeed ( feed, ( ( stopTimes, trips ), ( stops, pathways ) ) ) =
                             && Set.member walkway.to_stop_id stopIds
                     )
 
+        filteredTrips : Dict Id Trip
+        filteredTrips =
+            filterTrips calendars trips
+
+        filteredStopTimes : Dict ( Id, Id ) (List StopTime)
         filteredStopTimes =
-            filterStopTimes trips filteredStops stopTimes
+            filterStopTimes filteredTrips filteredStops stopTimes
     in
     Html.div
         [ Html.Attributes.style "display" "flex"
@@ -400,14 +425,14 @@ viewFeed ( feed, ( ( stopTimes, trips ), ( stops, pathways ) ) ) =
                         Nothing
 
                     else
-                        Just (viewStopTimes stops trips tripStops)
+                        Just (viewStopTimes stops filteredTrips tripStops)
                 )
             |> Html.div []
         ]
 
 
 filterStopTimes : Dict Id Trip -> List Stop -> List StopTime -> Dict ( Id, Id ) (List StopTime)
-filterStopTimes trips filteredStops stopTimes =
+filterStopTimes filteredTrips filteredStops stopTimes =
     let
         stopIds : Set Id
         stopIds =
@@ -416,7 +441,7 @@ filterStopTimes trips filteredStops stopTimes =
     stopTimes
         |> List.filter
             (\stopTime ->
-                case Dict.get stopTime.trip_id trips of
+                case Dict.get stopTime.trip_id filteredTrips of
                     Nothing ->
                         False
 
@@ -445,7 +470,7 @@ filterStopTimes trips filteredStops stopTimes =
         |> Dict.toList
         |> Dict.Extra.groupBy
             (\( trip_id, _ ) ->
-                case Dict.get trip_id trips of
+                case Dict.get trip_id filteredTrips of
                     Nothing ->
                         ( trip_id, "" )
 
@@ -746,11 +771,11 @@ viewPathways stops filteredPathways =
 
 
 viewStopTimes : Dict Id Stop -> Dict Id Trip -> List StopTime -> Html msg
-viewStopTimes stops trips filteredStopTimes =
+viewStopTimes stops filteredTrips filteredStopTimes =
     let
         trip : Id -> String
         trip id =
-            case Dict.get id trips of
+            case Dict.get id filteredTrips of
                 Nothing ->
                     id
 
