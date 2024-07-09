@@ -79,7 +79,7 @@ rebuildTimetable model =
                 filteredTrips =
                     filterTrips calendarDates calendars trips
 
-                filteredStopTimes : Dict ( Id, Id ) (List StopTime)
+                filteredStopTimes : List (List StopTime)
                 filteredStopTimes =
                     filterStopTimes filteredTrips filteredStops stopTimes
 
@@ -105,7 +105,6 @@ rebuildTimetable model =
                 timetable : Timetable
                 timetable =
                     filteredStopTimes
-                        |> Dict.values
                         |> List.concatMap
                             (\trip ->
                                 trip
@@ -453,7 +452,7 @@ viewFeed ( feed, ( calendarDates, ( stopTimes, ( trips, ( calendars, ( stops, pa
         filteredTrips =
             filterTrips calendarDates calendars trips
 
-        filteredStopTimes : Dict ( Id, Id ) (List StopTime)
+        filteredStopTimes : List (List StopTime)
         filteredStopTimes =
             filterStopTimes filteredTrips filteredStops stopTimes
     in
@@ -472,7 +471,6 @@ viewFeed ( feed, ( calendarDates, ( stopTimes, ( trips, ( calendars, ( stops, pa
           else
             Html.text ""
         , filteredStopTimes
-            |> Dict.values
             |> List.filterMap
                 (\tripStops ->
                     if List.length tripStops < 2 then
@@ -485,7 +483,7 @@ viewFeed ( feed, ( calendarDates, ( stopTimes, ( trips, ( calendars, ( stops, pa
         ]
 
 
-filterStopTimes : Dict Id Trip -> List Stop -> List StopTime -> Dict ( Id, Id ) (List StopTime)
+filterStopTimes : Dict Id Trip -> List Stop -> List StopTime -> List (List StopTime)
 filterStopTimes filteredTrips filteredStops stopTimes =
     let
         stopIds : Set Id
@@ -536,8 +534,9 @@ filterStopTimes filteredTrips filteredStops stopTimes =
                             Nothing ->
                                 ( trip_id, "" )
             )
-        |> Dict.map
-            (\_ v ->
+        |> Dict.values
+        |> List.map
+            (\v ->
                 v
                     |> List.concatMap Tuple.second
                     |> List.sortBy
