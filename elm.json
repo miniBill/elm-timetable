@@ -23,6 +23,7 @@
             "folkertdev/one-true-path-experiment": "6.0.1",
             "ianmackenzie/elm-geometry": "3.11.0",
             "ianmackenzie/elm-units": "2.10.0",
+            "justinmimbs/date": "4.1.0",
             "miniBill/elm-fast-dict": "1.1.0"
         },
         "indirect": {

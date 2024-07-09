@@ -160,6 +160,7 @@ init _ =
       , stops = RemoteData.Loading
       , pathways = RemoteData.Loading
       , stopTimes = RemoteData.Loading
+      , calendars = RemoteData.Loading
       , trips = RemoteData.Loading
       }
     , loadData
@@ -175,6 +176,7 @@ loadData =
                 , getCSVId GotPathways feed "pathways.txt" GTFS.pathwayDecoder
                 , getCSV GotStopTimes feed "stop_times.txt" GTFS.stopTimeDecoder
                 , getCSVId GotTrips feed "trips.txt" GTFS.tripDecoder
+                , getCSVId GotCalendars feed "calendar.txt" GTFS.calendarDecoder
                 ]
             )
         |> Cmd.batch
@@ -1281,72 +1283,47 @@ update msg model =
         OViewMode mode ->
             ( { model | mode = mode }, Cmd.none )
 
-        GotStops _ (Err e) ->
-            ( { model | stops = RemoteData.Error e }, Cmd.none )
+        GotStops feed res ->
+            ( { model | stops = mergeFeed feed res model.stops }, Cmd.none )
 
-        GotStops feed (Ok res) ->
-            let
-                existing : Dict Feed (Dict Id Stop)
-                existing =
-                    case model.stops of
-                        RemoteData.Loaded stops ->
-                            stops
+        GotPathways feed res ->
+            ( { model | pathways = mergeFeed feed res model.pathways }, Cmd.none )
 
-                        _ ->
-                            Dict.empty
-            in
-            ( { model | stops = RemoteData.Loaded (Dict.insert feed res existing) }, Cmd.none )
+        GotTrips feed res ->
+            ( { model | trips = mergeFeed feed res model.trips }, Cmd.none )
 
-        GotPathways _ (Err e) ->
-            ( { model | pathways = RemoteData.Error e }, Cmd.none )
+        GotStopTimes feed res ->
+            ( { model | stopTimes = mergeFeed feed res model.stopTimes }, Cmd.none )
 
-        GotPathways feed (Ok res) ->
-            let
-                existing : Dict Feed (Dict Id Pathway)
-                existing =
-                    case model.pathways of
-                        RemoteData.Loaded pathways ->
-                            pathways
-
-                        _ ->
-                            Dict.empty
-            in
-            ( { model | pathways = RemoteData.Loaded (Dict.insert feed res existing) }, Cmd.none )
-
-        GotTrips _ (Err e) ->
-            ( { model | trips = RemoteData.Error e }, Cmd.none )
-
-        GotTrips feed (Ok res) ->
-            let
-                existing : Dict Feed (Dict Id Trip)
-                existing =
-                    case model.trips of
-                        RemoteData.Loaded trips ->
-                            trips
-
-                        _ ->
-                            Dict.empty
-            in
-            ( { model | trips = RemoteData.Loaded (Dict.insert feed res existing) }, Cmd.none )
-
-        GotStopTimes _ (Err e) ->
-            ( { model | stopTimes = RemoteData.Error e }, Cmd.none )
-
-        GotStopTimes feed (Ok res) ->
-            let
-                existing : Dict Feed (List StopTime)
-                existing =
-                    case model.stopTimes of
-                        RemoteData.Loaded stopTimes ->
-                            stopTimes
-
-                        _ ->
-                            Dict.empty
-            in
-            ( { model | stopTimes = RemoteData.Loaded (Dict.insert feed res existing) }, Cmd.none )
+        GotCalendars feed res ->
+            ( { model | calendars = mergeFeed feed res model.calendars }, Cmd.none )
 
         Reload ->
             ( model, loadData )
+
+
+mergeFeed :
+    Feed
+    -> Result Http.Error a
+    -> RemoteData.RemoteData (Dict Feed a)
+    -> RemoteData.RemoteData (Dict Feed a)
+mergeFeed feed res data =
+    case res of
+        Err e ->
+            RemoteData.Error e
+
+        Ok val ->
+            let
+                existing : Dict Feed a
+                existing =
+                    case data of
+                        RemoteData.Loaded loaded ->
+                            loaded
+
+                        _ ->
+                            Dict.empty
+            in
+            RemoteData.Loaded (Dict.insert feed val existing)
 
 
 subscriptions : model -> Sub msg

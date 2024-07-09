@@ -1,7 +1,8 @@
-module GTFS exposing (Accessibility(..), Feed, Id, Latitude, LocationType(..), Longitude, Pathway, PathwayMode(..), PickupDropOffType, Stop, StopTime, Time, Timezone, Trip, pathwayDecoder, stopDecoder, stopTimeDecoder, timeToString, tripDecoder)
+module GTFS exposing (Accessibility(..), Calendar, Feed, Id, Latitude, LocationType(..), Longitude, Pathway, PathwayMode(..), PickupDropOffType, Stop, StopTime, Time, Timezone, Trip, calendarDecoder, pathwayDecoder, stopDecoder, stopTimeDecoder, timeToString, tripDecoder)
 
 import Angle exposing (Angle)
 import Csv.Decode
+import Date exposing (Date)
 import Duration exposing (Seconds)
 import Length exposing (Length)
 import Maybe.Extra
@@ -119,6 +120,58 @@ tripDecoder =
         |> optional "shape_id" id
         |> optional "wheelchair_accessible" accessibilityDecoder
         |> optional "bikes_allowed" accessibilityDecoder
+
+
+type alias Calendar =
+    { id : Id
+    , monday : Bool
+    , tuesday : Bool
+    , wednesday : Bool
+    , thursday : Bool
+    , friday : Bool
+    , saturday : Bool
+    , sunday : Bool
+    , start_date : Date
+    , end_date : Date
+    }
+
+
+calendarDecoder : Csv.Decode.Decoder Calendar
+calendarDecoder =
+    Csv.Decode.succeed Calendar
+        |> required "service_id" id
+        |> required "monday" boolDecoder
+        |> required "tuesday" boolDecoder
+        |> required "wednesday" boolDecoder
+        |> required "thursday" boolDecoder
+        |> required "friday" boolDecoder
+        |> required "saturday" boolDecoder
+        |> required "sunday" boolDecoder
+        |> required "start_date" dateDecoder
+        |> required "end_date" dateDecoder
+
+
+dateDecoder : Csv.Decode.Decoder Date
+dateDecoder =
+    parsed
+        (\string ->
+            string
+                |> String.toInt
+                |> Maybe.map
+                    (\raw ->
+                        let
+                            year =
+                                raw // 10000
+
+                            month =
+                                Date.numberToMonth (modBy 100 (raw // 100))
+
+                            day =
+                                modBy 100 raw
+                        in
+                        Date.fromCalendarDate year month day
+                    )
+        )
 
 
 type PickupDropOffType
