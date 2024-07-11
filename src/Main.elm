@@ -4,7 +4,7 @@ import Browser
 import Color
 import Csv.Decode
 import Dagre.Attributes
-import Date exposing (Date)
+import Date exposing (Date, Interval(..))
 import Dict exposing (Dict)
 import Dict.Extra
 import Duration exposing (Duration)
@@ -27,7 +27,7 @@ import Render.StandardDrawers.Attributes
 import Render.StandardDrawers.Types
 import Set
 import Table
-import Time
+import Time exposing (Weekday(..))
 import TypedSvg exposing (g, line, svg, text_, title)
 import TypedSvg.Attributes exposing (class, stroke, textAnchor, transform, viewBox)
 import TypedSvg.Attributes.InPx exposing (x1, x2, y, y1, y2)
@@ -59,11 +59,7 @@ rebuildTimetable model =
         RemoteData.map5
             (\t st cd s c ->
                 ( ( t |> Dict.values |> List.foldl IdDict.Extra.union IdDict.empty
-                  , let
-                        _ =
-                            Debug.todo
-                    in
-                    st |> Dict.values |> List.concat
+                  , st |> Dict.values |> List.concat
                   )
                 , cd |> Dict.values |> List.foldl mergeWithUnion IdDict.empty
                 , ( s |> Dict.values |> List.foldl IdDict.Extra.union IdDict.empty
@@ -199,12 +195,47 @@ filterTrips today calendarDates calendars trips =
                         exception_type == GTFS.ServiceAdded
 
                     Nothing ->
+                        -- let
+                        --     _ =
+                        --         Debug.log "No exceptions found for" trip.id
+                        -- in
                         case IdDict.get trip.service_id calendars of
                             Nothing ->
+                                let
+                                    _ =
+                                        Debug.log "Could not find calendar info for service_id" trip.service_id
+                                in
                                 False
 
                             Just calendar ->
-                                calendar.tuesday
+                                let
+                                    correctDay =
+                                        case Date.weekday today of
+                                            Mon ->
+                                                calendar.monday
+
+                                            Tue ->
+                                                calendar.tuesday
+
+                                            Wed ->
+                                                calendar.wednesday
+
+                                            Thu ->
+                                                calendar.thursday
+
+                                            Fri ->
+                                                calendar.friday
+
+                                            Sat ->
+                                                calendar.saturday
+
+                                            Sun ->
+                                                calendar.sunday
+
+                                    _ =
+                                        Debug.log "correctDay" ( trip.id, correctDay )
+                                in
+                                correctDay
                                     && (Date.compare calendar.start_date today /= GT)
                                     && (Date.compare calendar.end_date today /= LT)
             )
@@ -540,30 +571,12 @@ filterStopTimes filteredTrips filteredStops stopTimes =
     stopTimes
         |> List.filter
             (\stopTime ->
-                case IdDict.get stopTime.trip_id filteredTrips of
+                case stopTime.stop_id of
+                    Just id ->
+                        IdSet.member id stopIds
+
                     Nothing ->
                         False
-
-                    Just trip ->
-                        let
-                            defaulted : String
-                            defaulted =
-                                Maybe.withDefault "" trip.short_name
-                        in
-                        if
-                            String.startsWith "S " defaulted
-                                || String.startsWith "NJ " defaulted
-                                || String.startsWith "EN " defaulted
-                        then
-                            False
-
-                        else
-                            case stopTime.stop_id of
-                                Just id ->
-                                    IdSet.member id stopIds
-
-                                Nothing ->
-                                    False
             )
         |> IdDict.Extra.groupBy (\stopTime -> stopTime.trip_id)
         |> IdDict.toList
@@ -1169,8 +1182,8 @@ viewGraphs model =
                             timeX =
                                 timeToX timeRange time
 
-                            vline : Svg msg
-                            vline =
+                            verticalLine : Svg msg
+                            verticalLine =
                                 line
                                     [ class [ "grid" ]
                                     , x1 0
@@ -1219,7 +1232,7 @@ viewGraphs model =
                             next =
                                 g
                                     [ transform [ Translate timeX 0 ] ]
-                                    (vline :: label)
+                                    (verticalLine :: label)
                         in
                         ( Just time, next :: acc )
                     )
