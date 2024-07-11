@@ -47,4 +47,4 @@ type Msg
     | GotStopTimes Feed (Result Http.Error (List StopTime))
     | GotTrips Feed (Result Http.Error (IdDict TripId Trip))
     | GotCalendars Feed (Result Http.Error (IdDict ServiceId Calendar))
-    | GotCalendarDates Feed (Result Http.Error (IdDict ServiceId (Dict Int CalendarDate)))
+    | GotCalendarDates Feed (Result Http.Error (List CalendarDate))

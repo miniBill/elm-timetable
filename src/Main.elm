@@ -271,31 +271,7 @@ loadData =
                 , getCSV GotStopTimes feed "stop_times.txt" GTFS.stopTimeDecoder
                 , getCSVId GotTrips feed "trips.txt" GTFS.tripDecoder
                 , getCSVId GotCalendars feed "calendar.txt" GTFS.calendarDecoder
-                , getCSV
-                    (\_ calendarDates ->
-                        calendarDates
-                            |> Result.map
-                                (\dates ->
-                                    dates
-                                        |> IdDict.Extra.groupBy
-                                            (\calendarDate -> calendarDate.service_id)
-                                        |> IdDict.map
-                                            (\_ ->
-                                                List.foldl
-                                                    (\calendarDate acc ->
-                                                        Dict.insert
-                                                            (GTFS.dateToInt calendarDate.date)
-                                                            calendarDate
-                                                            acc
-                                                    )
-                                                    Dict.empty
-                                            )
-                                )
-                            |> GotCalendarDates feed
-                    )
-                    feed
-                    "calendar_dates.txt"
-                    GTFS.calendarDateDecoder
+                , getCSV GotCalendarDates feed "calendar_dates.txt" GTFS.calendarDateDecoder
                 ]
             )
         |> Cmd.batch
@@ -609,48 +585,34 @@ filterStopTimes filteredTrips filteredStops stopTimes =
 
 filterStops : IdDict StopId Stop -> List Stop
 filterStops stops =
+    let
+        stations =
+            [ "Pde:09162:100" -- München Hbf - ÖBB
+            , "Pit:22095:7049" -- Udine - ÖBB
+            , "Pat:42:3654" -- Villach Hbf - ÖBB
+            , "Pat:45:50002" -- Salzburg Hbf - ÖBB
+            , "Pde:09162:5" -- München Ost - ÖBB
+            , "Pit:22095:7068" -- Tarvisio - ÖBB
+            , "Pde:09172:42293" -- Freilassing - ÖBB
+
+            -- "Pde:09162:10" -- Pasing
+            --     , "de:09162:6:40:81"
+            --     , "de:09162:6_G"
+            ]
+                |> Set.fromList
+    in
     stops
         |> IdDict.values
         |> List.filter
             (\stop ->
-                String.startsWith "FUC" (Id.toString stop.id)
-                    -- let
-                    --     defaulted : String
-                    --     defaulted =
-                    --         Maybe.withDefault "" stop.name
-                    -- in
-                    -- List.member defaulted
-                    --     [ "München Hbf"
-                    --     , "München Hauptbahnhof"
-                    --     ]
-                    -- || String.contains "Isartor" defaulted
-                    || List.member (Id.toString stop.id)
-                        [ "Pde:09162:100" -- München Hbf - ÖBB
-                        , "Pit:22095:7049" -- Udine - ÖBB
-                        , "Pat:42:3654" -- Villach Hbf - ÖBB
-                        , "Pat:45:50002" -- Salzburg Hbf - ÖBB
+                Set.member (Id.toString stop.id) stations
+                    || (case stop.parent_station of
+                            Nothing ->
+                                False
 
-                        -- , "Pde:09162:5" -- München Ost - ÖBB
-                        , "Pit:22095:7068" -- Tarvisio - ÖBB
-                        , "Pde:09172:42293" -- Freilassing - ÖBB
-
-                        -- "Pde:09162:10" -- Pasing
-                        --     , "de:09162:6:40:81"
-                        --     , "de:09162:6_G"
-                        ]
-                    || List.member (Maybe.map Id.toString stop.parent_station)
-                        [ --  Just "Pde:09162:100" -- München Hbf
-                          -- , Just "Pde:09162:10" -- München Pasing
-                          -- , Just "de:09162:6_G"
-                          Just "Pde:09162:100" -- München Hbf - ÖBB
-                        , Just "Pit:22095:7049" -- Udine - ÖBB
-                        , Just "Pat:42:3654" -- Villach Hbf - ÖBB
-                        , Just "Pat:45:50002" -- Salzburg Hbf - ÖBB
-
-                        -- , Just "Pde:09162:5" -- München Ost - ÖBB
-                        , Just "Pit:22095:7068" -- Tarvisio - ÖBB
-                        , Just "Pde:09172:42293" -- Freilassing - ÖBB
-                        ]
+                            Just parent_id ->
+                                Set.member (Id.toString parent_id) stations
+                       )
             )
         |> List.take 1000
 
@@ -1491,7 +1453,27 @@ update msg model =
             ( { model | calendars = mergeFeed feed res model.calendars }, Cmd.none )
 
         GotCalendarDates feed res ->
-            ( { model | calendarDates = mergeFeed feed res model.calendarDates }, Cmd.none )
+            let
+                grouped : Result Http.Error (IdDict ServiceId (Dict Int CalendarDate))
+                grouped =
+                    Result.map
+                        (\dates ->
+                            dates
+                                |> List.foldl
+                                    (\calendarDate acc ->
+                                        IdDict.insert calendarDate.service_id
+                                            (IdDict.get calendarDate.service_id acc
+                                                |> Maybe.withDefault Dict.empty
+                                                |> Dict.insert (GTFS.dateToInt calendarDate.date)
+                                                    calendarDate
+                                            )
+                                            acc
+                                    )
+                                    IdDict.empty
+                        )
+                        res
+            in
+            ( { model | calendarDates = mergeFeed feed grouped model.calendarDates }, Cmd.none )
 
         Reload ->
             ( model, loadData )
