@@ -1,8 +1,9 @@
 {
-  "devDependencies": {
-    "elm": "^0.19.1-6",
-    "elm-codegen": "^0.5.3",
-    "elm-review": "^2.12.0",
-    "elm-watch": "^2.0.0-beta.3"
-  }
+    "devDependencies": {
+        "elm": "^0.19.1-6",
+        "elm-codegen": "^0.5.3",
+        "elm-review": "^2.12.0",
+        "elm-watch": "^2.0.0-beta.3"
+    },
+    "license": "BSD-3-Clause"
 }
