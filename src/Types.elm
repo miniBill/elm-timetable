@@ -4,7 +4,7 @@ import Date exposing (Date)
 import Dict exposing (Dict)
 import GTFS exposing (Calendar, CalendarDate, Feed, Pathway, Stop, StopTime, Time, Trip)
 import Http
-import Id exposing (PathwayId, ServiceId, StopId, TripId)
+import Id exposing (Id, PathwayId, ServiceId, StopId, TripId)
 import IdDict exposing (IdDict)
 import RemoteData exposing (RemoteData)
 
@@ -18,6 +18,8 @@ type alias Model =
     , calendars : RemoteData (Dict Feed (IdDict ServiceId Calendar))
     , trips : RemoteData (Dict Feed (IdDict TripId Trip))
     , calendarDates : RemoteData (Dict Feed (IdDict ServiceId (Dict Int CalendarDate)))
+    , from : Id StopId
+    , to : Id StopId
     }
 
 

@@ -251,6 +251,8 @@ init _ =
       , calendars = RemoteData.Loading
       , trips = RemoteData.Loading
       , calendarDates = RemoteData.Loading
+      , from = Id.fromString "Pit:22095:7049"
+      , to = Id.fromString "Pde:09162:100"
       }
     , loadData
     )
@@ -259,8 +261,8 @@ init _ =
 loadData : Cmd Msg
 loadData =
     [ -- "de" ,
-      -- "oebb-2024",
-      "micotra-2024"
+      "oebb-2024"
+    , "micotra-2024"
     ]
         |> List.concatMap
             (\feed ->
