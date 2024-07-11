@@ -111,7 +111,7 @@ debug v =
 
 time : Time -> Html msg
 time t =
-    string (GTFS.timeToString t)
+    string (GTFS.timeToHumanString t)
 
 
 id : Id kind -> Html msg

@@ -243,7 +243,7 @@ filterTrips today calendarDates calendars trips =
 
 init : flags -> ( Model, Cmd Msg )
 init _ =
-    ( { today = Date.fromCalendarDate 2024 Time.Jul 21
+    ( { today = Date.fromCalendarDate 2024 Time.Jul 9
       , timetable = []
       , stops = RemoteData.Loading
       , pathways = RemoteData.Loading
@@ -1127,7 +1127,14 @@ viewGraphs model =
                                         , y1 <| stationToY from
                                         , y2 <| stationToY to
                                         ]
-                                        []
+                                        [ title []
+                                            [ text
+                                                (GTFS.timeToHumanString link.from
+                                                    ++ " - "
+                                                    ++ GTFS.timeToHumanString link.to
+                                                )
+                                            ]
+                                        ]
                                     ]
                                 )
                     )
@@ -1199,8 +1206,7 @@ viewGraphs model =
                                                 , Rotate 90 0 0
                                                 ]
                                             ]
-                                            [ GTFS.timeToString time
-                                                |> String.left 5
+                                            [ GTFS.timeToHumanString time
                                                 |> text
                                             ]
                                 in
@@ -1309,7 +1315,7 @@ stationOrder station =
         "Salzburg Hauptbahnhof" ->
             19
 
-        "Freillasing Bahnhof" ->
+        "Freilassing Bahnhof" ->
             20
 
         "München Hauptbahnhof" ->

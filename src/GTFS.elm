@@ -1,4 +1,4 @@
-module GTFS exposing (Accessibility(..), Calendar, CalendarDate, ExceptionType(..), Feed, Latitude, LocationType(..), Longitude, Pathway, PathwayMode(..), PickupDropOffType, Stop, StopTime, Time, Timezone, Trip, calendarDateDecoder, calendarDecoder, dateToInt, pathwayDecoder, stopDecoder, stopTimeDecoder, timeToString, tripDecoder)
+module GTFS exposing (Accessibility(..), Calendar, CalendarDate, ExceptionType(..), Feed, Latitude, LocationType(..), Longitude, Pathway, PathwayMode(..), PickupDropOffType, Stop, StopTime, Time, Timezone, Trip, calendarDateDecoder, calendarDecoder, dateToInt, pathwayDecoder, stopDecoder, stopTimeDecoder, timeToHumanString, timeToString, tripDecoder)
 
 import Angle exposing (Angle)
 import Csv.Decode
@@ -528,6 +528,38 @@ timeToString t =
                 |> String.padLeft 2 '0'
     in
     pad hour ++ ":" ++ pad minute ++ ":" ++ pad second
+
+
+timeToHumanString : Time -> String
+timeToHumanString t =
+    let
+        fromStartOfDay : Int
+        fromStartOfDay =
+            12 * 60 * 60 + Quantity.unwrap t
+
+        allMinutes : Int
+        allMinutes =
+            fromStartOfDay // 60
+
+        hour : Int
+        hour =
+            allMinutes // 60
+
+        minute : Int
+        minute =
+            modBy 60 allMinutes
+
+        pad : Int -> String
+        pad x =
+            x
+                |> String.fromInt
+                |> String.padLeft 2 '0'
+    in
+    if hour >= 24 then
+        pad (modBy 24 hour) ++ ":" ++ pad minute ++ "(+" ++ String.fromInt (hour // 24) ++ ")"
+
+    else
+        pad hour ++ ":" ++ pad minute
 
 
 boolDecoder : Csv.Decode.Decoder Bool
