@@ -550,16 +550,20 @@ viewFeed today ( feed, ( calendarDates, ( stopTimes, ( trips, ( calendars, ( sto
 
           else
             Html.text ""
-        , filteredStopTimes
-            |> List.filterMap
-                (\tripStops ->
-                    if List.length tripStops < 2 then
-                        Nothing
+        , if False then
+            filteredStopTimes
+                |> List.filterMap
+                    (\tripStops ->
+                        if List.length tripStops < 2 then
+                            Nothing
 
-                    else
-                        Just (viewStopTimes stops filteredTrips tripStops)
-                )
-            |> Html.div []
+                        else
+                            Just (viewStopTimes stops filteredTrips tripStops)
+                    )
+                |> Html.div []
+
+          else
+            Html.text ""
         ]
 
 
@@ -581,16 +585,14 @@ filterStopTimes filteredTrips filteredStops stopTimes =
                     Nothing ->
                         False
             )
-        |> IdDict.Extra.groupBy (\stopTime -> stopTime.trip_id)
-        |> IdDict.toList
         |> Dict.Extra.groupBy
-            (\( trip_id, _ ) ->
+            (\{ trip_id } ->
                 case IdDict.get trip_id filteredTrips of
                     Nothing ->
                         ( Id.toString trip_id, "" )
 
                     Just trip ->
-                        case trip.block_id of
+                        case always Nothing trip.block_id of
                             Just id ->
                                 ( Id.toString trip.route_id, Id.toString id )
 
@@ -601,7 +603,6 @@ filterStopTimes filteredTrips filteredStops stopTimes =
         |> List.map
             (\v ->
                 v
-                    |> List.concatMap Tuple.second
                     |> List.sortBy (\stopTime -> stopTime.stop_sequence)
             )
 
@@ -1279,25 +1280,40 @@ stationOrder : Station -> Int
 stationOrder station =
     case station of
         "Trieste Centrale" ->
-            0
-
-        "Monfalcone" ->
             1
 
-        "Trieste Airport" ->
+        "Monfalcone" ->
             2
 
-        "Cervignano - Aquileia - Grado" ->
+        "Trieste Airport" ->
             3
 
-        "Palmanova" ->
+        "Cervignano - Aquileia - Grado" ->
             4
 
-        "Udine" ->
+        "Palmanova" ->
             5
 
-        "Villach Hauptbahnhof" ->
+        "Udine" ->
             6
+
+        "Udine stazione" ->
+            6
+
+        "Tarvisio Citta Boscoverde" ->
+            12
+
+        "Villach Hauptbahnhof" ->
+            18
+
+        "Salzburg Hauptbahnhof" ->
+            19
+
+        "Freillasing Bahnhof" ->
+            20
+
+        "München Hauptbahnhof" ->
+            21
 
         _ ->
             999
