@@ -1118,6 +1118,10 @@ viewGraphs model =
                             6
 
                         else
+                            let
+                                _ =
+                                    Debug.todo
+                            in
                             999
                      -- ( Quantity.unwrap min, -(Quantity.unwrap max) )
                     )
