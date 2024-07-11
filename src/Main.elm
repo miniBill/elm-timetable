@@ -28,9 +28,9 @@ import Render.StandardDrawers.Types
 import Set
 import Table
 import Time exposing (Weekday(..))
-import TypedSvg exposing (g, line, svg, text_, title)
+import TypedSvg exposing (circle, g, line, svg, text_, title)
 import TypedSvg.Attributes exposing (class, stroke, textAnchor, transform, viewBox)
-import TypedSvg.Attributes.InPx exposing (x1, x2, y, y1, y2)
+import TypedSvg.Attributes.InPx exposing (cx, cy, x1, x2, y, y1, y2)
 import TypedSvg.Core exposing (Svg, text)
 import TypedSvg.Types exposing (AnchorAlignment(..), Paint(..), Transform(..))
 import Types exposing (Event(..), Model, Msg(..), Station, Timetable)
@@ -139,7 +139,7 @@ rebuildTimetable model =
                                         (\stopTime ( last, acc ) ->
                                             case last of
                                                 Just previous ->
-                                                    if previous.trip_id == stopTime.trip_id then
+                                                    if previous.trip_id == stopTime.trip_id || True then
                                                         ( Just stopTime
                                                         , { from = stopName previous
                                                           , to = stopName stopTime
@@ -166,6 +166,7 @@ rebuildTimetable model =
                                 , to = to
                                 , links =
                                     links
+                                        |> List.sortBy (\{ departure } -> Quantity.unwrap departure)
                                         |> List.map
                                             (\{ departure, arrival } ->
                                                 { from = departure
@@ -242,7 +243,7 @@ filterTrips today calendarDates calendars trips =
 
 init : flags -> ( Model, Cmd Msg )
 init _ =
-    ( { today = Date.fromCalendarDate 2024 Time.Jul 9
+    ( { today = Date.fromCalendarDate 2024 Time.Jul 21
       , timetable = []
       , stops = RemoteData.Loading
       , pathways = RemoteData.Loading
@@ -599,15 +600,7 @@ filterStopTimes filteredTrips filteredStops stopTimes =
             (\v ->
                 v
                     |> List.concatMap Tuple.second
-                    |> List.sortBy
-                        (\stopTime ->
-                            case stopTime.arrival_time of
-                                Nothing ->
-                                    stopTime.stop_sequence
-
-                                Just arrival ->
-                                    Quantity.unwrap arrival
-                        )
+                    |> List.sortBy (\stopTime -> stopTime.stop_sequence)
             )
 
 
@@ -1122,9 +1115,9 @@ viewGraphs model =
                 |> List.concatMap
                     (\{ from, to, links } ->
                         links
-                            |> List.map
+                            |> List.concatMap
                                 (\link ->
-                                    line
+                                    [ line
                                         [ class [ "link" ]
                                         , x1 <| timeToX timeRange link.from
                                         , x2 <| timeToX timeRange link.to
@@ -1132,6 +1125,31 @@ viewGraphs model =
                                         , y2 <| stationToY to
                                         ]
                                         []
+                                    ]
+                                )
+                    )
+
+        endpointsViews : List (Svg msg)
+        endpointsViews =
+            model.timetable
+                |> List.concatMap
+                    (\{ from, to, links } ->
+                        links
+                            |> List.concatMap
+                                (\link ->
+                                    [ circle
+                                        [ class [ "endpoint" ]
+                                        , cx <| timeToX timeRange link.from
+                                        , cy <| stationToY from
+                                        ]
+                                        []
+                                    , circle
+                                        [ class [ "endpoint" ]
+                                        , cx <| timeToX timeRange link.to
+                                        , cy <| stationToY to
+                                        ]
+                                        []
+                                    ]
                                 )
                     )
 
@@ -1236,6 +1254,11 @@ viewGraphs model =
                     .wait {
                         stroke-width: 2px;
                     }
+
+                    .endpoint {
+                        fill: green;
+                        r: 5px;
+                    }
                     """
                 ]
     in
@@ -1247,7 +1270,7 @@ viewGraphs model =
         , Html.Attributes.style "max-width" "90vw"
         , viewBox -5 -5 (fullWidth + 10) (fullHeight + 10)
         ]
-        (styleNode :: stationsViews ++ linksViews ++ timesViews)
+        (styleNode :: stationsViews ++ linksViews ++ timesViews ++ endpointsViews)
 
 
 stationOrder : Station -> Int
