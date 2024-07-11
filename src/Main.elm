@@ -128,6 +128,7 @@ rebuildTimetable model =
                                                     { stop_id = stop_id
                                                     , departure_time = departure_time
                                                     , arrival_time = arrival_time
+                                                    , trip_id = stopTime.trip_id
                                                     }
                                                 )
                                                 stopTime.stop_id
@@ -137,18 +138,22 @@ rebuildTimetable model =
                                     |> List.foldl
                                         (\stopTime ( last, acc ) ->
                                             case last of
+                                                Just previous ->
+                                                    if previous.trip_id == stopTime.trip_id then
+                                                        ( Just stopTime
+                                                        , { from = stopName previous
+                                                          , to = stopName stopTime
+                                                          , departure = previous.departure_time
+                                                          , arrival = stopTime.arrival_time
+                                                          }
+                                                            :: acc
+                                                        )
+
+                                                    else
+                                                        ( Just stopTime, acc )
+
                                                 Nothing ->
                                                     ( Just stopTime, acc )
-
-                                                Just previous ->
-                                                    ( Just stopTime
-                                                    , { from = stopName previous
-                                                      , to = stopName stopTime
-                                                      , departure = previous.departure_time
-                                                      , arrival = stopTime.arrival_time
-                                                      }
-                                                        :: acc
-                                                    )
                                         )
                                         ( Nothing, [] )
                                     |> Tuple.second
@@ -566,8 +571,9 @@ filterStopTimes filteredTrips filteredStops stopTimes =
         |> List.filter
             (\stopTime ->
                 case stopTime.stop_id of
-                    Just id ->
-                        IdSet.member id stopIds
+                    Just stop_id ->
+                        IdDict.member stopTime.trip_id filteredTrips
+                            && IdSet.member stop_id stopIds
 
                     Nothing ->
                         False
@@ -1088,37 +1094,7 @@ viewGraphs model =
         sortedStations =
             stations
                 |> Dict.toList
-                |> List.sortBy
-                    (\( station, { min, max } ) ->
-                        if String.contains "Udine" station then
-                            0
-
-                        else if String.contains "Tarvisio" station then
-                            1
-
-                        else if String.contains "Villach" station then
-                            2
-
-                        else if String.contains "Salzburg" station then
-                            3
-
-                        else if String.contains "Freilassing" station then
-                            4
-
-                        else if String.contains "München Ost" station then
-                            5
-
-                        else if String.contains "München Hauptbahnhof" station then
-                            6
-
-                        else
-                            let
-                                _ =
-                                    Debug.todo
-                            in
-                            999
-                     -- ( Quantity.unwrap min, -(Quantity.unwrap max) )
-                    )
+                |> List.sortBy (\( station, _ ) -> stationOrder station)
                 |> List.reverse
 
         stationPositions : Dict Station Int
@@ -1272,6 +1248,34 @@ viewGraphs model =
         , viewBox -5 -5 (fullWidth + 10) (fullHeight + 10)
         ]
         (styleNode :: stationsViews ++ linksViews ++ timesViews)
+
+
+stationOrder : Station -> Int
+stationOrder station =
+    case station of
+        "Trieste Centrale" ->
+            0
+
+        "Monfalcone" ->
+            1
+
+        "Trieste Airport" ->
+            2
+
+        "Cervignano - Aquileia - Grado" ->
+            3
+
+        "Palmanova" ->
+            4
+
+        "Udine" ->
+            5
+
+        "Villach Hauptbahnhof" ->
+            6
+
+        _ ->
+            999
 
 
 fullWidth : number

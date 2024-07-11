@@ -12,5 +12,6 @@
         "timepoint",
         "Villach"
     ],
-    "cSpell.language": "en-US"
+    "cSpell.language": "en-US",
+    "files.associations": { "*.txt": "csv" }
 }
