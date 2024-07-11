@@ -195,10 +195,6 @@ filterTrips today calendarDates calendars trips =
                         exception_type == GTFS.ServiceAdded
 
                     Nothing ->
-                        -- let
-                        --     _ =
-                        --         Debug.log "No exceptions found for" trip.id
-                        -- in
                         case IdDict.get trip.service_id calendars of
                             Nothing ->
                                 let
@@ -209,6 +205,7 @@ filterTrips today calendarDates calendars trips =
 
                             Just calendar ->
                                 let
+                                    correctDay : Bool
                                     correctDay =
                                         case Date.weekday today of
                                             Mon ->
@@ -231,9 +228,6 @@ filterTrips today calendarDates calendars trips =
 
                                             Sun ->
                                                 calendar.sunday
-
-                                    _ =
-                                        Debug.log "correctDay" ( trip.id, correctDay )
                                 in
                                 correctDay
                                     && (Date.compare calendar.start_date today /= GT)
