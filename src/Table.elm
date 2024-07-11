@@ -1,4 +1,4 @@
-module Table exposing (angle, bool, debug, duration, float, int, length, maybe, seconds, string, time, url)
+module Table exposing (angle, bool, debug, duration, float, id, int, length, maybe, seconds, string, time, url)
 
 import Angle exposing (Angle)
 import Duration exposing (Seconds)
@@ -6,6 +6,7 @@ import Float.Extra
 import GTFS exposing (Time)
 import Html exposing (Attribute, Html)
 import Html.Attributes exposing (style)
+import Id exposing (Id)
 import Length
 import Quantity exposing (Quantity)
 import Url exposing (Url)
@@ -111,3 +112,8 @@ debug v =
 time : Time -> Html msg
 time t =
     string (GTFS.timeToString t)
+
+
+id : Id kind -> Html msg
+id v =
+    string (Id.toString v)

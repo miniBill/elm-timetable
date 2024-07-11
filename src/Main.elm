@@ -8,12 +8,16 @@ import Date exposing (Date)
 import Dict exposing (Dict)
 import Dict.Extra
 import Duration exposing (Duration)
-import GTFS exposing (Calendar, CalendarDate, Feed, Id, Pathway, Stop, StopTime, Time, Trip)
+import GTFS exposing (Calendar, CalendarDate, Feed, Pathway, Stop, StopTime, Time, Trip)
 import Graph
 import Html exposing (Html)
 import Html.Attributes
 import Html.Events
 import Http
+import Id exposing (Id, PathwayId, ServiceId, StopId, TripId)
+import IdDict exposing (IdDict)
+import IdDict.Extra
+import IdSet exposing (IdSet)
 import List.Extra
 import Quantity
 import RemoteData
@@ -54,12 +58,16 @@ rebuildTimetable model =
     case
         RemoteData.map5
             (\t st cd s c ->
-                ( ( t |> Dict.values |> List.foldl Dict.union Dict.empty
-                  , st |> Dict.values |> List.concat
+                ( ( t |> Dict.values |> List.foldl IdDict.Extra.union IdDict.empty
+                  , let
+                        _ =
+                            Debug.todo
+                    in
+                    st |> Dict.values |> List.foldl IdDict.Extra.union IdDict.empty
                   )
-                , cd |> Dict.values |> List.foldl Dict.union Dict.empty
-                , ( s |> Dict.values |> List.foldl Dict.union Dict.empty
-                  , c |> Dict.values |> List.foldl Dict.union Dict.empty
+                , cd |> Dict.values |> List.foldl IdDict.Extra.union IdDict.empty
+                , ( s |> Dict.values |> List.foldl IdDict.Extra.union IdDict.empty
+                  , c |> Dict.values |> List.foldl IdDict.Extra.union IdDict.empty
                   )
                 )
             )
@@ -75,7 +83,7 @@ rebuildTimetable model =
                 filteredStops =
                     filterStops stops
 
-                filteredTrips : Dict Id Trip
+                filteredTrips : IdDict TripId Trip
                 filteredTrips =
                     filterTrips calendarDates calendars trips
 
@@ -83,24 +91,33 @@ rebuildTimetable model =
                 filteredStopTimes =
                     filterStopTimes filteredTrips filteredStops stopTimes
 
-                stopName : { a | stop_id : Id } -> Id
+                stopName : { a | stop_id : Id StopId } -> String
                 stopName stopTime =
-                    case Dict.get stopTime.stop_id stops of
+                    case IdDict.get stopTime.stop_id stops of
                         Nothing ->
-                            stopTime.stop_id
+                            Id.toString stopTime.stop_id
 
                         Just stop ->
+                            let
+                                idString =
+                                    Id.toString stopTime.stop_id
+                            in
                             case stop.parent_station of
                                 Nothing ->
-                                    Maybe.withDefault stopTime.stop_id stop.name
+                                    Maybe.withDefault idString stop.name
 
                                 Just parent_id ->
-                                    case Dict.get parent_id stops of
+                                    case IdDict.get parent_id stops of
                                         Nothing ->
-                                            Maybe.withDefault stopTime.stop_id stop.name
+                                            stop.name
+                                                |> Maybe.withDefault idString
 
                                         Just parent ->
-                                            Maybe.withDefault (Maybe.withDefault stopTime.stop_id stop.name) parent.name
+                                            parent.name
+                                                |> Maybe.withDefault
+                                                    (stop.name
+                                                        |> Maybe.withDefault idString
+                                                    )
 
                 timetable : Timetable
                 timetable =
@@ -163,22 +180,30 @@ rebuildTimetable model =
             model
 
 
-filterTrips : Dict ( Id, Int ) CalendarDate -> Dict Id Calendar -> Dict Id Trip -> Dict Id Trip
+filterTrips :
+    IdDict ServiceId (Dict Int CalendarDate)
+    -> IdDict ServiceId Calendar
+    -> IdDict TripId Trip
+    -> IdDict TripId Trip
 filterTrips calendarDates calendars trips =
     trips
-        |> Dict.filter
+        |> IdDict.filter
             (\_ trip ->
                 let
                     today : Date
                     today =
                         Date.fromCalendarDate 2024 Time.Jul 9
                 in
-                case Dict.get ( trip.service_id, GTFS.dateToInt today ) calendarDates of
+                case
+                    calendarDates
+                        |> IdDict.get trip.service_id
+                        |> Maybe.andThen (Dict.get (GTFS.dateToInt today))
+                of
                     Just { exception_type } ->
                         exception_type == GTFS.ServiceAdded
 
                     Nothing ->
-                        case Dict.get trip.service_id calendars of
+                        case IdDict.get trip.service_id calendars of
                             Nothing ->
                                 False
 
@@ -206,9 +231,9 @@ init _ =
 
 loadData : Cmd Msg
 loadData =
-    [ --  "de" ,
-      "oebb-2024"
-    , "micotra-2024"
+    [ -- "de" ,
+      -- "oebb-2024",
+      "micotra-2024"
     ]
         |> List.concatMap
             (\feed ->
@@ -221,15 +246,14 @@ loadData =
                     (\_ calendarDates ->
                         calendarDates
                             |> Result.map
-                                (List.foldl
-                                    (\calendarDate ->
-                                        Dict.insert
-                                            ( calendarDate.service_id
-                                            , GTFS.dateToInt calendarDate.date
+                                (\dates ->
+                                    dates
+                                        |> IdDict.Extra.groupBy
+                                            (\calendarDate -> calendarDate.service_id)
+                                        |> IdDict.map
+                                            (\_ ->
+                                                Dict.Extra.groupBy (\calendarDate -> GTFS.dateToInt calendarDate.date)
                                             )
-                                            calendarDate
-                                    )
-                                    Dict.empty
                                 )
                             |> GotCalendarDates feed
                     )
@@ -242,10 +266,10 @@ loadData =
 
 
 getCSVId :
-    (String -> Result Http.Error (Dict Id { a | id : Id }) -> msg)
+    (String -> Result Http.Error (IdDict kind { a | id : Id kind }) -> msg)
     -> String
     -> String
-    -> Csv.Decode.Decoder { a | id : Id }
+    -> Csv.Decode.Decoder { a | id : Id kind }
     -> Cmd msg
 getCSVId toMsg feed filename decoder =
     getCSV
@@ -260,12 +284,12 @@ getCSVId toMsg feed filename decoder =
 
 
 toDictFromId :
-    List { a | id : Id }
-    -> Dict Id { a | id : Id }
+    List { a | id : Id kind }
+    -> IdDict kind { a | id : Id kind }
 toDictFromId list =
     List.foldl
-        (\stop acc -> Dict.insert stop.id stop acc)
-        Dict.empty
+        (\stop acc -> IdDict.insert stop.id stop acc)
+        IdDict.empty
         list
 
 
@@ -414,12 +438,12 @@ mergePair l r =
 
 viewFeed :
     ( Feed
-    , ( Dict ( Id, Int ) CalendarDate
+    , ( IdDict ServiceId (Dict Int CalendarDate)
       , ( List StopTime
-        , ( Dict Id Trip
-          , ( Dict Id Calendar
-            , ( Dict Id Stop
-              , Dict Id Pathway
+        , ( IdDict TripId Trip
+          , ( IdDict ServiceId Calendar
+            , ( IdDict StopId Stop
+              , IdDict PathwayId Pathway
               )
             )
           )
@@ -433,22 +457,23 @@ viewFeed ( feed, ( calendarDates, ( stopTimes, ( trips, ( calendars, ( stops, pa
         filteredStops =
             filterStops stops
 
+        stopIds : IdSet StopId
         stopIds =
             filteredStops
                 |> List.map .id
-                |> Set.fromList
+                |> IdSet.fromList
 
         filteredPathways : List Pathway
         filteredPathways =
             pathways
-                |> Dict.values
+                |> IdDict.values
                 |> List.filter
                     (\walkway ->
-                        Set.member walkway.from_stop_id stopIds
-                            && Set.member walkway.to_stop_id stopIds
+                        IdSet.member walkway.from_stop_id stopIds
+                            && IdSet.member walkway.to_stop_id stopIds
                     )
 
-        filteredTrips : Dict Id Trip
+        filteredTrips : IdDict TripId Trip
         filteredTrips =
             filterTrips calendarDates calendars trips
 
@@ -483,17 +508,17 @@ viewFeed ( feed, ( calendarDates, ( stopTimes, ( trips, ( calendars, ( stops, pa
         ]
 
 
-filterStopTimes : Dict Id Trip -> List Stop -> List StopTime -> List (List StopTime)
+filterStopTimes : IdDict TripId Trip -> List Stop -> List StopTime -> List (List StopTime)
 filterStopTimes filteredTrips filteredStops stopTimes =
     let
-        stopIds : Set Id
+        stopIds : IdSet StopId
         stopIds =
-            Set.fromList (List.map (\stop -> stop.id) filteredStops)
+            IdSet.fromList (List.map (\stop -> stop.id) filteredStops)
     in
     stopTimes
         |> List.filter
             (\stopTime ->
-                case Dict.get stopTime.trip_id filteredTrips of
+                case IdDict.get stopTime.trip_id filteredTrips of
                     Nothing ->
                         False
 
@@ -513,26 +538,26 @@ filterStopTimes filteredTrips filteredStops stopTimes =
                         else
                             case stopTime.stop_id of
                                 Just id ->
-                                    Set.member id stopIds
+                                    IdSet.member id stopIds
 
                                 Nothing ->
                                     False
             )
-        |> Dict.Extra.groupBy (\stopTime -> stopTime.trip_id)
-        |> Dict.toList
+        |> IdDict.Extra.groupBy (\stopTime -> stopTime.trip_id)
+        |> IdDict.toList
         |> Dict.Extra.groupBy
             (\( trip_id, _ ) ->
-                case Dict.get trip_id filteredTrips of
+                case IdDict.get trip_id filteredTrips of
                     Nothing ->
-                        ( trip_id, "" )
+                        ( Id.toString trip_id, "" )
 
                     Just trip ->
                         case trip.block_id of
                             Just id ->
-                                ( trip.route_id, id )
+                                ( Id.toString trip.route_id, Id.toString id )
 
                             Nothing ->
-                                ( trip_id, "" )
+                                ( Id.toString trip_id, "" )
             )
         |> Dict.values
         |> List.map
@@ -551,37 +576,38 @@ filterStopTimes filteredTrips filteredStops stopTimes =
             )
 
 
-filterStops : Dict Id Stop -> List Stop
+filterStops : IdDict StopId Stop -> List Stop
 filterStops stops =
     stops
-        |> Dict.values
+        |> IdDict.values
         |> List.filter
             (\stop ->
-                -- let
-                --     defaulted : String
-                --     defaulted =
-                --         Maybe.withDefault "" stop.name
-                -- in
-                -- List.member defaulted
-                --     [ "München Hbf"
-                --     , "München Hauptbahnhof"
-                --     ]
-                -- || String.contains "Isartor" defaulted
-                List.member stop.id
-                    [ "Pde:09162:100" -- München Hbf - ÖBB
-                    , "Pit:22095:7049" -- Udine - ÖBB
-                    , "Pat:42:3654" -- Villach Hbf - ÖBB
-                    , "Pat:45:50002" -- Salzburg Hbf - ÖBB
+                String.startsWith "FUC" (Id.toString stop.id)
+                    -- let
+                    --     defaulted : String
+                    --     defaulted =
+                    --         Maybe.withDefault "" stop.name
+                    -- in
+                    -- List.member defaulted
+                    --     [ "München Hbf"
+                    --     , "München Hauptbahnhof"
+                    --     ]
+                    -- || String.contains "Isartor" defaulted
+                    || List.member (Id.toString stop.id)
+                        [ "Pde:09162:100" -- München Hbf - ÖBB
+                        , "Pit:22095:7049" -- Udine - ÖBB
+                        , "Pat:42:3654" -- Villach Hbf - ÖBB
+                        , "Pat:45:50002" -- Salzburg Hbf - ÖBB
 
-                    -- , "Pde:09162:5" -- München Ost - ÖBB
-                    , "Pit:22095:7068" -- Tarvisio - ÖBB
-                    , "Pde:09172:42293" -- Freilassing - ÖBB
+                        -- , "Pde:09162:5" -- München Ost - ÖBB
+                        , "Pit:22095:7068" -- Tarvisio - ÖBB
+                        , "Pde:09172:42293" -- Freilassing - ÖBB
 
-                    -- "Pde:09162:10" -- Pasing
-                    --     , "de:09162:6:40:81"
-                    --     , "de:09162:6_G"
-                    ]
-                    || List.member stop.parent_station
+                        -- "Pde:09162:10" -- Pasing
+                        --     , "de:09162:6:40:81"
+                        --     , "de:09162:6_G"
+                        ]
+                    || List.member (Maybe.map Id.toString stop.parent_station)
                         [ --  Just "Pde:09162:100" -- München Hbf
                           -- , Just "Pde:09162:10" -- München Pasing
                           -- , Just "de:09162:6_G"
@@ -598,14 +624,14 @@ filterStops stops =
         |> List.take 1000
 
 
-viewStops : Dict Id Stop -> List Stop -> Html msg
+viewStops : IdDict StopId Stop -> List Stop -> Html msg
 viewStops stops filteredStops =
     let
-        stopName : Id -> String
+        stopName : Id StopId -> String
         stopName id =
-            case Dict.get id stops of
+            case IdDict.get id stops of
                 Nothing ->
-                    id
+                    Id.toString id
 
                 Just found ->
                     [ found.name
@@ -617,20 +643,20 @@ viewStops stops filteredStops =
 
         viewStop : Stop -> Html msg
         viewStop stop =
-            [ Table.string stop.id
+            [ Table.id stop.id
             , Table.maybe Table.string stop.code
             , Table.maybe Table.string stop.name
             , Table.maybe Table.string stop.tts_name
             , Table.maybe Table.string stop.description
             , Table.maybe Table.angle stop.lat
             , Table.maybe Table.angle stop.lon
-            , Table.maybe Table.string stop.zone_id
+            , Table.maybe Table.id stop.zone_id
             , Table.maybe Table.url stop.url
             , Table.debug stop.location_type
             , Table.maybe (Table.string << stopName) stop.parent_station
             , Table.maybe Table.string stop.timezone
             , Table.maybe Table.debug stop.wheelchair_boarding
-            , Table.maybe Table.string stop.level_id
+            , Table.maybe Table.id stop.level_id
             , Table.maybe Table.string stop.platform_code
             ]
                 |> Html.tr []
@@ -664,14 +690,14 @@ viewStops stops filteredStops =
             ]
 
 
-viewPathways : Dict Id Stop -> List Pathway -> Html msg
+viewPathways : IdDict StopId Stop -> List Pathway -> Html msg
 viewPathways stops filteredPathways =
     let
-        stop : Id -> String
+        stop : Id StopId -> String
         stop id =
-            case Dict.get id stops of
+            case IdDict.get id stops of
                 Nothing ->
-                    id
+                    Id.toString id
 
                 Just found ->
                     [ found.name
@@ -681,7 +707,7 @@ viewPathways stops filteredPathways =
                         |> List.filterMap identity
                         |> String.join " - "
 
-        stopIds : List Id
+        stopIds : List (Id StopId)
         stopIds =
             filteredPathways
                 |> List.concatMap
@@ -690,16 +716,16 @@ viewPathways stops filteredPathways =
                         , pathway.to_stop_id
                         ]
                     )
-                |> Set.fromList
-                |> Set.toList
+                |> IdSet.fromList
+                |> IdSet.toList
 
-        stopIdToNodeId : Dict Id Int
+        stopIdToNodeId : IdDict StopId Int
         stopIdToNodeId =
             stopIds
                 |> List.indexedMap (\i id -> ( id, i ))
-                |> Dict.fromList
+                |> IdDict.fromList
 
-        graph : Graph.Graph Id ()
+        graph : Graph.Graph (Id StopId) ()
         graph =
             let
                 edges : List (Graph.Edge ())
@@ -708,8 +734,8 @@ viewPathways stops filteredPathways =
                         |> List.concatMap
                             (\pathway ->
                                 case
-                                    ( Dict.get pathway.from_stop_id stopIdToNodeId
-                                    , Dict.get pathway.to_stop_id stopIdToNodeId
+                                    ( IdDict.get pathway.from_stop_id stopIdToNodeId
+                                    , IdDict.get pathway.to_stop_id stopIdToNodeId
                                     )
                                 of
                                     ( Just fromId, Just toId ) ->
@@ -735,16 +761,21 @@ viewPathways stops filteredPathways =
                                         []
                             )
 
-                nodes : List (Graph.Node String)
+                nodes : List (Graph.Node (Id StopId))
                 nodes =
                     stopIds
-                        |> List.indexedMap (\i id -> { id = i, label = id })
+                        |> List.indexedMap
+                            (\i id ->
+                                { id = i
+                                , label = id
+                                }
+                            )
             in
             Graph.fromNodesAndEdges nodes edges
 
         viewPathway : Pathway -> Html msg
         viewPathway pathway =
-            [ Table.string pathway.id
+            [ Table.id pathway.id
             , Table.string (stop pathway.from_stop_id)
             , Table.string (stop pathway.to_stop_id)
             , Table.debug pathway.mode
@@ -823,28 +854,28 @@ viewPathways stops filteredPathways =
         ]
 
 
-viewStopTimes : Dict Id Stop -> Dict Id Trip -> List StopTime -> Html msg
+viewStopTimes : IdDict StopId Stop -> IdDict TripId Trip -> List StopTime -> Html msg
 viewStopTimes stops filteredTrips filteredStopTimes =
     let
-        trip : Id -> String
+        trip : Id TripId -> String
         trip id =
-            case Dict.get id filteredTrips of
+            case IdDict.get id filteredTrips of
                 Nothing ->
-                    id
+                    Id.toString id
 
                 Just found ->
                     [ found.short_name
-                    , found.block_id
-                    , Just id
+                    , Maybe.map Id.toString found.block_id
+                    , Just (Id.toString id)
                     ]
                         |> List.filterMap identity
                         |> String.join " - "
 
-        stop : Id -> String
+        stop : Id StopId -> String
         stop id =
-            case Dict.get id stops of
+            case IdDict.get id stops of
                 Nothing ->
-                    id
+                    Id.toString id
 
                 Just found ->
                     [ found.name
@@ -860,8 +891,8 @@ viewStopTimes stops filteredTrips filteredStopTimes =
             , Table.maybe Table.time stopTime.arrival_time
             , Table.maybe Table.time stopTime.departure_time
             , Table.maybe Table.string (Maybe.map stop stopTime.stop_id)
-            , Table.maybe Table.string stopTime.location_group_id
-            , Table.maybe Table.string stopTime.location_id
+            , Table.maybe Table.id stopTime.location_group_id
+            , Table.maybe Table.id stopTime.location_id
             , Table.int stopTime.stop_sequence
             , Table.maybe Table.string stopTime.stop_headsign
             , Table.maybe Table.time stopTime.start_pickup_drop_off_window
@@ -872,8 +903,8 @@ viewStopTimes stops filteredTrips filteredStopTimes =
             , Table.maybe Table.debug stopTime.continuous_drop_off
             , Table.maybe Table.float stopTime.shape_dist_traveled
             , Table.maybe Table.bool stopTime.timepoint
-            , Table.maybe Table.string stopTime.pickup_booking_rule_id
-            , Table.maybe Table.string stopTime.drop_off_booking_rule_id
+            , Table.maybe Table.id stopTime.pickup_booking_rule_id
+            , Table.maybe Table.id stopTime.drop_off_booking_rule_id
             ]
                 |> Html.tr []
     in

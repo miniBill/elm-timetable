@@ -2,6 +2,7 @@
     "type": "application",
     "source-directories": [
         "src",
+        "generated",
         "vendored/BrianHicks/elm-csv/4.0.1/src",
         "vendored/goyalarchit/elm-dagre/4.0.1/src"
     ],

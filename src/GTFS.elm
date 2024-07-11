@@ -4,6 +4,7 @@ import Angle exposing (Angle)
 import Csv.Decode
 import Date exposing (Date)
 import Duration exposing (Seconds)
+import Id exposing (BlockId, Id(..), LevelId, LocationGroupId, LocationId, PathwayId, RouteId, ServiceId, ShapeId, StopId, TripId, ZoneId)
 import Length exposing (Length)
 import Maybe.Extra
 import Parser exposing ((|.), (|=), Parser)
@@ -11,12 +12,8 @@ import Quantity exposing (Quantity)
 import Url exposing (Url)
 
 
-type alias Id =
-    String
-
-
 type alias Feed =
-    Id
+    String
 
 
 type alias Timezone =
@@ -47,12 +44,12 @@ type alias Time =
 
 
 type alias StopTime =
-    { trip_id : Id
+    { trip_id : Id TripId
     , arrival_time : Maybe Time
     , departure_time : Maybe Time
-    , stop_id : Maybe Id
-    , location_group_id : Maybe Id
-    , location_id : Maybe Id
+    , stop_id : Maybe (Id StopId)
+    , location_group_id : Maybe (Id LocationGroupId)
+    , location_id : Maybe (Id LocationId)
     , stop_sequence : Int
     , stop_headsign : Maybe String
     , start_pickup_drop_off_window : Maybe Time
@@ -65,8 +62,8 @@ type alias StopTime =
 
     -- False for approximate, True or Nothing for exact
     , timepoint : Maybe Bool
-    , pickup_booking_rule_id : Maybe Id
-    , drop_off_booking_rule_id : Maybe Id
+    , pickup_booking_rule_id : Maybe (Id Never)
+    , drop_off_booking_rule_id : Maybe (Id Never)
     }
 
 
@@ -94,14 +91,14 @@ stopTimeDecoder =
 
 
 type alias Trip =
-    { route_id : Id
-    , service_id : Id
-    , id : Id
+    { route_id : Id RouteId
+    , service_id : Id ServiceId
+    , id : Id TripId
     , headsign : Maybe String
     , short_name : Maybe String
     , direction_id : Maybe Bool
-    , block_id : Maybe Id
-    , shape_id : Maybe Id
+    , block_id : Maybe (Id BlockId)
+    , shape_id : Maybe (Id ShapeId)
     , wheelchair_accessible : Maybe Accessibility
     , bikes_allowed : Maybe Accessibility
     }
@@ -123,7 +120,7 @@ tripDecoder =
 
 
 type alias Calendar =
-    { id : Id
+    { id : Id ServiceId
     , monday : Bool
     , tuesday : Bool
     , wednesday : Bool
@@ -152,7 +149,7 @@ calendarDecoder =
 
 
 type alias CalendarDate =
-    { service_id : Id
+    { service_id : Id ServiceId
     , date : Date
     , exception_type : ExceptionType
     }
@@ -254,20 +251,20 @@ pickupDropOffTypeParser input =
 
 
 type alias Stop =
-    { id : Id
+    { id : Id StopId
     , code : Maybe String
     , name : Maybe String
     , tts_name : Maybe String
     , description : Maybe String
     , lat : Maybe Latitude
     , lon : Maybe Longitude
-    , zone_id : Maybe Id
+    , zone_id : Maybe (Id ZoneId)
     , url : Maybe Url
     , location_type : LocationType
-    , parent_station : Maybe Id
+    , parent_station : Maybe (Id StopId)
     , timezone : Maybe Timezone
     , wheelchair_boarding : Maybe Accessibility
-    , level_id : Maybe Id
+    , level_id : Maybe (Id LevelId)
     , platform_code : Maybe String
     }
 
@@ -293,9 +290,9 @@ stopDecoder =
 
 
 type alias Pathway =
-    { id : Id
-    , from_stop_id : Id
-    , to_stop_id : Id
+    { id : Id PathwayId
+    , from_stop_id : Id StopId
+    , to_stop_id : Id StopId
     , mode : PathwayMode
     , is_bidirectional : Bool
     , length : Maybe Length
@@ -442,9 +439,9 @@ pathwayModeParser input =
 --------------------
 
 
-id : Csv.Decode.Decoder Id
+id : Csv.Decode.Decoder (Id kind)
 id =
-    Csv.Decode.string
+    Csv.Decode.map Id.fromString Csv.Decode.string
 
 
 timeDecoder : Csv.Decode.Decoder Time
