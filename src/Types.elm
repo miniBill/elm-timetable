@@ -1,4 +1,4 @@
-module Types exposing (Event(..), Model, Msg(..), Station, Timetable, ViewMode(..))
+module Types exposing (Event(..), Model, Msg(..), Station, Timetable)
 
 import Dict exposing (Dict)
 import GTFS exposing (Calendar, CalendarDate, Feed, Pathway, Stop, StopTime, Time, Trip)
@@ -10,18 +10,13 @@ import RemoteData exposing (RemoteData)
 
 type alias Model =
     { timetable : Timetable
-    , mode : ViewMode
     , stops : RemoteData (Dict Feed (IdDict StopId Stop))
     , pathways : RemoteData (Dict Feed (IdDict PathwayId Pathway))
     , stopTimes : RemoteData (Dict Feed (List StopTime))
     , calendars : RemoteData (Dict Feed (IdDict ServiceId Calendar))
     , trips : RemoteData (Dict Feed (IdDict TripId Trip))
-    , calendarDates : RemoteData (Dict Feed (Dict ServiceId (Dict Int CalendarDate)))
+    , calendarDates : RemoteData (Dict Feed (IdDict ServiceId (Dict Int CalendarDate)))
     }
-
-
-type ViewMode
-    = ViewSimple
 
 
 type alias Timetable =
@@ -42,11 +37,10 @@ type Event
 
 
 type Msg
-    = OViewMode ViewMode
-    | Reload
+    = Reload
     | GotStops Feed (Result Http.Error (IdDict StopId Stop))
     | GotPathways Feed (Result Http.Error (IdDict PathwayId Pathway))
     | GotStopTimes Feed (Result Http.Error (List StopTime))
     | GotTrips Feed (Result Http.Error (IdDict TripId Trip))
     | GotCalendars Feed (Result Http.Error (IdDict ServiceId Calendar))
-    | GotCalendarDates Feed (Result Http.Error (Dict ServiceId (Dict Int CalendarDate)))
+    | GotCalendarDates Feed (Result Http.Error (IdDict ServiceId (Dict Int CalendarDate)))

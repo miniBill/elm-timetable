@@ -25,7 +25,7 @@ import Render
 import Render.StandardDrawers
 import Render.StandardDrawers.Attributes
 import Render.StandardDrawers.Types
-import Set exposing (Set)
+import Set
 import Table
 import Time
 import TypedSvg exposing (g, line, svg, text_, title)
@@ -33,7 +33,7 @@ import TypedSvg.Attributes exposing (class, stroke, textAnchor, transform, viewB
 import TypedSvg.Attributes.InPx exposing (x1, x2, y, y1, y2)
 import TypedSvg.Core exposing (Svg, text)
 import TypedSvg.Types exposing (AnchorAlignment(..), Paint(..), Transform(..))
-import Types exposing (Event(..), Model, Msg(..), Station, Timetable, ViewMode(..))
+import Types exposing (Event(..), Model, Msg(..), Station, Timetable)
 import Url.Builder
 
 
@@ -63,9 +63,9 @@ rebuildTimetable model =
                         _ =
                             Debug.todo
                     in
-                    st |> Dict.values |> List.foldl IdDict.Extra.union IdDict.empty
+                    st |> Dict.values |> List.concat
                   )
-                , cd |> Dict.values |> List.foldl IdDict.Extra.union IdDict.empty
+                , cd |> Dict.values |> List.foldl mergeWithUnion IdDict.empty
                 , ( s |> Dict.values |> List.foldl IdDict.Extra.union IdDict.empty
                   , c |> Dict.values |> List.foldl IdDict.Extra.union IdDict.empty
                   )
@@ -217,7 +217,6 @@ filterTrips calendarDates calendars trips =
 init : flags -> ( Model, Cmd Msg )
 init _ =
     ( { timetable = []
-      , mode = ViewSimple
       , stops = RemoteData.Loading
       , pathways = RemoteData.Loading
       , stopTimes = RemoteData.Loading
@@ -252,7 +251,14 @@ loadData =
                                             (\calendarDate -> calendarDate.service_id)
                                         |> IdDict.map
                                             (\_ ->
-                                                Dict.Extra.groupBy (\calendarDate -> GTFS.dateToInt calendarDate.date)
+                                                List.foldl
+                                                    (\calendarDate acc ->
+                                                        Dict.insert
+                                                            (GTFS.dateToInt calendarDate.date)
+                                                            calendarDate
+                                                            acc
+                                                    )
+                                                    Dict.empty
                                             )
                                 )
                             |> GotCalendarDates feed
@@ -329,9 +335,7 @@ getCSV toMsg feed filename decoder =
 view : Model -> Html Msg
 view model =
     Html.div []
-        [ case model.mode of
-            ViewSimple ->
-                viewSimple model
+        [ viewGraphs model
         , Html.button
             [ Html.Events.onClick Reload ]
             [ Html.text "Reload" ]
@@ -434,6 +438,25 @@ mergePair l r =
         l
         r
         Dict.empty
+
+
+mergeWithUnion :
+    IdDict kind (Dict comparable v)
+    -> IdDict kind (Dict comparable v)
+    -> IdDict kind (Dict comparable v)
+mergeWithUnion l r =
+    IdDict.Extra.merge
+        (\_ _ acc -> acc)
+        (\k le re acc ->
+            IdDict.insert
+                k
+                (Dict.union le re)
+                acc
+        )
+        (\_ _ acc -> acc)
+        l
+        r
+        IdDict.empty
 
 
 viewFeed :
@@ -941,8 +964,8 @@ viewStopTimes stops filteredTrips filteredStopTimes =
         ]
 
 
-viewSimple : Model -> Html msg
-viewSimple model =
+viewGraphs : Model -> Html msg
+viewGraphs model =
     let
         fullHeight : Float
         fullHeight =
@@ -1391,9 +1414,6 @@ waitTimeToColor f =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        OViewMode mode ->
-            ( { model | mode = mode }, Cmd.none )
-
         GotStops feed res ->
             ( { model | stops = mergeFeed feed res model.stops }, Cmd.none )
 

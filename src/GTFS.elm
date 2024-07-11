@@ -1,10 +1,10 @@
-module GTFS exposing (Accessibility(..), Calendar, CalendarDate, ExceptionType(..), Feed, Id, Latitude, LocationType(..), Longitude, Pathway, PathwayMode(..), PickupDropOffType, Stop, StopTime, Time, Timezone, Trip, calendarDateDecoder, calendarDecoder, dateToInt, pathwayDecoder, stopDecoder, stopTimeDecoder, timeToString, tripDecoder)
+module GTFS exposing (Accessibility(..), Calendar, CalendarDate, ExceptionType(..), Feed, Latitude, LocationType(..), Longitude, Pathway, PathwayMode(..), PickupDropOffType, Stop, StopTime, Time, Timezone, Trip, calendarDateDecoder, calendarDecoder, dateToInt, pathwayDecoder, stopDecoder, stopTimeDecoder, timeToString, tripDecoder)
 
 import Angle exposing (Angle)
 import Csv.Decode
 import Date exposing (Date)
 import Duration exposing (Seconds)
-import Id exposing (BlockId, Id(..), LevelId, LocationGroupId, LocationId, PathwayId, RouteId, ServiceId, ShapeId, StopId, TripId, ZoneId)
+import Id exposing (BlockId, Id, LevelId, LocationGroupId, LocationId, PathwayId, RouteId, ServiceId, ShapeId, StopId, TripId, ZoneId)
 import Length exposing (Length)
 import Maybe.Extra
 import Parser exposing ((|.), (|=), Parser)
