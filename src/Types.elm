@@ -1,5 +1,6 @@
 module Types exposing (Event(..), Model, Msg(..), Station, Timetable)
 
+import Date exposing (Date)
 import Dict exposing (Dict)
 import GTFS exposing (Calendar, CalendarDate, Feed, Pathway, Stop, StopTime, Time, Trip)
 import Http
@@ -9,7 +10,8 @@ import RemoteData exposing (RemoteData)
 
 
 type alias Model =
-    { timetable : Timetable
+    { today : Date
+    , timetable : Timetable
     , stops : RemoteData (Dict Feed (IdDict StopId Stop))
     , pathways : RemoteData (Dict Feed (IdDict PathwayId Pathway))
     , stopTimes : RemoteData (Dict Feed (List StopTime))

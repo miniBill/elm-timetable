@@ -85,7 +85,7 @@ rebuildTimetable model =
 
                 filteredTrips : IdDict TripId Trip
                 filteredTrips =
-                    filterTrips calendarDates calendars trips
+                    filterTrips model.today calendarDates calendars trips
 
                 filteredStopTimes : List (List StopTime)
                 filteredStopTimes =
@@ -181,19 +181,15 @@ rebuildTimetable model =
 
 
 filterTrips :
-    IdDict ServiceId (Dict Int CalendarDate)
+    Date
+    -> IdDict ServiceId (Dict Int CalendarDate)
     -> IdDict ServiceId Calendar
     -> IdDict TripId Trip
     -> IdDict TripId Trip
-filterTrips calendarDates calendars trips =
+filterTrips today calendarDates calendars trips =
     trips
         |> IdDict.filter
             (\_ trip ->
-                let
-                    today : Date
-                    today =
-                        Date.fromCalendarDate 2024 Time.Jul 9
-                in
                 case
                     calendarDates
                         |> IdDict.get trip.service_id
@@ -216,7 +212,8 @@ filterTrips calendarDates calendars trips =
 
 init : flags -> ( Model, Cmd Msg )
 init _ =
-    ( { timetable = []
+    ( { today = Date.fromCalendarDate 2024 Time.Jul 9
+      , timetable = []
       , stops = RemoteData.Loading
       , pathways = RemoteData.Loading
       , stopTimes = RemoteData.Loading
@@ -417,7 +414,7 @@ view model =
                                                                 |> mergePair stopTimes
                                                                 |> mergePair calendarDates
                                                                 |> Dict.toList
-                                                                |> List.map viewFeed
+                                                                |> List.map (viewFeed model.today)
         ]
 
 
@@ -460,21 +457,23 @@ mergeWithUnion l r =
 
 
 viewFeed :
-    ( Feed
-    , ( IdDict ServiceId (Dict Int CalendarDate)
-      , ( List StopTime
-        , ( IdDict TripId Trip
-          , ( IdDict ServiceId Calendar
-            , ( IdDict StopId Stop
-              , IdDict PathwayId Pathway
+    Date
+    ->
+        ( Feed
+        , ( IdDict ServiceId (Dict Int CalendarDate)
+          , ( List StopTime
+            , ( IdDict TripId Trip
+              , ( IdDict ServiceId Calendar
+                , ( IdDict StopId Stop
+                  , IdDict PathwayId Pathway
+                  )
+                )
               )
             )
           )
         )
-      )
-    )
     -> Html msg
-viewFeed ( feed, ( calendarDates, ( stopTimes, ( trips, ( calendars, ( stops, pathways ) ) ) ) ) ) =
+viewFeed today ( feed, ( calendarDates, ( stopTimes, ( trips, ( calendars, ( stops, pathways ) ) ) ) ) ) =
     let
         filteredStops : List Stop
         filteredStops =
@@ -498,7 +497,7 @@ viewFeed ( feed, ( calendarDates, ( stopTimes, ( trips, ( calendars, ( stops, pa
 
         filteredTrips : IdDict TripId Trip
         filteredTrips =
-            filterTrips calendarDates calendars trips
+            filterTrips today calendarDates calendars trips
 
         filteredStopTimes : List (List StopTime)
         filteredStopTimes =
