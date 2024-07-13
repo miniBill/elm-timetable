@@ -366,6 +366,7 @@ view model =
         , Html.div
             [ Html.Attributes.style "border" "1px solid black"
             , Html.Attributes.style "padding" "8px"
+            , Html.Attributes.style "margin-top" "8px"
             ]
           <|
             case model.stops of
