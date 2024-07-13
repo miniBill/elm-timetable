@@ -7,7 +7,7 @@ import Dagre.Attributes
 import Date exposing (Date, Interval(..))
 import Dict exposing (Dict)
 import Dict.Extra
-import Duration exposing (Duration)
+import Duration exposing (Duration, Seconds)
 import GTFS exposing (Calendar, CalendarDate, Feed, Pathway, Stop, StopTime, Time, Trip)
 import Graph
 import Html exposing (Html)
@@ -20,6 +20,7 @@ import IdDict.Extra
 import IdSet exposing (IdSet)
 import List.Extra
 import Quantity
+import QuantityDict exposing (QuantityDict)
 import RemoteData
 import Render
 import Render.StandardDrawers
@@ -969,14 +970,14 @@ viewGraphs model =
                     Station
                     { min : Time
                     , max : Time
-                    , events : Dict Int Event
+                    , events : QuantityDict Int Seconds Event
                     }
             ->
                 Dict
                     Station
                     { min : Time
                     , max : Time
-                    , events : Dict Int Event
+                    , events : QuantityDict Int Seconds Event
                     }
         addStation station time event dict =
             let
@@ -986,14 +987,14 @@ viewGraphs model =
                             { min = time
                             , max = time
                             , events =
-                                Dict.singleton (Quantity.unwrap time) event
+                                QuantityDict.singleton time event
                             }
 
                         Just existing ->
                             { min = liftTime Quantity.min (Just existing.min) time
                             , max = liftTime Quantity.max (Just existing.max) time
                             , events =
-                                Dict.insert (Quantity.unwrap time) event existing.events
+                                QuantityDict.insert time event existing.events
                             }
             in
             Dict.insert station new dict
@@ -1030,7 +1031,7 @@ viewGraphs model =
                 Station
                 { min : Time
                 , max : Time
-                , events : Dict Int Event
+                , events : QuantityDict Int Seconds Event
                 }
         stations =
             model.timetable
@@ -1050,7 +1051,7 @@ viewGraphs model =
         sortedStations :
             List
                 ( Station
-                , { events : Dict Int Event
+                , { events : QuantityDict Int Seconds Event
                   , min : Time
                   , max : Time
                   }
@@ -1343,7 +1344,7 @@ timeToX { minTime, maxTime } time =
 viewStation :
     { minTime : Maybe Time, maxTime : Maybe Time }
     -> Dict Station Int
-    -> ( Station, { events : Dict Int Event, min : Time, max : Time } )
+    -> ( Station, { events : QuantityDict Int Seconds Event, min : Time, max : Time } )
     -> Svg msg
 viewStation timeRange stationPositions ( name, { events } ) =
     let
@@ -1356,7 +1357,7 @@ viewStation timeRange stationPositions ( name, { events } ) =
         waitLines : List (Svg msg)
         waitLines =
             let
-                go : List ( Int, Event ) -> List (Svg msg) -> List (Svg msg)
+                go : List ( Time, Event ) -> List (Svg msg) -> List (Svg msg)
                 go queue acc =
                     case queue of
                         [] ->
@@ -1364,7 +1365,7 @@ viewStation timeRange stationPositions ( name, { events } ) =
 
                         ( at, _ ) :: tail ->
                             let
-                                nextDeparture : Maybe Int
+                                nextDeparture : Maybe Time
                                 nextDeparture =
                                     List.Extra.findMap
                                         (\( dep, kind ) ->
@@ -1382,32 +1383,45 @@ viewStation timeRange stationPositions ( name, { events } ) =
 
                                 Just dep ->
                                     let
+                                        duration : Duration
                                         duration =
-                                            Duration.milliseconds (toFloat (dep - at))
+                                            Quantity.difference dep at
+                                                |> Quantity.toFloatQuantity
 
-                                        minString : String
-                                        minString =
-                                            Duration.inMinutes duration
-                                                |> floor
-                                                |> String.fromInt
+                                        timeString : String
+                                        timeString =
+                                            let
+                                                rawMins : Int
+                                                rawMins =
+                                                    Duration.inMinutes duration
+                                                        |> floor
+                                            in
+                                            if rawMins > 60 then
+                                                String.fromInt (rawMins // 60)
+                                                    ++ "h "
+                                                    ++ String.padLeft 2 '0' (String.fromInt (modBy 60 rawMins))
+                                                    ++ "m"
+
+                                            else
+                                                String.fromInt rawMins ++ "m"
                                     in
                                     go tail
                                         (line
                                             [ class [ "wait" ]
-                                            , x1 <| timeToX timeRange (Quantity.unsafe at)
-                                            , x2 <| timeToX timeRange (Quantity.unsafe dep)
+                                            , x1 <| timeToX timeRange at
+                                            , x2 <| timeToX timeRange dep
                                             , y1 stationY
                                             , y2 stationY
                                             , stroke (Paint (waitTimeToColor duration))
                                             ]
                                             [ title []
-                                                [ text (minString ++ " min")
+                                                [ text timeString
                                                 ]
                                             ]
                                             :: acc
                                         )
             in
-            go (Dict.toList events) []
+            go (QuantityDict.toList events) []
     in
     g []
         ([ line
