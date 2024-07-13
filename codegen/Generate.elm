@@ -30,7 +30,7 @@ main =
             |> GenericSet.withTypeName "IdSet"
             |> GenericSet.generateFile
         , GenericDict.init
-            { keyType = Gen.Quantity.annotation_.quantity (Annotation.var "comparable") (Annotation.var "unit")
+            { keyType = Gen.Quantity.annotation_.quantity (Annotation.var "number") (Annotation.var "units")
             , namespace = []
             , toComparable = Gen.Quantity.unwrap
             }
@@ -38,7 +38,7 @@ main =
             |> GenericDict.withTypeName "QuantityDict"
             |> GenericDict.generateFile
         , GenericSet.init
-            { valueType = Gen.Quantity.annotation_.quantity (Annotation.var "comparable") (Annotation.var "unit")
+            { valueType = Gen.Quantity.annotation_.quantity (Annotation.var "number") (Annotation.var "units")
             , namespace = []
             , toComparable = Gen.Quantity.unwrap
             }
