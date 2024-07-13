@@ -1356,6 +1356,7 @@ viewStation timeRange stationPositions ( name, { events } ) =
         waitLines : List (Svg msg)
         waitLines =
             let
+                go : List ( Int, Event ) -> List (Svg msg) -> List (Svg msg)
                 go queue acc =
                     case queue of
                         [] ->
@@ -1400,10 +1401,7 @@ viewStation timeRange stationPositions ( name, { events } ) =
                                             , stroke (Paint (waitTimeToColor duration))
                                             ]
                                             [ title []
-                                                [ text
-                                                    (minString
-                                                        ++ " min"
-                                                    )
+                                                [ text (minString ++ " min")
                                                 ]
                                             ]
                                             :: acc
