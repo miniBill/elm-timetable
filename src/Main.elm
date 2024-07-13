@@ -167,7 +167,7 @@ rebuildTimetable model =
                                 , to = to
                                 , links =
                                     links
-                                        |> List.sortBy (\{ departure } -> Quantity.unwrap departure)
+                                        |> Quantity.sortBy (\{ departure } -> departure)
                                         |> List.map
                                             (\{ departure, arrival } ->
                                                 { from = departure
@@ -1331,10 +1331,9 @@ timeToX { minTime, maxTime } time =
             namesWidth
                 + tableHorizontalMargin
                 + (fullWidth - namesWidth - tableHorizontalMargin * 2)
-                * toFloat
-                    (Quantity.unwrap time - Quantity.unwrap min)
-                / toFloat
-                    (Quantity.unwrap max - Quantity.unwrap min)
+                * Quantity.ratio
+                    (Quantity.toFloatQuantity <| Quantity.difference time min)
+                    (Quantity.toFloatQuantity <| Quantity.difference max min)
 
         _ ->
             -- This never happens but we're going to force a mislayout if the assumptions are wrong
