@@ -1191,8 +1191,9 @@ viewGraphs model =
                                     Just lastTime ->
                                         if
                                             Quantity.difference time lastTime
+                                                |> Quantity.toFloatQuantity
                                                 |> Quantity.greaterThan
-                                                    (Quantity.unsafe (30 * 60))
+                                                    (Duration.minutes 30)
                                         then
                                             timesHeight / 2
 
