@@ -243,7 +243,7 @@ filterTrips today calendarDates calendars trips =
 
 init : flags -> ( Model, Cmd Msg )
 init _ =
-    ( { today = Date.fromCalendarDate 2024 Time.Jul 9
+    ( { today = Date.fromCalendarDate 2024 Time.Jul 7
       , timetable = []
       , stops = RemoteData.Loading
       , pathways = RemoteData.Loading
@@ -261,8 +261,8 @@ init _ =
 loadData : Cmd Msg
 loadData =
     [ -- "de" ,
-      "oebb-2024"
-    , "micotra-2024"
+      --   "oebb-2024",
+      "micotra-2024"
     ]
         |> List.concatMap
             (\feed ->
@@ -305,7 +305,12 @@ toDictFromId list =
         list
 
 
-getCSV : (String -> Result Http.Error (List a) -> msg) -> String -> String -> Csv.Decode.Decoder a -> Cmd msg
+getCSV :
+    (String -> Result Http.Error (List a) -> msg)
+    -> String
+    -> String
+    -> Csv.Decode.Decoder a
+    -> Cmd msg
 getCSV toMsg feed filename decoder =
     Http.request
         { method = "GET"
@@ -314,28 +319,41 @@ getCSV toMsg feed filename decoder =
         , timeout = Nothing
         , tracker = Nothing
         , body = Http.emptyBody
-        , expect =
-            Http.expectString
-                (\got ->
-                    got
-                        |> Result.andThen
-                            (\res ->
-                                Csv.Decode.decodeCsv Csv.Decode.FieldNamesFromFirstRow decoder res
-                                    |> Result.mapError
-                                        (\err ->
-                                            Http.BadBody
-                                                ("While decoding "
-                                                    ++ feed
-                                                    ++ "/"
-                                                    ++ filename
-                                                    ++ ", "
-                                                    ++ Csv.Decode.errorToString err
-                                                )
-                                        )
-                            )
-                        |> toMsg feed
-                )
+        , expect = expectCsv toMsg feed filename decoder
         }
+
+
+expectCsv :
+    (String -> Result Http.Error (List a) -> msg)
+    -> String
+    -> String
+    -> Csv.Decode.Decoder a
+    -> Http.Expect msg
+expectCsv toMsg feed filename decoder =
+    Http.expectString
+        (\got ->
+            case got of
+                Ok res ->
+                    case Csv.Decode.decodeCsv Csv.Decode.FieldNamesFromFirstRow decoder res of
+                        Ok val ->
+                            toMsg feed (Ok val)
+
+                        Err err ->
+                            let
+                                msg : String
+                                msg =
+                                    "While decoding "
+                                        ++ feed
+                                        ++ "/"
+                                        ++ filename
+                                        ++ ", "
+                                        ++ Csv.Decode.errorToString err
+                            in
+                            toMsg feed (Err (Http.BadBody msg))
+
+                Err e ->
+                    toMsg feed (Err e)
+        )
 
 
 view : Model -> Html Msg
@@ -561,20 +579,7 @@ filterStopTimes filteredTrips filteredStops stopTimes =
                     Nothing ->
                         False
             )
-        |> Dict.Extra.groupBy
-            (\{ trip_id } ->
-                case IdDict.get trip_id filteredTrips of
-                    Nothing ->
-                        ( Id.toString trip_id, "" )
-
-                    Just trip ->
-                        case always Nothing trip.block_id of
-                            Just id ->
-                                ( Id.toString trip.route_id, Id.toString id )
-
-                            Nothing ->
-                                ( Id.toString trip_id, "" )
-            )
+        |> Dict.Extra.groupBy (\{ trip_id } -> Id.toString trip_id)
         |> Dict.values
         |> List.map
             (\v ->
@@ -613,6 +618,7 @@ filterStops stops =
                             Just parent_id ->
                                 Set.member (Id.toString parent_id) stations
                        )
+                    || True
             )
         |> List.take 1000
 
@@ -858,7 +864,6 @@ viewStopTimes stops filteredTrips filteredStopTimes =
 
                 Just found ->
                     [ found.short_name
-                    , Maybe.map Id.toString found.block_id
                     , Just (Id.toString id)
                     ]
                         |> List.filterMap identity
