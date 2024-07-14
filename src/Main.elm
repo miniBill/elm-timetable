@@ -783,7 +783,7 @@ viewPathways stops filteredPathways =
             , Table.debug pathway.mode
             , Table.debug pathway.is_bidirectional
             , Table.maybe Table.length pathway.length
-            , Table.maybe Table.seconds pathway.traversal_time
+            , Table.maybe Table.duration pathway.traversal_time
             , Table.maybe Table.int pathway.stair_count
             , Table.maybe Table.float pathway.max_slope
             , Table.maybe Table.length pathway.min_width

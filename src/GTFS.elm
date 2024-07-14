@@ -3,7 +3,7 @@ module GTFS exposing (Accessibility(..), Calendar, CalendarDate, ExceptionType(.
 import Angle exposing (Angle)
 import Csv.Decode
 import Date exposing (Date)
-import Duration exposing (Seconds)
+import Duration exposing (Duration, Seconds)
 import Id exposing (BlockId, Id, LevelId, LocationGroupId, LocationId, PathwayId, RouteId, ServiceId, ShapeId, StopId, TripId, ZoneId)
 import Length exposing (Length)
 import Maybe.Extra
@@ -296,7 +296,7 @@ type alias Pathway =
     , mode : PathwayMode
     , is_bidirectional : Bool
     , length : Maybe Length
-    , traversal_time : Maybe (Quantity Int Seconds)
+    , traversal_time : Maybe Duration
     , stair_count : Maybe Int
     , max_slope : Maybe Float
     , min_width : Maybe Length
@@ -314,7 +314,7 @@ pathwayDecoder =
         |> required "pathway_mode" pathwayModeDecoder
         |> required "is_bidirectional" boolDecoder
         |> optional "length" length
-        |> optional "traversal_time" (Csv.Decode.map Quantity.unsafe Csv.Decode.int)
+        |> optional "traversal_time" (Csv.Decode.map Duration.seconds Csv.Decode.float)
         |> optional "stair_count" Csv.Decode.int
         |> optional "max_slope" Csv.Decode.float
         |> optional "min_width" length
