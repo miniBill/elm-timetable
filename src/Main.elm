@@ -13,6 +13,7 @@ import IdDict.Extra
 import IdSet exposing (IdSet)
 import Quantity
 import RemoteData
+import Result.Extra
 import Set
 import Table
 import Theme
@@ -374,91 +375,55 @@ view model =
             |> Ui.html
             |> Ui.el
                 [ Ui.scrollableX
-                , Theme.padding
+                , Ui.paddingWith { left = Theme.rhythm, bottom = Theme.rhythm, right = Theme.rhythm, top = 0 }
                 ]
-        , Theme.button []
-            { onPress = Reload
-            , label = Ui.text "Reload"
-            }
+        , Ui.el
+            [ Ui.scrollableX
+            , Ui.paddingWith { left = Theme.rhythm, bottom = Theme.rhythm, right = Theme.rhythm, top = 0 }
+            ]
+            (Theme.button []
+                { onPress = Reload
+                , label = Ui.text "Reload"
+                }
+            )
         , Theme.column
             [ Ui.border 1
-            , Theme.padding
+            , Ui.paddingWith { left = Theme.rhythm, bottom = Theme.rhythm, right = Theme.rhythm, top = 0 }
             ]
           <|
-            case model.stops of
-                RemoteData.Error e ->
-                    [ Ui.text (Debug.toString e) ]
-
-                RemoteData.NotAsked ->
-                    [ Ui.text "Stops not asked" ]
-
-                RemoteData.Loading ->
-                    [ Ui.text "Stops loading..." ]
-
-                RemoteData.Loaded stops ->
-                    case model.pathways of
+            let
+                toResult label data =
+                    case data of
                         RemoteData.Error e ->
-                            [ Ui.text (Debug.toString e) ]
+                            Err [ Ui.text (Debug.toString e) ]
 
                         RemoteData.NotAsked ->
-                            [ Ui.text "Pathways not asked" ]
+                            Err [ Ui.text (label ++ " not asked") ]
 
                         RemoteData.Loading ->
-                            [ Ui.text "Pathways loading..." ]
+                            Err [ Ui.text (label ++ " loading...") ]
 
-                        RemoteData.Loaded pathways ->
-                            case model.stopTimes of
-                                RemoteData.Error e ->
-                                    [ Ui.text (Debug.toString e) ]
-
-                                RemoteData.NotAsked ->
-                                    [ Ui.text "Stop times not asked" ]
-
-                                RemoteData.Loading ->
-                                    [ Ui.text "Stop times loading..." ]
-
-                                RemoteData.Loaded stopTimes ->
-                                    case model.trips of
-                                        RemoteData.Error e ->
-                                            [ Ui.text (Debug.toString e) ]
-
-                                        RemoteData.NotAsked ->
-                                            [ Ui.text "Trips not asked" ]
-
-                                        RemoteData.Loading ->
-                                            [ Ui.text "Trips loading..." ]
-
-                                        RemoteData.Loaded trips ->
-                                            case model.calendars of
-                                                RemoteData.Error e ->
-                                                    [ Ui.text (Debug.toString e) ]
-
-                                                RemoteData.NotAsked ->
-                                                    [ Ui.text "Calendars not asked" ]
-
-                                                RemoteData.Loading ->
-                                                    [ Ui.text "Calendars loading..." ]
-
-                                                RemoteData.Loaded calendars ->
-                                                    case model.calendarDates of
-                                                        RemoteData.Error e ->
-                                                            [ Ui.text (Debug.toString e) ]
-
-                                                        RemoteData.NotAsked ->
-                                                            [ Ui.text "Calendar dates not asked" ]
-
-                                                        RemoteData.Loading ->
-                                                            [ Ui.text "Calendar dates loading..." ]
-
-                                                        RemoteData.Loaded calendarDates ->
-                                                            pathways
-                                                                |> mergePair stops
-                                                                |> mergePair calendars
-                                                                |> mergePair trips
-                                                                |> mergePair stopTimes
-                                                                |> mergePair calendarDates
-                                                                |> Dict.toList
-                                                                |> List.map (viewFeed model.today)
+                        RemoteData.Loaded loaded ->
+                            Ok loaded
+            in
+            Ok
+                (\stops pathways stopTimes trips calendars calendarDates ->
+                    pathways
+                        |> mergePair stops
+                        |> mergePair calendars
+                        |> mergePair trips
+                        |> mergePair stopTimes
+                        |> mergePair calendarDates
+                        |> Dict.toList
+                        |> List.map (viewFeed model.today)
+                )
+                |> Result.Extra.andMap (toResult "Stops" model.stops)
+                |> Result.Extra.andMap (toResult "Pathways" model.pathways)
+                |> Result.Extra.andMap (toResult "Stop times" model.stopTimes)
+                |> Result.Extra.andMap (toResult "Trips" model.trips)
+                |> Result.Extra.andMap (toResult "Calendars" model.calendars)
+                |> Result.Extra.andMap (toResult "Calendar dates" model.calendarDates)
+                |> Result.Extra.merge
         ]
 
 

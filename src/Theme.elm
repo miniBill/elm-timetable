@@ -1,4 +1,4 @@
-module Theme exposing (button, column, padding, row, spacing, table, tableColumn)
+module Theme exposing (button, column, padding, rhythm, row, spacing, table, tableColumn)
 
 import Color
 import Ui exposing (Attribute, Element)
