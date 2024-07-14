@@ -1,16 +1,20 @@
-module Timetable exposing (view, viewDAG, viewGraph)
+module Timetable exposing (build, view, viewDAG, viewGraph)
 
 import Clock exposing (Clock)
 import Color
 import Dagre.Attributes
+import Date exposing (Date)
 import Dict exposing (Dict)
+import Dict.Extra
 import Duration exposing (Seconds)
+import GTFS exposing (Calendar, CalendarDate, Stop, StopTime, Trip)
 import Graph
 import Html exposing (Html)
 import Html.Attributes
-import Id exposing (Id)
+import Id exposing (Id, ServiceId, StopId, TripId)
 import IdDict exposing (IdDict)
 import IdSet
+import Pathfinding
 import Quantity
 import QuantityDict exposing (QuantityDict)
 import Render
@@ -93,6 +97,7 @@ view timetable =
                     }
         addStation station time event dict =
             let
+                new : { min : Clock, max : Clock, events : QuantityDict Int Seconds Event }
                 new =
                     case Dict.get station dict of
                         Nothing ->
@@ -160,25 +165,18 @@ view timetable =
                     )
                     Dict.empty
 
-        sortedStations :
-            List
-                ( Station
-                , { events : QuantityDict Int Seconds Event
-                  , min : Clock
-                  , max : Clock
-                  }
-                )
+        sortedStations : List Station
         sortedStations =
             stations
-                |> Dict.toList
-                |> List.sortBy (\( station, _ ) -> stationOrder station)
+                |> Dict.keys
+                |> List.sortBy (\station -> stationOrder station)
                 |> List.reverse
 
         stationPositions : Dict Station Int
         stationPositions =
             sortedStations
                 |> List.indexedMap
-                    (\i ( name, _ ) -> ( name, timesHeight + i * lineHeight ))
+                    (\i name -> ( name, timesHeight + i * lineHeight ))
                 |> Dict.fromList
 
         stationToY : Station -> Float
@@ -367,6 +365,7 @@ viewTimeGrid ({ minTime, maxTime } as timeRange) fullHeight =
                     children =
                         if modBy 4 quarterHour == 0 then
                             let
+                                inner : AnchorAlignment -> Float -> Svg msg
                                 inner anchor transformation =
                                     text_
                                         [ textAnchor anchor
@@ -470,9 +469,9 @@ timeToX { minTime, maxTime } time =
 viewStation :
     { minTime : Clock, maxTime : Clock }
     -> Dict Station Int
-    -> ( Station, { events : QuantityDict Int Seconds Event, min : Clock, max : Clock } )
+    -> Station
     -> Svg msg
-viewStation timeRange stationPositions ( name, { events } ) =
+viewStation timeRange stationPositions name =
     let
         stationY : Float
         stationY =
@@ -638,3 +637,136 @@ viewDAG toName edgeList =
         -- , Render.style "width: 100%;max-height:100vh;max-width:100vw"
         ]
         graph
+
+
+build :
+    Date
+    ->
+        { trips : IdDict TripId Trip
+        , stopTimes : List StopTime
+        , calendarDates : IdDict ServiceId (Dict Int CalendarDate)
+        , stops : IdDict StopId Stop
+        , calendars : IdDict ServiceId Calendar
+        }
+    -> Timetable
+build today { trips, stopTimes, calendarDates, stops, calendars } =
+    let
+        filteredStops : List Stop
+        filteredStops =
+            Pathfinding.filterStops stops
+
+        filteredTrips : IdDict TripId Trip
+        filteredTrips =
+            Pathfinding.filterTrips today calendarDates calendars trips
+
+        filteredStopTimes : List ( Id TripId, List StopTime )
+        filteredStopTimes =
+            Pathfinding.filterStopTimes filteredTrips filteredStops stopTimes
+
+        stopName : { a | stop_id : Id StopId } -> String
+        stopName stopTime =
+            case IdDict.get stopTime.stop_id stops of
+                Nothing ->
+                    Id.toString stopTime.stop_id
+
+                Just stop ->
+                    let
+                        idString : String
+                        idString =
+                            Id.toString stopTime.stop_id
+                    in
+                    case stop.parent_station of
+                        Nothing ->
+                            Maybe.withDefault idString stop.name
+
+                        Just parent_id ->
+                            case IdDict.get parent_id stops of
+                                Nothing ->
+                                    stop.name
+                                        |> Maybe.withDefault idString
+
+                                Just parent ->
+                                    parent.name
+                                        |> Maybe.withDefault
+                                            (stop.name
+                                                |> Maybe.withDefault idString
+                                            )
+    in
+    filteredStopTimes
+        |> List.concatMap
+            (\( trip_id, tripStopTimes ) ->
+                case IdDict.get trip_id trips of
+                    Nothing ->
+                        []
+
+                    Just trip ->
+                        let
+                            train : String
+                            train =
+                                case trip.block_id of
+                                    Nothing ->
+                                        Id.toString trip.id
+
+                                    Just block_id ->
+                                        Id.toString trip.route_id
+                                            ++ " - "
+                                            ++ Id.toString block_id
+                        in
+                        tripStopTimes
+                            |> List.filterMap
+                                (\stopTime ->
+                                    Maybe.map3
+                                        (\stop_id departure_time arrival_time ->
+                                            { stop_id = stop_id
+                                            , departure_time = departure_time
+                                            , arrival_time = arrival_time
+                                            , trip_label =
+                                                Maybe.withDefault
+                                                    (Id.toString stopTime.trip_id)
+                                                    trip.short_name
+                                            }
+                                        )
+                                        stopTime.stop_id
+                                        stopTime.departure_time
+                                        stopTime.arrival_time
+                                )
+                            |> List.foldl
+                                (\stopTime ( last, acc ) ->
+                                    case last of
+                                        Just previous ->
+                                            ( Just stopTime
+                                            , { from = stopName previous
+                                              , to = stopName stopTime
+                                              , departure = previous.departure_time
+                                              , arrival = stopTime.arrival_time
+                                              , label = stopTime.trip_label
+                                              , train = train
+                                              }
+                                                :: acc
+                                            )
+
+                                        Nothing ->
+                                            ( Just stopTime, acc )
+                                )
+                                ( Nothing, [] )
+                            |> Tuple.second
+            )
+        |> Dict.Extra.groupBy (\{ from, to } -> ( from, to ))
+        |> Dict.toList
+        |> List.map
+            (\( ( from, to ), links ) ->
+                { from = from
+                , to = to
+                , links =
+                    links
+                        |> Quantity.sortBy (\{ departure } -> departure)
+                        |> List.map
+                            (\{ departure, label, train, arrival } ->
+                                { from = departure
+                                , label = label
+                                , train = train
+                                , to = arrival
+                                }
+                            )
+                }
+            )

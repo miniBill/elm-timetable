@@ -1,22 +1,153 @@
-module Pathfinding exposing (pathfind, pathfind2)
+module Pathfinding exposing (filterStopTimes, filterStops, filterTrips, pathfind, pathfind2)
 
+import Angle
+import Date exposing (Date)
 import Dict exposing (Dict)
-import GTFS exposing (Id, Pathway, Stop, StopTime, Trip)
+import GTFS exposing (Calendar, CalendarDate, Pathway, Stop, StopTime, Trip)
+import Id exposing (Id, PathwayId, ServiceId, StopId, TripId)
+import IdDict exposing (IdDict)
+import IdDict.Extra
+import IdSet exposing (IdSet)
+import List.Extra
+import Set
+import Time exposing (Weekday(..))
+
+
+filterStops : IdDict StopId Stop -> List Stop
+filterStops stops =
+    let
+        stations =
+            [ "Pde:09162:100" -- München Hbf - ÖBB
+            , "Pit:22095:7049" -- Udine - ÖBB
+            , "Pat:42:3654" -- Villach Hbf - ÖBB
+            , "Pat:45:50002" -- Salzburg Hbf - ÖBB
+            , "Pde:09162:5" -- München Ost - ÖBB
+            , "Pit:22095:7068" -- Tarvisio - ÖBB
+
+            -- , "Pde:09172:42293" -- Freilassing - ÖBB
+            , "Pit:22095:7068" -- Tarvisio Boscoverde - ÖBB
+
+            -- "Pde:09162:10" -- Pasing - ÖBB
+            ]
+                |> Set.fromList
+    in
+    stops
+        |> IdDict.values
+        |> List.filter
+            (\stop ->
+                Set.member (Id.toString stop.id) stations
+                    || (case stop.parent_station of
+                            Nothing ->
+                                False
+
+                            Just parent_id ->
+                                Set.member (Id.toString parent_id) stations
+                       )
+            )
+        |> List.take 1000
+
+
+filterStopTimes : IdDict TripId Trip -> List Stop -> List StopTime -> List ( Id TripId, List StopTime )
+filterStopTimes filteredTrips filteredStops stopTimes =
+    let
+        stopIds : IdSet StopId
+        stopIds =
+            IdSet.fromList (List.map (\stop -> stop.id) filteredStops)
+    in
+    stopTimes
+        |> List.filter
+            (\stopTime ->
+                case stopTime.stop_id of
+                    Just stop_id ->
+                        IdDict.member stopTime.trip_id filteredTrips
+                            && IdSet.member stop_id stopIds
+
+                    Nothing ->
+                        False
+            )
+        |> IdDict.Extra.groupBy (\{ trip_id } -> trip_id)
+        |> IdDict.toList
+        |> List.map
+            (\( k, v ) ->
+                ( k
+                , v
+                    |> List.sortBy (\stopTime -> stopTime.stop_sequence)
+                )
+            )
+
+
+filterTrips :
+    Date
+    -> IdDict ServiceId (Dict Int CalendarDate)
+    -> IdDict ServiceId Calendar
+    -> IdDict TripId Trip
+    -> IdDict TripId Trip
+filterTrips today calendarDates calendars trips =
+    trips
+        |> IdDict.filter
+            (\_ trip ->
+                case
+                    calendarDates
+                        |> IdDict.get trip.service_id
+                        |> Maybe.andThen (Dict.get (GTFS.dateToInt today))
+                of
+                    Just { exception_type } ->
+                        exception_type == GTFS.ServiceAdded
+
+                    Nothing ->
+                        case IdDict.get trip.service_id calendars of
+                            Nothing ->
+                                let
+                                    _ =
+                                        Debug.log "Could not find calendar info for service_id" trip.service_id
+                                in
+                                False
+
+                            Just calendar ->
+                                let
+                                    correctDay : Bool
+                                    correctDay =
+                                        case Date.weekday today of
+                                            Mon ->
+                                                calendar.monday
+
+                                            Tue ->
+                                                calendar.tuesday
+
+                                            Wed ->
+                                                calendar.wednesday
+
+                                            Thu ->
+                                                calendar.thursday
+
+                                            Fri ->
+                                                calendar.friday
+
+                                            Sat ->
+                                                calendar.saturday
+
+                                            Sun ->
+                                                calendar.sunday
+                                in
+                                correctDay
+                                    && (Date.compare calendar.start_date today /= GT)
+                                    && (Date.compare calendar.end_date today /= LT)
+            )
 
 
 pathfind :
-    { from : Id, to : Id }
-    -> Dict Id Stop
-    -> Dict Id StopTime
-    -> Dict Id Trip
+    { from : Id StopId, to : Id StopId }
+    -> IdDict StopId Stop
+    -> List StopTime
+    -> IdDict TripId Trip
     -> Maybe (List String)
 pathfind =
     Debug.todo "pathfind"
 
 
 pathfind2 :
-    Dict Id Stop
-    -> Dict Id Pathway
+    IdDict StopId Stop
+    -> IdDict PathwayId Pathway
     -> Stop
     -> Stop
     -> Maybe (List String)
@@ -29,18 +160,18 @@ pathfind2 stops pathways from to =
 
         stopCoords : Stop -> ( Float, Float )
         stopCoords stop =
-            ( Maybe.withDefault 0 stop.lon
-            , Maybe.withDefault 0 stop.lat
+            ( Maybe.withDefault 0 <| Maybe.map Angle.inDegrees stop.lon
+            , Maybe.withDefault 0 <| Maybe.map Angle.inDegrees stop.lat
             )
 
         getPathwaysFrom : Stop -> List { to : Stop, pathway : Pathway }
         getPathwaysFrom a =
             pathways
-                |> Dict.foldl
+                |> IdDict.foldl
                     (\_ pathway acc ->
                         case
-                            ( Dict.get pathway.from_stop_id stops
-                            , Dict.get pathway.to_stop_id stops
+                            ( IdDict.get pathway.from_stop_id stops
+                            , IdDict.get pathway.to_stop_id stops
                             )
                         of
                             ( Just pathFrom, Just pathTo ) ->
@@ -76,22 +207,22 @@ pathfind2 stops pathways from to =
                     )
 
         go :
-            Dict Id (List { to : Stop, pathway : Pathway })
+            IdDict StopId (List { to : Stop, pathway : Pathway })
             -> Stop
-            -> Set String
+            -> IdSet StopId
             -> Maybe (List a)
         go cache a visited =
-            if Set.member a.id visited then
+            if IdSet.member a.id visited then
                 Nothing
 
             else if a == to then
                 Just []
 
             else
-                case Dict.get a.id cache of
+                case IdDict.get a.id cache of
                     Nothing ->
                         go
-                            (Dict.insert a.id (getPathwaysFrom a) cache)
+                            (IdDict.insert a.id (getPathwaysFrom a) cache)
                             a
                             visited
 
@@ -99,7 +230,7 @@ pathfind2 stops pathways from to =
                         options
                             |> List.Extra.findMap
                                 (\pathway ->
-                                    go cache pathway.to (Set.insert pathway.to.id visited)
+                                    go cache pathway.to (IdSet.insert pathway.to.id visited)
                                 )
     in
-    go Dict.empty from Set.empty
+    go IdDict.empty from IdSet.empty

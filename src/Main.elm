@@ -4,22 +4,20 @@ import Browser
 import Csv.Decode
 import Date exposing (Date)
 import Dict exposing (Dict)
-import Dict.Extra
 import GTFS exposing (Calendar, CalendarDate, Feed, Pathway, Stop, StopTime, Trip)
 import Http
 import Id exposing (Id, PathwayId, ServiceId, StopId, TripId)
 import IdDict exposing (IdDict)
 import IdDict.Extra
 import IdSet exposing (IdSet)
-import Quantity
+import Pathfinding
 import RemoteData
 import Result.Extra
-import Set
 import Table
 import Theme
-import Time exposing (Weekday(..))
+import Time
 import Timetable
-import Types exposing (Model, Msg(..), Timetable)
+import Types exposing (Model, Msg(..))
 import Ui exposing (Element)
 import Ui.Table
 import Url.Builder
@@ -46,14 +44,12 @@ rebuildTimetable model =
     case
         RemoteData.map5
             (\t st cd s c ->
-                ( ( t |> Dict.values |> List.foldl IdDict.Extra.union IdDict.empty
-                  , st |> Dict.values |> List.concat
-                  )
-                , cd |> Dict.values |> List.foldl mergeWithUnion IdDict.empty
-                , ( s |> Dict.values |> List.foldl IdDict.Extra.union IdDict.empty
-                  , c |> Dict.values |> List.foldl IdDict.Extra.union IdDict.empty
-                  )
-                )
+                { trips = t |> Dict.values |> List.foldl IdDict.Extra.union IdDict.empty
+                , stopTimes = st |> Dict.values |> List.concat
+                , calendarDates = cd |> Dict.values |> List.foldl mergeWithUnion IdDict.empty
+                , stops = s |> Dict.values |> List.foldl IdDict.Extra.union IdDict.empty
+                , calendars = c |> Dict.values |> List.foldl IdDict.Extra.union IdDict.empty
+                }
             )
             model.trips
             model.stopTimes
@@ -61,190 +57,11 @@ rebuildTimetable model =
             model.stops
             model.calendars
     of
-        RemoteData.Loaded ( ( trips, stopTimes ), calendarDates, ( stops, calendars ) ) ->
-            let
-                filteredStops : List Stop
-                filteredStops =
-                    filterStops stops
-
-                filteredTrips : IdDict TripId Trip
-                filteredTrips =
-                    filterTrips model.today calendarDates calendars trips
-
-                filteredStopTimes : List (List StopTime)
-                filteredStopTimes =
-                    filterStopTimes filteredTrips filteredStops stopTimes
-
-                stopName : { a | stop_id : Id StopId } -> String
-                stopName stopTime =
-                    case IdDict.get stopTime.stop_id stops of
-                        Nothing ->
-                            Id.toString stopTime.stop_id
-
-                        Just stop ->
-                            let
-                                idString =
-                                    Id.toString stopTime.stop_id
-                            in
-                            case stop.parent_station of
-                                Nothing ->
-                                    Maybe.withDefault idString stop.name
-
-                                Just parent_id ->
-                                    case IdDict.get parent_id stops of
-                                        Nothing ->
-                                            stop.name
-                                                |> Maybe.withDefault idString
-
-                                        Just parent ->
-                                            parent.name
-                                                |> Maybe.withDefault
-                                                    (stop.name
-                                                        |> Maybe.withDefault idString
-                                                    )
-
-                timetable : Timetable
-                timetable =
-                    filteredStopTimes
-                        |> List.concatMap
-                            (\tripStopTimes ->
-                                tripStopTimes
-                                    |> List.filterMap
-                                        (\stopTime ->
-                                            Maybe.map4
-                                                (\stop_id departure_time arrival_time trip ->
-                                                    { stop_id = stop_id
-                                                    , departure_time = departure_time
-                                                    , arrival_time = arrival_time
-                                                    , trip_id = stopTime.trip_id
-                                                    , trip_label =
-                                                        Maybe.withDefault
-                                                            (Id.toString stopTime.trip_id)
-                                                            trip.short_name
-                                                    , train =
-                                                        case trip.block_id of
-                                                            Nothing ->
-                                                                Id.toString trip.id
-
-                                                            Just block_id ->
-                                                                Id.toString trip.route_id
-                                                                    ++ " - "
-                                                                    ++ Id.toString block_id
-                                                    }
-                                                )
-                                                stopTime.stop_id
-                                                stopTime.departure_time
-                                                stopTime.arrival_time
-                                                (IdDict.get stopTime.trip_id trips)
-                                        )
-                                    |> List.foldl
-                                        (\stopTime ( last, acc ) ->
-                                            case last of
-                                                Just previous ->
-                                                    if previous.trip_id == stopTime.trip_id || True then
-                                                        ( Just stopTime
-                                                        , { from = stopName previous
-                                                          , to = stopName stopTime
-                                                          , departure = previous.departure_time
-                                                          , arrival = stopTime.arrival_time
-                                                          , label = stopTime.trip_label
-                                                          , train = stopTime.train
-                                                          }
-                                                            :: acc
-                                                        )
-
-                                                    else
-                                                        ( Just stopTime, acc )
-
-                                                Nothing ->
-                                                    ( Just stopTime, acc )
-                                        )
-                                        ( Nothing, [] )
-                                    |> Tuple.second
-                            )
-                        |> Dict.Extra.groupBy (\{ from, to } -> ( from, to ))
-                        |> Dict.toList
-                        |> List.map
-                            (\( ( from, to ), links ) ->
-                                { from = from
-                                , to = to
-                                , links =
-                                    links
-                                        |> Quantity.sortBy (\{ departure } -> departure)
-                                        |> List.map
-                                            (\{ departure, label, train, arrival } ->
-                                                { from = departure
-                                                , label = label
-                                                , train = train
-                                                , to = arrival
-                                                }
-                                            )
-                                }
-                            )
-            in
-            { model | timetable = timetable }
+        RemoteData.Loaded data ->
+            { model | timetable = Timetable.build model.today data }
 
         _ ->
             model
-
-
-filterTrips :
-    Date
-    -> IdDict ServiceId (Dict Int CalendarDate)
-    -> IdDict ServiceId Calendar
-    -> IdDict TripId Trip
-    -> IdDict TripId Trip
-filterTrips today calendarDates calendars trips =
-    trips
-        |> IdDict.filter
-            (\_ trip ->
-                case
-                    calendarDates
-                        |> IdDict.get trip.service_id
-                        |> Maybe.andThen (Dict.get (GTFS.dateToInt today))
-                of
-                    Just { exception_type } ->
-                        exception_type == GTFS.ServiceAdded
-
-                    Nothing ->
-                        case IdDict.get trip.service_id calendars of
-                            Nothing ->
-                                let
-                                    _ =
-                                        Debug.log "Could not find calendar info for service_id" trip.service_id
-                                in
-                                False
-
-                            Just calendar ->
-                                let
-                                    correctDay : Bool
-                                    correctDay =
-                                        case Date.weekday today of
-                                            Mon ->
-                                                calendar.monday
-
-                                            Tue ->
-                                                calendar.tuesday
-
-                                            Wed ->
-                                                calendar.wednesday
-
-                                            Thu ->
-                                                calendar.thursday
-
-                                            Fri ->
-                                                calendar.friday
-
-                                            Sat ->
-                                                calendar.saturday
-
-                                            Sun ->
-                                                calendar.sunday
-                                in
-                                correctDay
-                                    && (Date.compare calendar.start_date today /= GT)
-                                    && (Date.compare calendar.end_date today /= LT)
-            )
 
 
 init : flags -> ( Model, Cmd Msg )
@@ -488,30 +305,31 @@ viewFeed today ( feed, ( calendarDates, ( stopTimes, ( trips, ( calendars, ( sto
     let
         filteredStops : List Stop
         filteredStops =
-            filterStops stops
+            Pathfinding.filterStops stops
 
         stopIds : IdSet StopId
         stopIds =
             filteredStops
                 |> List.map .id
                 |> IdSet.fromList
-
-        filteredPathways : List Pathway
-        filteredPathways =
-            pathways
-                |> IdDict.values
-                |> List.filter
-                    (\walkway ->
-                        IdSet.member walkway.from_stop_id stopIds
-                            && IdSet.member walkway.to_stop_id stopIds
-                    )
     in
     Theme.column []
         [ Ui.text feed
 
-        -- , pathfinder stops pathways
+        -- , pathfinder stops filteredPathways
         , viewStops stops filteredStops
         , if False then
+            let
+                filteredPathways : List Pathway
+                filteredPathways =
+                    pathways
+                        |> IdDict.values
+                        |> List.filter
+                            (\walkway ->
+                                IdSet.member walkway.from_stop_id stopIds
+                                    && IdSet.member walkway.to_stop_id stopIds
+                            )
+            in
             viewPathways stops filteredPathways
 
           else
@@ -520,15 +338,15 @@ viewFeed today ( feed, ( calendarDates, ( stopTimes, ( trips, ( calendars, ( sto
             let
                 filteredTrips : IdDict TripId Trip
                 filteredTrips =
-                    filterTrips today calendarDates calendars trips
+                    Pathfinding.filterTrips today calendarDates calendars trips
 
-                filteredStopTimes : List (List StopTime)
+                filteredStopTimes : List ( Id TripId, List StopTime )
                 filteredStopTimes =
-                    filterStopTimes filteredTrips filteredStops stopTimes
+                    Pathfinding.filterStopTimes filteredTrips filteredStops stopTimes
             in
             filteredStopTimes
                 |> List.filterMap
-                    (\tripStops ->
+                    (\( _, tripStops ) ->
                         if List.length tripStops < 2 then
                             Nothing
 
@@ -540,69 +358,6 @@ viewFeed today ( feed, ( calendarDates, ( stopTimes, ( trips, ( calendars, ( sto
           else
             Ui.none
         ]
-
-
-filterStopTimes : IdDict TripId Trip -> List Stop -> List StopTime -> List (List StopTime)
-filterStopTimes filteredTrips filteredStops stopTimes =
-    let
-        stopIds : IdSet StopId
-        stopIds =
-            IdSet.fromList (List.map (\stop -> stop.id) filteredStops)
-    in
-    stopTimes
-        |> List.filter
-            (\stopTime ->
-                case stopTime.stop_id of
-                    Just stop_id ->
-                        IdDict.member stopTime.trip_id filteredTrips
-                            && IdSet.member stop_id stopIds
-
-                    Nothing ->
-                        False
-            )
-        |> Dict.Extra.groupBy (\{ trip_id } -> Id.toString trip_id)
-        |> Dict.values
-        |> List.map
-            (\v ->
-                v
-                    |> List.sortBy (\stopTime -> stopTime.stop_sequence)
-            )
-
-
-filterStops : IdDict StopId Stop -> List Stop
-filterStops stops =
-    let
-        stations =
-            [ "Pde:09162:100" -- München Hbf - ÖBB
-            , "Pit:22095:7049" -- Udine - ÖBB
-            , "Pat:42:3654" -- Villach Hbf - ÖBB
-            , "Pat:45:50002" -- Salzburg Hbf - ÖBB
-            , "Pde:09162:5" -- München Ost - ÖBB
-            , "Pit:22095:7068" -- Tarvisio - ÖBB
-
-            -- , "Pde:09172:42293" -- Freilassing - ÖBB
-            , "Pit:22095:7068" -- Tarvisio Boscoverde - ÖBB
-
-            -- "Pde:09162:10" -- Pasing
-            --     , "de:09162:6:40:81"
-            --     , "de:09162:6_G"
-            ]
-                |> Set.fromList
-    in
-    stops
-        |> IdDict.values
-        |> List.filter
-            (\stop ->
-                Set.member (Id.toString stop.id) stations
-                    || (case stop.parent_station of
-                            Nothing ->
-                                False
-
-                            Just parent_id ->
-                                Set.member (Id.toString parent_id) stations
-                       )
-            )
-        |> List.take 1000
 
 
 viewStops : IdDict StopId Stop -> List Stop -> Element msg
