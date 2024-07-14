@@ -38,7 +38,7 @@ lineHeight =
 
 timesHeight : number
 timesHeight =
-    50
+    80
 
 
 namesWidth : number

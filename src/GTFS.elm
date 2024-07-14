@@ -189,12 +189,15 @@ dateParser string =
         |> Maybe.map
             (\raw ->
                 let
+                    year : Int
                     year =
                         raw // 10000
 
+                    month : Date.Month
                     month =
                         Date.numberToMonth (modBy 100 (raw // 100))
 
+                    day : Int
                     day =
                         modBy 100 raw
                 in
@@ -450,6 +453,7 @@ timeParser input =
 timeInnerParser : Parser Clock
 timeInnerParser =
     let
+        int : Parser Int
         int =
             (Parser.chompIf Char.isDigit
                 |. Parser.chompWhile Char.isDigit

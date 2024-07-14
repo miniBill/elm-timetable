@@ -63,7 +63,7 @@ toHumanString (Quantity fromStartOfDay) =
                 |> String.padLeft 2 '0'
     in
     if hour >= 24 then
-        pad (modBy 24 hour) ++ ":" ++ pad minute ++ "(+" ++ String.fromInt (hour // 24) ++ ")"
+        pad (modBy 24 hour) ++ ":" ++ pad minute ++ " (+" ++ String.fromInt (hour // 24) ++ ")"
 
     else
         pad hour ++ ":" ++ pad minute
