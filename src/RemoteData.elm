@@ -4,8 +4,7 @@ import Http
 
 
 type RemoteData a
-    = NotAsked
-    | Loading
+    = Loading
     | Loaded a
     | Error Http.Error
 
@@ -13,9 +12,6 @@ type RemoteData a
 map : (a -> b) -> RemoteData a -> RemoteData b
 map f x =
     case x of
-        NotAsked ->
-            NotAsked
-
         Loading ->
             Loading
 
@@ -33,9 +29,6 @@ map2 :
     -> RemoteData c
 map2 f a b =
     case a of
-        NotAsked ->
-            NotAsked
-
         Loading ->
             Loading
 
@@ -44,9 +37,6 @@ map2 f a b =
 
         Loaded la ->
             case b of
-                NotAsked ->
-                    NotAsked
-
                 Loading ->
                     Loading
 
@@ -65,9 +55,6 @@ map3 :
     -> RemoteData d
 map3 f a b c =
     case a of
-        NotAsked ->
-            NotAsked
-
         Loading ->
             Loading
 
@@ -76,9 +63,6 @@ map3 f a b c =
 
         Loaded la ->
             case b of
-                NotAsked ->
-                    NotAsked
-
                 Loading ->
                     Loading
 
@@ -87,9 +71,6 @@ map3 f a b c =
 
                 Loaded lb ->
                     case c of
-                        NotAsked ->
-                            NotAsked
-
                         Loading ->
                             Loading
 

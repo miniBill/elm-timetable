@@ -179,16 +179,16 @@ view timetable =
                 |> List.indexedMap
                     (\i name -> ( name, timesHeight + i * lineHeight ))
                 |> Dict.fromList
-
-        stationToY : Station -> Float
-        stationToY station =
-            Dict.get station stationPositions
-                |> Maybe.withDefault -1
-                |> toFloat
     in
     case ( timeRange.minTime, timeRange.maxTime ) of
         ( Just minTime, Just maxTime ) ->
             let
+                stationToY : Station -> Float
+                stationToY station =
+                    Dict.get station stationPositions
+                        |> Maybe.withDefault -1
+                        |> toFloat
+
                 fullHeight : Float
                 fullHeight =
                     timesHeight * 2 + lineHeight * toFloat (Dict.size stations - 1)

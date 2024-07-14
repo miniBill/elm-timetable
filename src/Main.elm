@@ -226,20 +226,12 @@ view model =
                 |> IdDict.toList
                 |> List.map
                     (\( feedId, feed ) ->
-                        let
-                            label : String
-                            label =
-                                Id.toString feedId
-                        in
                         case feed of
                             RemoteData.Error e ->
                                 Ui.text (Debug.toString e)
 
-                            RemoteData.NotAsked ->
-                                Ui.text ("Feed " ++ label ++ " not asked")
-
                             RemoteData.Loading ->
-                                Ui.text ("Feed " ++ label ++ " loading...")
+                                Ui.text ("Feed " ++ Id.toString feedId ++ " loading...")
 
                             RemoteData.Loaded loaded ->
                                 loaded
