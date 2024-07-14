@@ -26,8 +26,7 @@ import Table
 import Theme
 import Time exposing (Weekday(..))
 import Timetable
-import TypedSvg.Types exposing (AnchorAlignment(..), Paint(..), Transform(..))
-import Types exposing (Event(..), Model, Msg(..), Timetable)
+import Types exposing (Model, Msg(..), Timetable)
 import Ui exposing (Element)
 import Url.Builder
 
