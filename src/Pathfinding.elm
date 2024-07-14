@@ -9,13 +9,14 @@ import IdDict exposing (IdDict)
 import IdDict.Extra
 import IdSet exposing (IdSet)
 import List.Extra
-import Set
+import Set exposing (Set)
 import Time exposing (Weekday(..))
 
 
 filterStops : IdDict StopId Stop -> List Stop
 filterStops stops =
     let
+        stations : Set String
         stations =
             [ "Pde:09162:100" -- München Hbf - ÖBB
             , "Pit:22095:7049" -- Udine - ÖBB
@@ -176,6 +177,7 @@ pathfind2 stops pathways from to =
                         of
                             ( Just pathFrom, Just pathTo ) ->
                                 let
+                                    withStraight : List { pathway : Pathway, to : Stop }
                                     withStraight =
                                         if pathFrom == a then
                                             { pathway = pathway
