@@ -249,7 +249,7 @@ filterTrips today calendarDates calendars trips =
 
 init : flags -> ( Model, Cmd Msg )
 init _ =
-    ( { today = Date.fromCalendarDate 2024 Time.Jul 7
+    ( { today = Date.fromCalendarDate 2024 Time.Jul 9
       , timetable = []
       , stops = RemoteData.Loading
       , pathways = RemoteData.Loading
