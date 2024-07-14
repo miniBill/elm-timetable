@@ -202,24 +202,24 @@ view timetable =
                                 (minTime
                                     |> Quantity.toFloatQuantity
                                 )
-                                (Duration.minutes 15)
+                                Duration.hour
                                 |> floor
                             )
-                            (Clock.fromHoursMinutesSeconds 0 15 0)
+                            (Clock.fromHoursMinutesSeconds 1 0 0)
                     , maxTime =
                         Quantity.multiplyBy
                             (Quantity.ratio
                                 (maxTime
                                     |> Quantity.toFloatQuantity
                                 )
-                                (Duration.minutes 15)
+                                Duration.hour
                                 |> ceiling
                             )
-                            (Clock.fromHoursMinutesSeconds 0 15 0)
+                            (Clock.fromHoursMinutesSeconds 1 0 0)
                     }
             in
             svg
-                [ Html.Attributes.style "width" (String.fromInt fullWidth ++ "px")
+                [ Html.Attributes.style "width" (String.fromFloat (fullWidth * 2) ++ "px")
                 , viewBox 0 0 fullWidth fullHeight
                 ]
                 [ styleNode
@@ -378,17 +378,29 @@ viewTimeGrid ({ minTime, maxTime } as timeRange) fullHeight =
                                             |> text
                                         ]
                             in
-                            [ line
-                                [ class [ "grid" ]
-                                , x1 0
-                                , x2 0
-                                , y1 0
-                                , y2 fullHeight
+                            if quarterHour == to then
+                                [ line
+                                    [ class [ "grid" ]
+                                    , x1 0
+                                    , x2 0
+                                    , y1 timesHeight
+                                    , y2 (fullHeight - timesHeight)
+                                    ]
+                                    []
                                 ]
-                                []
-                            , inner AnchorStart 0
-                            , inner AnchorEnd fullHeight
-                            ]
+
+                            else
+                                [ line
+                                    [ class [ "grid" ]
+                                    , x1 0
+                                    , x2 0
+                                    , y1 0
+                                    , y2 fullHeight
+                                    ]
+                                    []
+                                , inner AnchorStart 0
+                                , inner AnchorEnd fullHeight
+                                ]
 
                         else
                             [ line
@@ -415,8 +427,7 @@ styleNode =
         [ text
             """
             .stationLine {
-                stroke: gray;
-                stroke-width: 1px;
+                stroke: black;
             }
 
             .link {
@@ -425,7 +436,7 @@ styleNode =
 
             .grid {
                 stroke: gray;
-                stroke-width: 1px;
+                stroke-width: 0.5px;
             }
 
             .secondary {
@@ -471,8 +482,8 @@ viewStation timeRange stationPositions ( name, { events } ) =
     g [ id <| "Station - " ++ name ]
         [ line
             [ class [ "stationLine" ]
-            , x1 (timeToX timeRange timeRange.minTime - 1)
-            , x2 (timeToX timeRange timeRange.maxTime + 1)
+            , x1 (timeToX timeRange timeRange.minTime - 0.5)
+            , x2 (timeToX timeRange timeRange.maxTime + 0.5)
             , y1 stationY
             , y2 stationY
             ]
