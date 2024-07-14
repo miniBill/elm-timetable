@@ -43,12 +43,12 @@ rebuildTimetable : Model -> Model
 rebuildTimetable model =
     case
         RemoteData.map5
-            (\t st cd s c ->
-                { trips = t |> Dict.values |> List.foldl IdDict.Extra.union IdDict.empty
-                , stopTimes = st |> Dict.values |> List.concat
-                , calendarDates = cd |> Dict.values |> List.foldl mergeWithUnion IdDict.empty
-                , stops = s |> Dict.values |> List.foldl IdDict.Extra.union IdDict.empty
-                , calendars = c |> Dict.values |> List.foldl IdDict.Extra.union IdDict.empty
+            (\trips stopTimes calendarDates stops calendars ->
+                { trips = trips |> Dict.values |> List.foldl IdDict.Extra.union IdDict.empty
+                , stopTimes = stopTimes |> Dict.values |> List.concat
+                , calendarDates = calendarDates |> Dict.values |> List.foldl mergeWithUnion IdDict.empty
+                , stops = stops |> Dict.values |> List.foldl IdDict.Extra.union IdDict.empty
+                , calendars = calendars |> Dict.values |> List.foldl IdDict.Extra.union IdDict.empty
                 }
             )
             model.trips
@@ -227,12 +227,23 @@ view model =
             in
             Ok
                 (\stops pathways stopTimes trips calendars calendarDates ->
-                    pathways
-                        |> mergePair stops
-                        |> mergePair calendars
-                        |> mergePair trips
-                        |> mergePair stopTimes
-                        |> mergePair calendarDates
+                    Dict.map
+                        (\_ _ pathways_ stops_ calendars_ trips_ stopTimes_ calendarDates_ ->
+                            { pathways = pathways_
+                            , stops = stops_
+                            , calendars = calendars_
+                            , trips = trips_
+                            , stopTimes = stopTimes_
+                            , calendarDates = calendarDates_
+                            }
+                        )
+                        pathways
+                        |> andMerge pathways
+                        |> andMerge stops
+                        |> andMerge calendars
+                        |> andMerge trips
+                        |> andMerge stopTimes
+                        |> andMerge calendarDates
                         |> Dict.toList
                         |> List.map (viewFeed model.today)
                 )
@@ -246,17 +257,14 @@ view model =
         ]
 
 
-mergePair :
-    Dict comparable a
-    -> Dict comparable b
-    -> Dict comparable ( a, b )
-mergePair l r =
+andMerge : Dict comparable a -> Dict comparable (a -> b) -> Dict comparable b
+andMerge l r =
     Dict.merge
         (\_ _ acc -> acc)
         (\k le re acc ->
             Dict.insert
                 k
-                ( le, re )
+                (re le)
                 acc
         )
         (\_ _ acc -> acc)
@@ -287,21 +295,17 @@ mergeWithUnion l r =
 viewFeed :
     Date
     ->
-        ( Feed
-        , ( IdDict ServiceId (Dict Int CalendarDate)
-          , ( List StopTime
-            , ( IdDict TripId Trip
-              , ( IdDict ServiceId Calendar
-                , ( IdDict StopId Stop
-                  , IdDict PathwayId Pathway
-                  )
-                )
-              )
-            )
-          )
+        ( String
+        , { calendarDates : IdDict ServiceId (Dict Int CalendarDate)
+          , stopTimes : List StopTime
+          , trips : IdDict TripId Trip
+          , calendars : IdDict ServiceId Calendar
+          , stops : IdDict StopId Stop
+          , pathways : IdDict PathwayId Pathway
+          }
         )
     -> Element msg
-viewFeed today ( feed, ( calendarDates, ( stopTimes, ( trips, ( calendars, ( stops, pathways ) ) ) ) ) ) =
+viewFeed today ( feed, { calendarDates, stopTimes, trips, calendars, stops, pathways } ) =
     let
         filteredStops : List Stop
         filteredStops =
