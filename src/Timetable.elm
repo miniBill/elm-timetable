@@ -4,16 +4,15 @@ import Clock exposing (Clock)
 import Color
 import Dict exposing (Dict)
 import Duration exposing (Duration, Seconds)
-import GTFS exposing (LocationType(..))
 import Html.Attributes
 import List.Extra
 import Quantity
 import QuantityDict exposing (QuantityDict)
-import TypedSvg exposing (circle, g, line, svg, text_, title)
-import TypedSvg.Attributes exposing (class, stroke, textAnchor, transform, viewBox)
+import TypedSvg exposing (circle, g, line, style, svg, text_, title)
+import TypedSvg.Attributes exposing (class, id, stroke, textAnchor, transform, viewBox)
 import TypedSvg.Attributes.InPx exposing (cx, cy, x1, x2, y, y1, y2)
 import TypedSvg.Core exposing (Svg, text)
-import TypedSvg.Types exposing (AnchorAlignment(..), Paint(..), Transform(..))
+import TypedSvg.Types exposing (AnchorAlignment(..), Paint(..), Transform(..), percent)
 import Types exposing (Event(..), Station, Timetable)
 
 
@@ -236,79 +235,95 @@ view timetable =
                                     ]
                                 )
                     )
+    in
+    svg
+        [ Html.Attributes.style "width" (String.fromInt fullWidth ++ "px")
+        , viewBox -5 -5 (fullWidth + 10) (fullHeight + 10)
+        ]
+        [ styleNode
+        , g [ id "Stations" ] stationsViews
+        , g [ id "Links" ] linksViews
+        , g [ id "Time Grid" ] (timeGridView timeRange fullHeight)
+        , g [ id "Endpoints" ] endpointsViews
+        ]
 
-        timesViews : List (Svg msg)
-        timesViews =
-            case ( timeRange.minTime, timeRange.maxTime ) of
-                ( Just minTime, Just maxTime ) ->
-                    let
-                        from : Int
-                        from =
-                            ceiling <| Duration.inHours <| Quantity.toFloatQuantity minTime
 
-                        to : Int
-                        to =
-                            floor <| Duration.inHours <| Quantity.toFloatQuantity maxTime
-                    in
-                    List.range from to
-                        |> List.map
-                            (\hour ->
+timeGridView : { minTime : Maybe Clock, maxTime : Maybe Clock } -> Float -> List (Svg msg)
+timeGridView timeRange fullHeight =
+    case ( timeRange.minTime, timeRange.maxTime ) of
+        ( Just minTime, Just maxTime ) ->
+            let
+                from : Int
+                from =
+                    ceiling <| Duration.inHours <| Quantity.toFloatQuantity minTime
+
+                to : Int
+                to =
+                    floor <| Duration.inHours <| Quantity.toFloatQuantity maxTime
+            in
+            List.range from to
+                |> List.map
+                    (\hour ->
+                        let
+                            time : Clock
+                            time =
+                                Clock.fromHoursMinutesSeconds hour 0 0
+
+                            timeX : Float
+                            timeX =
+                                timeToX timeRange time
+
+                            verticalLine : Svg msg
+                            verticalLine =
+                                line
+                                    [ class [ "grid" ]
+                                    , x1 0
+                                    , x2 0
+                                    , y1 0
+                                    , TypedSvg.Attributes.y2 (percent 1)
+                                    ]
+                                    []
+
+                            label : List (Svg msg)
+                            label =
                                 let
-                                    time : Clock
-                                    time =
-                                        Clock.fromHoursMinutesSeconds hour 0 0
-
-                                    timeX : Float
-                                    timeX =
-                                        timeToX timeRange time
-
-                                    verticalLine : Svg msg
-                                    verticalLine =
-                                        line
-                                            [ class [ "grid" ]
-                                            , x1 0
-                                            , x2 0
-                                            , y1 0
-                                            , y2 fullHeight
+                                    inner anchor transformation =
+                                        text_
+                                            [ textAnchor anchor
+                                            , transform
+                                                [ Translate 5 transformation
+                                                , Rotate 90 0 0
+                                                ]
                                             ]
-                                            []
-
-                                    label : List (Svg msg)
-                                    label =
-                                        let
-                                            inner anchor transformation =
-                                                text_
-                                                    [ textAnchor anchor
-                                                    , transform
-                                                        [ Translate 5 transformation
-                                                        , Rotate 90 0 0
-                                                        ]
-                                                    ]
-                                                    [ Clock.toHumanString time
-                                                        |> text
-                                                    ]
-                                        in
-                                        [ inner AnchorStart 0
-                                        , inner AnchorEnd fullHeight
-                                        ]
+                                            [ Clock.toHumanString time
+                                                |> text
+                                            ]
                                 in
-                                g
-                                    [ transform [ Translate timeX 0 ] ]
-                                    (if hour == from then
-                                        verticalLine :: label
+                                [ inner AnchorStart 0
+                                , inner AnchorEnd fullHeight
+                                ]
+                        in
+                        g
+                            [ id <| String.fromInt hour ++ ":00"
+                            , transform [ Translate timeX 0 ]
+                            ]
+                            (if hour == from then
+                                verticalLine :: label
 
-                                     else
-                                        verticalLine :: label
-                                    )
+                             else
+                                verticalLine :: label
                             )
+                    )
 
-                _ ->
-                    []
+        _ ->
+            []
 
-        styleNode =
-            TypedSvg.style []
-                [ text
-                    """
+
+styleNode : Svg msg
+styleNode =
+    style []
+        [ text
+            """
                     .horiz {
                         stroke: black;
                         stroke-width: 2px;
@@ -334,13 +349,7 @@ view timetable =
                         r: 5px;
                     }
                     """
-                ]
-    in
-    (styleNode :: stationsViews ++ linksViews ++ timesViews ++ endpointsViews)
-        |> svg
-            [ Html.Attributes.style "width" (String.fromInt fullWidth ++ "px")
-            , viewBox -5 -5 (fullWidth + 10) (fullHeight + 10)
-            ]
+        ]
 
 
 timeToX :
@@ -445,7 +454,7 @@ viewStation timeRange stationPositions ( name, { events } ) =
             in
             go (QuantityDict.toList events) []
     in
-    g []
+    g [ id <| "Station - " ++ name ]
         ([ line
             [ class [ "horiz" ]
             , x1 namesWidth
