@@ -27,6 +27,7 @@ merge :
     -> a
 merge onLeft onBoth onRight left right acc =
     let
+        go : List ( Id kind, lv ) -> List ( Id kind, rv ) -> a -> a
         go lqueue rqueue iacc =
             case lqueue of
                 [] ->

@@ -65,60 +65,8 @@ tableHorizontalMargin =
 view : Timetable -> Svg msg
 view timetable =
     let
-        liftTime :
-            (Clock -> Clock -> Clock)
-            -> Maybe Clock
-            -> Clock
-            -> Clock
-        liftTime op acc e =
-            case acc of
-                Nothing ->
-                    e
-
-                Just v ->
-                    op v e
-
-        addStation :
-            Station
-            -> Clock
-            -> Event
-            ->
-                Dict
-                    Station
-                    { min : Clock
-                    , max : Clock
-                    , events : QuantityDict Int Seconds Event
-                    }
-            ->
-                Dict
-                    Station
-                    { min : Clock
-                    , max : Clock
-                    , events : QuantityDict Int Seconds Event
-                    }
-        addStation station time event dict =
-            let
-                new : { min : Clock, max : Clock, events : QuantityDict Int Seconds Event }
-                new =
-                    case Dict.get station dict of
-                        Nothing ->
-                            { min = time
-                            , max = time
-                            , events =
-                                QuantityDict.singleton time event
-                            }
-
-                        Just existing ->
-                            { min = liftTime Quantity.min (Just existing.min) time
-                            , max = liftTime Quantity.max (Just existing.max) time
-                            , events =
-                                QuantityDict.insert time event existing.events
-                            }
-            in
-            Dict.insert station new dict
-
-        times : List ( Clock, Clock )
-        times =
+        timeRange : { minTime : Maybe Clock, maxTime : Maybe Clock }
+        timeRange =
             timetable
                 |> List.concatMap
                     (\{ links } ->
@@ -128,61 +76,57 @@ view timetable =
                             )
                             links
                     )
-
-        timeRange : { minTime : Maybe Clock, maxTime : Maybe Clock }
-        timeRange =
-            List.foldl
-                (\( from, to ) acc ->
-                    { minTime =
-                        Just <| liftTime Quantity.min acc.minTime from
-                    , maxTime =
-                        Just <| liftTime Quantity.max acc.maxTime to
-                    }
-                )
-                { minTime = Nothing
-                , maxTime = Nothing
-                }
-                times
-
-        stations :
-            Dict
-                Station
-                { min : Clock
-                , max : Clock
-                , events : QuantityDict Int Seconds Event
-                }
-        stations =
-            timetable
                 |> List.foldl
-                    (\{ from, to, links } acc ->
-                        links
-                            |> List.foldl
-                                (\link iacc ->
-                                    iacc
-                                        |> addStation from link.from Departure
-                                        |> addStation to link.to Arrival
-                                )
-                                acc
+                    (\( from, to ) acc ->
+                        { minTime =
+                            Just <| liftTime Quantity.min acc.minTime from
+                        , maxTime =
+                            Just <| liftTime Quantity.max acc.maxTime to
+                        }
                     )
-                    Dict.empty
-
-        sortedStations : List Station
-        sortedStations =
-            stations
-                |> Dict.keys
-                |> List.sortBy (\station -> stationOrder station)
-                |> List.reverse
-
-        stationPositions : Dict Station Int
-        stationPositions =
-            sortedStations
-                |> List.indexedMap
-                    (\i name -> ( name, timesHeight + i * lineHeight ))
-                |> Dict.fromList
+                    { minTime = Nothing
+                    , maxTime = Nothing
+                    }
     in
     case ( timeRange.minTime, timeRange.maxTime ) of
         ( Just minTime, Just maxTime ) ->
             let
+                stations :
+                    Dict
+                        Station
+                        { min : Clock
+                        , max : Clock
+                        , events : QuantityDict Int Seconds Event
+                        }
+                stations =
+                    timetable
+                        |> List.foldl
+                            (\{ from, to, links } acc ->
+                                links
+                                    |> List.foldl
+                                        (\link iacc ->
+                                            iacc
+                                                |> addStation from link.from Departure
+                                                |> addStation to link.to Arrival
+                                        )
+                                        acc
+                            )
+                            Dict.empty
+
+                sortedStations : List Station
+                sortedStations =
+                    stations
+                        |> Dict.keys
+                        |> List.sortBy (\station -> stationOrder station)
+                        |> List.reverse
+
+                stationPositions : Dict Station Int
+                stationPositions =
+                    sortedStations
+                        |> List.indexedMap
+                            (\i name -> ( name, timesHeight + i * lineHeight ))
+                        |> Dict.fromList
+
                 stationToY : Station -> Float
                 stationToY station =
                     Dict.get station stationPositions
@@ -231,6 +175,60 @@ view timetable =
 
         _ ->
             Html.text "Empty timetable"
+
+
+liftTime :
+    (Clock -> Clock -> Clock)
+    -> Maybe Clock
+    -> Clock
+    -> Clock
+liftTime op acc e =
+    case acc of
+        Nothing ->
+            e
+
+        Just v ->
+            op v e
+
+
+addStation :
+    Station
+    -> Clock
+    -> Event
+    ->
+        Dict
+            Station
+            { min : Clock
+            , max : Clock
+            , events : QuantityDict Int Seconds Event
+            }
+    ->
+        Dict
+            Station
+            { min : Clock
+            , max : Clock
+            , events : QuantityDict Int Seconds Event
+            }
+addStation station time event dict =
+    let
+        new : { min : Clock, max : Clock, events : QuantityDict Int Seconds Event }
+        new =
+            case Dict.get station dict of
+                Nothing ->
+                    { min = time
+                    , max = time
+                    , events =
+                        QuantityDict.singleton time event
+                    }
+
+                Just existing ->
+                    { min = liftTime Quantity.min (Just existing.min) time
+                    , max = liftTime Quantity.max (Just existing.max) time
+                    , events =
+                        QuantityDict.insert time event existing.events
+                    }
+    in
+    Dict.insert station new dict
 
 
 viewLinks : { minTime : Clock, maxTime : Clock } -> (Station -> Float) -> Timetable -> List (Svg msg)

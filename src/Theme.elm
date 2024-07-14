@@ -51,6 +51,7 @@ table :
     -> Element msg
 table attrs columns data =
     let
+        tableConfig : Ui.Table.Config () Int a msg
         tableConfig =
             columns
                 |> List.filterMap identity
