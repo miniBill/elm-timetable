@@ -1,7 +1,7 @@
 module Theme exposing (button, column, padding, rhythm, row, spacing, table, tableColumn)
 
 import Color
-import Ui exposing (Attribute, Element)
+import Ui exposing (Attribute, Element, shrink, width)
 import Ui.Input
 import Ui.Table
 
@@ -40,7 +40,7 @@ button :
     -> Element msg
 button attrs { onPress, label } =
     Ui.el
-        (Ui.Input.button onPress :: padding :: Ui.border 1 :: attrs)
+        (Ui.Input.button onPress :: padding :: Ui.border 1 :: width shrink :: attrs)
         label
 
 

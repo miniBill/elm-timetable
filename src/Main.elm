@@ -183,33 +183,34 @@ expectCsv toMsg feed filename decoder =
 
 view : Model -> Element Msg
 view model =
-    Theme.column []
-        [ Timetable.view model.timetable
-            |> Ui.html
-            |> Ui.el
-                [ Ui.scrollableX
-                , Theme.padding
-                ]
-        , Timetable.viewGraph model.timetable
-            |> Ui.html
-            |> Ui.el
+    let
+        shared : List (Element Msg)
+        shared =
+            [ Timetable.view model.timetable
+                |> Ui.html
+                |> Ui.el
+                    [ Ui.scrollableX
+                    , Theme.padding
+                    ]
+            , Timetable.viewGraph model.timetable
+                |> Ui.html
+                |> Ui.el
+                    [ Ui.scrollableX
+                    , Ui.paddingWith { left = Theme.rhythm, bottom = Theme.rhythm, right = Theme.rhythm, top = 0 }
+                    ]
+            , Ui.el
                 [ Ui.scrollableX
                 , Ui.paddingWith { left = Theme.rhythm, bottom = Theme.rhythm, right = Theme.rhythm, top = 0 }
                 ]
-        , Ui.el
-            [ Ui.scrollableX
-            , Ui.paddingWith { left = Theme.rhythm, bottom = Theme.rhythm, right = Theme.rhythm, top = 0 }
+                (Theme.button []
+                    { onPress = Reload
+                    , label = Ui.text "Reload"
+                    }
+                )
             ]
-            (Theme.button []
-                { onPress = Reload
-                , label = Ui.text "Reload"
-                }
-            )
-        , Theme.column
-            [ Ui.border 1
-            , Ui.paddingWith { left = Theme.rhythm, bottom = Theme.rhythm, right = Theme.rhythm, top = 0 }
-            ]
-          <|
+
+        feedViews : List (Element msg)
+        feedViews =
             let
                 toResult : String -> RemoteData a -> Result (List (Element msg)) a
                 toResult label data =
@@ -246,7 +247,15 @@ view model =
                         |> andMerge stopTimes
                         |> andMerge calendarDates
                         |> Dict.toList
-                        |> List.map (viewFeed model.today)
+                        |> List.map
+                            (\feed ->
+                                feed
+                                    |> viewFeed model.today
+                                    |> Ui.el
+                                        [ Ui.scrollableX
+                                        , Ui.paddingWith { left = Theme.rhythm, bottom = Theme.rhythm, right = Theme.rhythm, top = 0 }
+                                        ]
+                            )
                 )
                 |> Result.Extra.andMap (toResult "Stops" model.stops)
                 |> Result.Extra.andMap (toResult "Pathways" model.pathways)
@@ -255,7 +264,8 @@ view model =
                 |> Result.Extra.andMap (toResult "Calendars" model.calendars)
                 |> Result.Extra.andMap (toResult "Calendar dates" model.calendarDates)
                 |> Result.Extra.merge
-        ]
+    in
+    Theme.column [] (shared ++ feedViews)
 
 
 andMerge : Dict comparable a -> Dict comparable (a -> b) -> Dict comparable b
