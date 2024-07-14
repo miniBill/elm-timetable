@@ -1,10 +1,10 @@
-module Table exposing (accessibility, angle, bool, clock, debug, duration, float, id, int, length, maybe, string, url)
+module Table exposing (accessibility, angle, bool, clock, duration, float, id, int, length, maybe, pathwayMode, pickupDropOffType, string, url)
 
 import Angle exposing (Angle)
 import Clock exposing (Clock)
 import Duration
 import Float.Extra
-import GTFS exposing (Accessibility(..))
+import GTFS exposing (Accessibility(..), PathwayMode(..), PickupDropOffType(..))
 import Id exposing (Id)
 import Length
 import Ui exposing (Attribute)
@@ -121,11 +121,6 @@ url v =
     string (Url.toString v)
 
 
-debug : a -> Ui.Table.Cell msg
-debug v =
-    string (Debug.toString v)
-
-
 clock : Clock -> Ui.Table.Cell msg
 clock t =
     string (Clock.toHumanString t)
@@ -148,4 +143,49 @@ accessibility value =
 
             Accessibly ->
                 "Accessible"
+        )
+
+
+pickupDropOffType : PickupDropOffType -> Ui.Table.Cell msg
+pickupDropOffType value =
+    string
+        (case value of
+            RegularlyScheduled ->
+                "Regularly scheduled"
+
+            NoPickupDropOff ->
+                "None"
+
+            PhoneAgency ->
+                "Phone the agency"
+
+            CoordinateWithDriver ->
+                "Coordinate with driver"
+        )
+
+
+pathwayMode : PathwayMode -> Ui.Table.Cell msg
+pathwayMode value =
+    string
+        (case value of
+            Walkway ->
+                "Walkway"
+
+            Stairs ->
+                "Stairs"
+
+            MovingSidewalk ->
+                "Moving sidewalk"
+
+            Escalator ->
+                "Escalator"
+
+            Elevator ->
+                "Elevator"
+
+            FareGate ->
+                "Fare gate"
+
+            ExitGate ->
+                "Exit gate"
         )

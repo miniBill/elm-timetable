@@ -459,8 +459,8 @@ viewPathways stops filteredPathways =
             [ Theme.tableColumn "id" .id Table.id
             , Theme.tableColumn "from" .from_stop_id (Table.string << stopName)
             , Theme.tableColumn "to" .to_stop_id (Table.string << stopName)
-            , Theme.tableColumn "mode" .mode Table.debug
-            , Theme.tableColumn "is_bidirectional" .is_bidirectional Table.debug
+            , Theme.tableColumn "mode" .mode Table.pathwayMode
+            , Theme.tableColumn "is_bidirectional" .is_bidirectional Table.bool
             , maybeColumn "length" .length Table.length
             , maybeColumn "traversal_time" .traversal_time Table.duration
             , maybeColumn "stair_count" .stair_count Table.int
@@ -550,10 +550,10 @@ viewStopTimes stops filteredTrips filteredStopTimes =
             , maybeColumn "stop_headsign" .stop_headsign Table.string
             , maybeColumn "start_pickup_drop_off_window" .start_pickup_drop_off_window Table.clock
             , maybeColumn "end_pickup_drop_off_window" .end_pickup_drop_off_window Table.clock
-            , maybeColumn "pickup_type" .pickup_type Table.debug
-            , maybeColumn "drop_off_type" .drop_off_type Table.debug
-            , maybeColumn "continuous_pickup" .continuous_pickup Table.debug
-            , maybeColumn "continuous_drop_off" .continuous_drop_off Table.debug
+            , maybeColumn "pickup_type" .pickup_type Table.pickupDropOffType
+            , maybeColumn "drop_off_type" .drop_off_type Table.pickupDropOffType
+            , maybeColumn "continuous_pickup" .continuous_pickup Table.pickupDropOffType
+            , maybeColumn "continuous_drop_off" .continuous_drop_off Table.pickupDropOffType
             , maybeColumn "shape_dist_traveled" .shape_dist_traveled Table.float
             , maybeColumn "timepoint" .timepoint Table.bool
             , maybeColumn "pickup_booking_rule_id" .pickup_booking_rule_id Table.id
