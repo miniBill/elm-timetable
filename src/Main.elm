@@ -1,6 +1,7 @@
 module Main exposing (main)
 
 import Browser
+import Color
 import Csv.Decode
 import Date exposing (Date)
 import Dict exposing (Dict)
@@ -22,6 +23,7 @@ import Time exposing (Weekday(..))
 import Timetable
 import Types exposing (Model, Msg(..), Timetable)
 import Ui exposing (Element)
+import Ui.Table
 import Url.Builder
 
 
@@ -644,54 +646,80 @@ viewStops stops filteredStops =
                         |> List.filterMap identity
                         |> String.join " - "
 
-        viewStop : Stop -> Html msg
-        viewStop stop =
-            [ Table.id stop.id
-            , Table.maybe Table.string stop.code
-            , Table.maybe Table.string stop.name
-            , Table.maybe Table.string stop.tts_name
-            , Table.maybe Table.string stop.description
-            , Table.maybe Table.angle stop.lat
-            , Table.maybe Table.angle stop.lon
-            , Table.maybe Table.id stop.zone_id
-            , Table.maybe Table.url stop.url
-            , Table.debug stop.location_type
-            , Table.maybe (Table.string << stopName) stop.parent_station
-            , Table.maybe Table.string stop.timezone
-            , Table.maybe Table.debug stop.wheelchair_boarding
-            , Table.maybe Table.id stop.level_id
-            , Table.maybe Table.string stop.platform_code
+        tableConfig : Ui.Table.Config globalState Int Stop msg
+        tableConfig =
+            let
+                column :
+                    String
+                    -> (Stop -> value)
+                    -> (value -> Ui.Table.Cell msg)
+                    -> Maybe (Ui.Table.Column globalState rowState Stop msg)
+                column header prop viewItem =
+                    Ui.Table.column
+                        { header = Ui.Table.header header
+                        , view = \value -> viewItem (prop value)
+                        }
+                        |> Just
+
+                maybeColumn :
+                    String
+                    -> (Stop -> Maybe value)
+                    -> (value -> Ui.Table.Cell msg)
+                    -> Maybe (Ui.Table.Column globalState rowState Stop msg)
+                maybeColumn header prop viewItem =
+                    if List.any (\value -> prop value /= Nothing) data then
+                        Ui.Table.column
+                            { header = Ui.Table.header header
+                            , view = \value -> Table.maybe viewItem (prop value)
+                            }
+                            |> Just
+
+                    else
+                        Nothing
+            in
+            [ column "id" .id Table.id
+            , maybeColumn "code" .code Table.string
+            , maybeColumn "name" .name Table.string
+            , maybeColumn "tts_name" .tts_name Table.string
+            , maybeColumn "description" .description Table.string
+            , maybeColumn "lat" .lat Table.angle
+            , maybeColumn "lon" .lon Table.angle
+            , maybeColumn "zone_id" .zone_id Table.id
+            , maybeColumn "url" .url Table.url
+            , column "location_type" .location_type (Table.string << GTFS.locationTypeToString)
+            , maybeColumn "parent_station" .parent_station (Table.string << stopName)
+            , maybeColumn "timezone" .timezone Table.string
+            , maybeColumn "wheelchair_boarding" .wheelchair_boarding Table.debug
+            , maybeColumn "level_id" .level_id Table.id
+            , maybeColumn "platform_code" .platform_code Table.string
             ]
-                |> Html.tr []
+                |> List.filterMap identity
+                |> Ui.Table.columns
+                |> Ui.Table.withScrollable { stickFirstColumn = True }
+                |> Ui.Table.withRowKey (\{ id } -> Id.toString id)
+                |> Ui.Table.withRowState (\_ index _ -> Just index)
+                |> Ui.Table.withRowAttributes
+                    (\maybeIndex _ ->
+                        case modBy 2 (Maybe.withDefault 0 maybeIndex) of
+                            0 ->
+                                [ Ui.background Color.grey ]
+
+                            _ ->
+                                []
+                    )
+
+        data : List Stop
+        data =
+            filteredStops
+                |> List.filter (\stop -> stop.parent_station == Nothing)
     in
-    filteredStops
-        |> List.filter (\stop -> stop.parent_station == Nothing)
-        |> List.map viewStop
-        |> (::)
-            ([ "id"
-             , "code"
-             , "name"
-             , "tts_name"
-             , "description"
-             , "lat"
-             , "lon"
-             , "zone_id"
-             , "url"
-             , "location_type"
-             , "parent_station"
-             , "timezone"
-             , "wheelchair_boarding"
-             , "level_id"
-             , "platform_code"
-             ]
-                |> List.map (\col -> Html.th [] [ Html.text col ])
-                |> Html.tr []
-            )
-        |> Html.table
-            [ Html.Attributes.style "border" "1px solid black"
-            , Html.Attributes.style "padding" "8px"
-            ]
-        |> Ui.html
+    Ui.Table.viewWithState
+        [ Ui.border 1
+        , Ui.padding 0
+        ]
+        tableConfig
+        ()
+        data
 
 
 viewPathways : IdDict StopId Stop -> List Pathway -> Element msg
@@ -711,7 +739,7 @@ viewPathways stops filteredPathways =
                         |> List.filterMap identity
                         |> String.join " - "
 
-        viewPathway : Pathway -> Html msg
+        viewPathway : Pathway -> Element msg
         viewPathway pathway =
             [ Table.id pathway.id
             , Table.string (stopName pathway.from_stop_id)
@@ -726,7 +754,8 @@ viewPathways stops filteredPathways =
             , Table.maybe Table.string pathway.signposted_as
             , Table.maybe Table.string pathway.reversed_signposted_as
             ]
-                |> Html.tr []
+                |> List.map (\{ attrs, children } -> Ui.row attrs children)
+                |> Ui.row []
     in
     Theme.column []
         [ filteredPathways
@@ -745,14 +774,11 @@ viewPathways stops filteredPathways =
                  , "signposted_as"
                  , "reversed_signposted_as"
                  ]
-                    |> List.map (\col -> Html.th [] [ Html.text col ])
-                    |> Html.tr []
+                    |> List.map Ui.Table.header
+                    |> List.map (\{ attrs, children } -> Ui.row attrs children)
+                    |> Ui.row []
                 )
-            |> Html.table
-                [ Html.Attributes.style "border" "1px solid black"
-                , Html.Attributes.style "padding" "8px"
-                ]
-            |> Ui.html
+            |> Ui.column []
         , filteredPathways
             |> List.concatMap
                 (\{ from_stop_id, to_stop_id, is_bidirectional } ->
@@ -803,7 +829,7 @@ viewStopTimes stops filteredTrips filteredStopTimes =
                         |> List.filterMap identity
                         |> String.join " - "
 
-        viewStopTime : StopTime -> Html msg
+        viewStopTime : StopTime -> Element msg
         viewStopTime stopTime =
             [ Table.string (trip stopTime.trip_id)
             , Table.maybe Table.clock stopTime.arrival_time
@@ -824,7 +850,8 @@ viewStopTimes stops filteredTrips filteredStopTimes =
             , Table.maybe Table.id stopTime.pickup_booking_rule_id
             , Table.maybe Table.id stopTime.drop_off_booking_rule_id
             ]
-                |> Html.tr []
+                |> List.map (\{ attrs, children } -> Ui.row attrs children)
+                |> Ui.row []
     in
     filteredStopTimes
         |> List.map viewStopTime
@@ -848,14 +875,11 @@ viewStopTimes stops filteredTrips filteredStopTimes =
              , "pickup_booking_rule_id"
              , "drop_off_booking_rule_id"
              ]
-                |> List.map (\col -> Html.th [] [ Html.text col ])
-                |> Html.tr []
+                |> List.map Ui.Table.header
+                |> List.map (\{ attrs, children } -> Ui.row attrs children)
+                |> Ui.row []
             )
-        |> Html.table
-            [ Html.Attributes.style "border" "1px solid black"
-            , Html.Attributes.style "padding" "8px"
-            ]
-        |> Ui.html
+        |> Ui.column []
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )

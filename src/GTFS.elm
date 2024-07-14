@@ -1,4 +1,4 @@
-module GTFS exposing (Accessibility(..), Calendar, CalendarDate, ExceptionType(..), Feed, Latitude, LocationType(..), Longitude, Pathway, PathwayMode(..), PickupDropOffType, Stop, StopTime, Timezone, Trip, calendarDateDecoder, calendarDecoder, dateToInt, pathwayDecoder, stopDecoder, stopTimeDecoder, tripDecoder)
+module GTFS exposing (Accessibility(..), Calendar, CalendarDate, ExceptionType(..), Feed, Latitude, LocationType(..), Longitude, Pathway, PathwayMode(..), PickupDropOffType, Stop, StopTime, Timezone, Trip, calendarDateDecoder, calendarDecoder, dateToInt, locationTypeToString, pathwayDecoder, stopDecoder, stopTimeDecoder, tripDecoder)
 
 import Angle exposing (Angle)
 import Clock exposing (Clock)
@@ -542,3 +542,22 @@ parsed validation =
                     Nothing ->
                         Csv.Decode.fail "Failed to parse"
             )
+
+
+locationTypeToString : LocationType -> String
+locationTypeToString locationType =
+    case locationType of
+        StopPlatform ->
+            "Stop / Platform"
+
+        Station ->
+            "Station"
+
+        EntranceExit ->
+            "Entrance / Exit"
+
+        GenericNode ->
+            "Generic node"
+
+        BoardingArea ->
+            "Boarding area"

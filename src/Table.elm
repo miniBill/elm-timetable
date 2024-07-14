@@ -4,19 +4,20 @@ import Angle exposing (Angle)
 import Clock exposing (Clock)
 import Duration
 import Float.Extra
-import Html exposing (Attribute, Html)
-import Html.Attributes exposing (style)
 import Id exposing (Id)
 import Length
+import Ui exposing (Attribute)
+import Ui.Font
+import Ui.Table
 import Url exposing (Url)
 
 
-cell : List (Attribute msg) -> String -> Html msg
+cell : List (Attribute msg) -> String -> Ui.Table.Cell msg
 cell attrs s =
-    Html.td attrs [ Html.text s ]
+    Ui.Table.cell attrs (Ui.text s)
 
 
-maybe : (a -> Html msg) -> Maybe a -> Html msg
+maybe : (a -> Ui.Table.Cell msg) -> Maybe a -> Ui.Table.Cell msg
 maybe f x =
     case x of
         Just v ->
@@ -26,22 +27,22 @@ maybe f x =
             string "---"
 
 
-string : String -> Html msg
+string : String -> Ui.Table.Cell msg
 string s =
     cell [] s
 
 
-angle : Angle -> Html msg
+angle : Angle -> Ui.Table.Cell msg
 angle a =
     float (Angle.inDegrees a)
 
 
-length : Length.Length -> Html msg
+length : Length.Length -> Ui.Table.Cell msg
 length l =
     string (String.fromFloat (Length.inMeters l) ++ "m")
 
 
-duration : Duration.Duration -> Html msg
+duration : Duration.Duration -> Ui.Table.Cell msg
 duration l =
     let
         raw =
@@ -55,7 +56,7 @@ duration l =
     in
     if m > 0 then
         cell
-            [ style "text-align" "right" ]
+            [ Ui.Font.alignRight ]
             (String.fromInt m
                 ++ "' "
                 ++ String.fromFloat s
@@ -64,11 +65,11 @@ duration l =
 
     else
         cell
-            [ style "text-align" "right" ]
+            [ Ui.Font.alignRight ]
             (String.fromFloat s ++ "\"")
 
 
-bool : Bool -> Html msg
+bool : Bool -> Ui.Table.Cell msg
 bool b =
     string
         (if b then
@@ -79,35 +80,35 @@ bool b =
         )
 
 
-float : Float -> Html msg
+float : Float -> Ui.Table.Cell msg
 float f =
     cell
-        [ style "text-align" "right" ]
+        [ Ui.Font.alignRight ]
         (String.fromFloat f)
 
 
-int : Int -> Html msg
+int : Int -> Ui.Table.Cell msg
 int f =
     cell
-        [ style "text-align" "right" ]
+        [ Ui.Font.alignRight ]
         (String.fromInt f)
 
 
-url : Url -> Html msg
+url : Url -> Ui.Table.Cell msg
 url v =
     string (Url.toString v)
 
 
-debug : a -> Html msg
+debug : a -> Ui.Table.Cell msg
 debug v =
     string (Debug.toString v)
 
 
-clock : Clock -> Html msg
+clock : Clock -> Ui.Table.Cell msg
 clock t =
     string (Clock.toHumanString t)
 
 
-id : Id kind -> Html msg
+id : Id kind -> Ui.Table.Cell msg
 id v =
     string (Id.toString v)
