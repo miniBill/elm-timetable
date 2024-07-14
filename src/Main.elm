@@ -3,17 +3,18 @@ module Main exposing (main)
 import Browser
 import Csv.Decode
 import Date exposing (Date)
-import Dict exposing (Dict)
-import GTFS exposing (Calendar, CalendarDate, Feed, Pathway, Stop, StopTime, Trip)
+import Dict
+import Feed exposing (Feed)
+import GTFS exposing (Pathway, Stop, StopTime, Trip)
 import Http
-import Id exposing (Id, PathwayId, ServiceId, StopId, TripId)
+import Id exposing (FeedId, Id, StopId, TripId)
 import IdDict exposing (IdDict)
-import IdDict.Extra
 import IdSet exposing (IdSet)
 import Pathfinding
-import RemoteData exposing (RemoteData)
-import Result.Extra
+import Platform exposing (Task)
+import RemoteData
 import Table
+import Task
 import Theme
 import Time
 import Timetable
@@ -42,20 +43,10 @@ main =
 rebuildTimetable : Model -> Model
 rebuildTimetable model =
     case
-        RemoteData.map5
-            (\trips stopTimes calendarDates stops calendars ->
-                { trips = trips |> Dict.values |> List.foldl IdDict.Extra.union IdDict.empty
-                , stopTimes = stopTimes |> Dict.values |> List.concat
-                , calendarDates = calendarDates |> Dict.values |> List.foldl mergeWithUnion IdDict.empty
-                , stops = stops |> Dict.values |> List.foldl IdDict.Extra.union IdDict.empty
-                , calendars = calendars |> Dict.values |> List.foldl IdDict.Extra.union IdDict.empty
-                }
-            )
-            model.trips
-            model.stopTimes
-            model.calendarDates
-            model.stops
-            model.calendars
+        IdDict.foldl
+            (\_ -> RemoteData.map2 Feed.merge)
+            (RemoteData.Loaded Feed.empty)
+            model.feeds
     of
         RemoteData.Loaded data ->
             { model | timetable = Timetable.build model.today data }
@@ -66,56 +57,77 @@ rebuildTimetable model =
 
 init : flags -> ( Model, Cmd Msg )
 init _ =
+    let
+        feeds : List (Id FeedId)
+        feeds =
+            [ -- Id.fromString "de" ,
+              Id.fromString "oebb-2024"
+            , Id.fromString "micotra-2024"
+            ]
+    in
     ( { today = Date.fromCalendarDate 2024 Time.Jul 9
       , timetable = []
-      , stops = RemoteData.Loading
-      , pathways = RemoteData.Loading
-      , stopTimes = RemoteData.Loading
-      , calendars = RemoteData.Loading
-      , trips = RemoteData.Loading
-      , calendarDates = RemoteData.Loading
+      , feeds =
+            feeds
+                |> List.map (\feed -> ( feed, RemoteData.Loading ))
+                |> IdDict.fromList
       , from = Id.fromString "Pde:09162:100"
       , to = Id.fromString "Pit:22095:7049"
       }
-    , loadData
+    , feeds
+        |> List.map
+            (\feed ->
+                Task.map2
+                    (\( stops, pathways, stopTimes ) ( trips, calendars, calendarDates ) ->
+                        let
+                            q : Feed
+                            q =
+                                { stops = stops
+                                , pathways = pathways
+                                , stopTimes = stopTimes
+                                , trips = trips
+                                , calendars = calendars
+                                , calendarDates =
+                                    calendarDates
+                                        |> List.foldl
+                                            (\calendarDate acc ->
+                                                IdDict.insert calendarDate.service_id
+                                                    (IdDict.get calendarDate.service_id acc
+                                                        |> Maybe.withDefault Dict.empty
+                                                        |> Dict.insert (GTFS.dateToInt calendarDate.date)
+                                                            calendarDate
+                                                    )
+                                                    acc
+                                            )
+                                            IdDict.empty
+                                }
+                        in
+                        q
+                    )
+                    (Task.map3 (\l m r -> ( l, m, r ))
+                        (getCSVId feed "stops.txt" GTFS.stopDecoder)
+                        (getCSVId feed "pathways.txt" GTFS.pathwayDecoder)
+                        (getCSV feed "stop_times.txt" GTFS.stopTimeDecoder)
+                    )
+                    (Task.map3 (\l m r -> ( l, m, r ))
+                        (getCSVId feed "trips.txt" GTFS.tripDecoder)
+                        (getCSVId feed "calendar.txt" GTFS.calendarDecoder)
+                        (getCSV feed "calendar_dates.txt" GTFS.calendarDateDecoder)
+                    )
+                    |> Task.attempt (GotFeed feed)
+            )
+        |> Cmd.batch
     )
 
 
-loadData : Cmd Msg
-loadData =
-    [ -- "de" ,
-      "oebb-2024"
-    , "micotra-2024"
-    ]
-        |> List.concatMap
-            (\feed ->
-                [ getCSVId GotStops feed "stops.txt" GTFS.stopDecoder
-                , getCSVId GotPathways feed "pathways.txt" GTFS.pathwayDecoder
-                , getCSV GotStopTimes feed "stop_times.txt" GTFS.stopTimeDecoder
-                , getCSVId GotTrips feed "trips.txt" GTFS.tripDecoder
-                , getCSVId GotCalendars feed "calendar.txt" GTFS.calendarDecoder
-                , getCSV GotCalendarDates feed "calendar_dates.txt" GTFS.calendarDateDecoder
-                ]
-            )
-        |> Cmd.batch
-
-
 getCSVId :
-    (String -> Result Http.Error (IdDict kind { a | id : Id kind }) -> msg)
-    -> String
+    Id FeedId
     -> String
     -> Csv.Decode.Decoder { a | id : Id kind }
-    -> Cmd msg
-getCSVId toMsg feed filename decoder =
-    getCSV
-        (\_ raw ->
-            raw
-                |> Result.map toDictFromId
-                |> toMsg feed
-        )
-        feed
-        filename
-        decoder
+    -> Task Http.Error (IdDict kind { a | id : Id kind })
+getCSVId feed filename decoder =
+    getCSV feed filename decoder
+        |> Task.map toDictFromId
 
 
 toDictFromId :
@@ -129,55 +141,59 @@ toDictFromId list =
 
 
 getCSV :
-    (String -> Result Http.Error (List a) -> msg)
-    -> String
+    Id FeedId
     -> String
     -> Csv.Decode.Decoder a
-    -> Cmd msg
-getCSV toMsg feed filename decoder =
-    Http.request
+    -> Task Http.Error (List a)
+getCSV feed filename decoder =
+    Http.task
         { method = "GET"
         , headers = []
-        , url = Url.Builder.absolute [ "feeds", feed, filename ] []
+        , url = Url.Builder.absolute [ "feeds", Id.toString feed, filename ] []
         , timeout = Nothing
-        , tracker = Nothing
         , body = Http.emptyBody
-        , expect = expectCsv toMsg feed filename decoder
+        , resolver = csvResolver feed filename decoder
         }
 
 
-expectCsv :
-    (String -> Result Http.Error (List a) -> msg)
-    -> String
+csvResolver :
+    Id FeedId
     -> String
     -> Csv.Decode.Decoder a
-    -> Http.Expect msg
-expectCsv toMsg feed filename decoder =
-    Http.expectString
+    -> Http.Resolver Http.Error (List a)
+csvResolver feed filename decoder =
+    Http.stringResolver
         (\got ->
-            toMsg feed
-                (case got of
-                    Ok res ->
-                        case Csv.Decode.decodeCsv Csv.Decode.FieldNamesFromFirstRow decoder res of
-                            Ok val ->
-                                Ok val
+            case got of
+                Http.GoodStatus_ _ res ->
+                    case Csv.Decode.decodeCsv Csv.Decode.FieldNamesFromFirstRow decoder res of
+                        Ok val ->
+                            Ok val
 
-                            Err err ->
-                                let
-                                    msg : String
-                                    msg =
-                                        "While decoding "
-                                            ++ feed
-                                            ++ "/"
-                                            ++ filename
-                                            ++ ", "
-                                            ++ Csv.Decode.errorToString err
-                                in
-                                Err (Http.BadBody msg)
+                        Err err ->
+                            let
+                                msg : String
+                                msg =
+                                    "While decoding "
+                                        ++ Id.toString feed
+                                        ++ "/"
+                                        ++ filename
+                                        ++ ", "
+                                        ++ Csv.Decode.errorToString err
+                            in
+                            Err (Http.BadBody msg)
 
-                    Err e ->
-                        Err e
-                )
+                Http.BadUrl_ url ->
+                    Err (Http.BadUrl url)
+
+                Http.Timeout_ ->
+                    Err Http.Timeout
+
+                Http.NetworkError_ ->
+                    Err Http.NetworkError
+
+                Http.BadStatus_ { statusCode } _ ->
+                    Err (Http.BadStatus statusCode)
         )
 
 
@@ -211,119 +227,50 @@ view model =
 
         feedViews : List (Element msg)
         feedViews =
-            let
-                toResult : String -> RemoteData a -> Result (List (Element msg)) a
-                toResult label data =
-                    case data of
-                        RemoteData.Error e ->
-                            Err [ Ui.text (Debug.toString e) ]
+            model.feeds
+                |> IdDict.toList
+                |> List.map
+                    (\( feedId, feed ) ->
+                        let
+                            label : String
+                            label =
+                                Id.toString feedId
+                        in
+                        case feed of
+                            RemoteData.Error e ->
+                                Ui.text (Debug.toString e)
 
-                        RemoteData.NotAsked ->
-                            Err [ Ui.text (label ++ " not asked") ]
+                            RemoteData.NotAsked ->
+                                Ui.text ("Feed " ++ label ++ " not asked")
 
-                        RemoteData.Loading ->
-                            Err [ Ui.text (label ++ " loading...") ]
+                            RemoteData.Loading ->
+                                Ui.text ("Feed " ++ label ++ " loading...")
 
-                        RemoteData.Loaded loaded ->
-                            Ok loaded
-            in
-            Ok
-                (\stops pathways stopTimes trips calendars calendarDates ->
-                    Dict.map
-                        (\_ _ pathways_ stops_ calendars_ trips_ stopTimes_ calendarDates_ ->
-                            { pathways = pathways_
-                            , stops = stops_
-                            , calendars = calendars_
-                            , trips = trips_
-                            , stopTimes = stopTimes_
-                            , calendarDates = calendarDates_
-                            }
-                        )
-                        pathways
-                        |> andMerge pathways
-                        |> andMerge stops
-                        |> andMerge calendars
-                        |> andMerge trips
-                        |> andMerge stopTimes
-                        |> andMerge calendarDates
-                        |> Dict.toList
-                        |> List.map
-                            (\feed ->
-                                feed
-                                    |> viewFeed model.today
+                            RemoteData.Loaded loaded ->
+                                loaded
+                                    |> viewFeed model.today feedId
                                     |> Ui.el
                                         [ Ui.scrollableX
                                         , Ui.paddingWith { left = Theme.rhythm, bottom = Theme.rhythm, right = Theme.rhythm, top = 0 }
                                         ]
-                            )
-                )
-                |> Result.Extra.andMap (toResult "Stops" model.stops)
-                |> Result.Extra.andMap (toResult "Pathways" model.pathways)
-                |> Result.Extra.andMap (toResult "Stop times" model.stopTimes)
-                |> Result.Extra.andMap (toResult "Trips" model.trips)
-                |> Result.Extra.andMap (toResult "Calendars" model.calendars)
-                |> Result.Extra.andMap (toResult "Calendar dates" model.calendarDates)
-                |> Result.Extra.merge
+                    )
     in
     Theme.column [] (shared ++ feedViews)
 
 
-andMerge : Dict comparable a -> Dict comparable (a -> b) -> Dict comparable b
-andMerge l r =
-    Dict.merge
-        (\_ _ acc -> acc)
-        (\k le re acc ->
-            Dict.insert
-                k
-                (re le)
-                acc
-        )
-        (\_ _ acc -> acc)
-        l
-        r
-        Dict.empty
-
-
-mergeWithUnion :
-    IdDict kind (Dict comparable v)
-    -> IdDict kind (Dict comparable v)
-    -> IdDict kind (Dict comparable v)
-mergeWithUnion l r =
-    IdDict.Extra.merge
-        (\_ _ acc -> acc)
-        (\k le re acc ->
-            IdDict.insert
-                k
-                (Dict.union le re)
-                acc
-        )
-        (\_ _ acc -> acc)
-        l
-        r
-        IdDict.empty
-
-
 viewFeed :
     Date
-    ->
-        ( String
-        , { calendarDates : IdDict ServiceId (Dict Int CalendarDate)
-          , stopTimes : List StopTime
-          , trips : IdDict TripId Trip
-          , calendars : IdDict ServiceId Calendar
-          , stops : IdDict StopId Stop
-          , pathways : IdDict PathwayId Pathway
-          }
-        )
+    -> Id FeedId
+    -> Feed
     -> Element msg
-viewFeed today ( feed, { calendarDates, stopTimes, trips, calendars, stops, pathways } ) =
+viewFeed today feed { calendarDates, stopTimes, trips, calendars, stops, pathways } =
     let
         filteredStops : List Stop
         filteredStops =
             Pathfinding.filterStops stops
     in
     Theme.column []
-        [ Ui.text feed
+        [ Ui.text (Id.toString feed)
 
         -- , pathfinder stops filteredPathways
         , viewStops stops filteredStops
@@ -576,70 +523,14 @@ viewStopTimes stops filteredTrips filteredStopTimes =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        GotStops feed res ->
-            ( { model | stops = mergeFeed feed res model.stops }, Cmd.none )
+        GotFeed feed (Ok res) ->
+            ( { model | feeds = IdDict.insert feed (RemoteData.Loaded res) model.feeds }, Cmd.none )
 
-        GotPathways feed res ->
-            ( { model | pathways = mergeFeed feed res model.pathways }, Cmd.none )
-
-        GotTrips feed res ->
-            ( { model | trips = mergeFeed feed res model.trips }, Cmd.none )
-
-        GotStopTimes feed res ->
-            ( { model | stopTimes = mergeFeed feed res model.stopTimes }, Cmd.none )
-
-        GotCalendars feed res ->
-            ( { model | calendars = mergeFeed feed res model.calendars }, Cmd.none )
-
-        GotCalendarDates feed res ->
-            let
-                grouped : Result Http.Error (IdDict ServiceId (Dict Int CalendarDate))
-                grouped =
-                    Result.map
-                        (\dates ->
-                            dates
-                                |> List.foldl
-                                    (\calendarDate acc ->
-                                        IdDict.insert calendarDate.service_id
-                                            (IdDict.get calendarDate.service_id acc
-                                                |> Maybe.withDefault Dict.empty
-                                                |> Dict.insert (GTFS.dateToInt calendarDate.date)
-                                                    calendarDate
-                                            )
-                                            acc
-                                    )
-                                    IdDict.empty
-                        )
-                        res
-            in
-            ( { model | calendarDates = mergeFeed feed grouped model.calendarDates }, Cmd.none )
+        GotFeed feed (Err e) ->
+            ( { model | feeds = IdDict.insert feed (RemoteData.Error e) model.feeds }, Cmd.none )
 
         Reload ->
-            ( model, loadData )
-
-
-mergeFeed :
-    Feed
-    -> Result Http.Error a
-    -> RemoteData.RemoteData (Dict Feed a)
-    -> RemoteData.RemoteData (Dict Feed a)
-mergeFeed feed res data =
-    case res of
-        Err e ->
-            RemoteData.Error e
-
-        Ok val ->
-            let
-                existing : Dict Feed a
-                existing =
-                    case data of
-                        RemoteData.Loaded loaded ->
-                            loaded
-
-                        _ ->
-                            Dict.empty
-            in
-            RemoteData.Loaded (Dict.insert feed val existing)
+            init {}
 
 
 subscriptions : model -> Sub msg

@@ -1,4 +1,4 @@
-module GTFS exposing (Accessibility(..), Calendar, CalendarDate, ExceptionType(..), Feed, Latitude, LocationType(..), Longitude, Pathway, PathwayMode(..), PickupDropOffType(..), Stop, StopTime, Timezone, Trip, calendarDateDecoder, calendarDecoder, dateToInt, locationTypeToString, pathwayDecoder, stopDecoder, stopTimeDecoder, tripDecoder)
+module GTFS exposing (Accessibility(..), Calendar, CalendarDate, ExceptionType(..), Latitude, LocationType(..), Longitude, Pathway, PathwayMode(..), PickupDropOffType(..), Stop, StopTime, Timezone, Trip, calendarDateDecoder, calendarDecoder, dateToInt, locationTypeToString, pathwayDecoder, stopDecoder, stopTimeDecoder, tripDecoder)
 
 import Angle exposing (Angle)
 import Clock exposing (Clock)
@@ -10,10 +10,6 @@ import Length exposing (Length)
 import Maybe.Extra
 import Parser exposing ((|.), (|=), Parser)
 import Url exposing (Url)
-
-
-type alias Feed =
-    String
 
 
 type alias Timezone =

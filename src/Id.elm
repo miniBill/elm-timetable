@@ -1,5 +1,6 @@
 module Id exposing
     ( BlockId
+    , FeedId
     , Id
     , LevelId
     , LocationGroupId
@@ -59,6 +60,10 @@ type RouteId
 
 type ServiceId
     = ServiceId
+
+
+type FeedId
+    = FeedId
 
 
 type Id kind

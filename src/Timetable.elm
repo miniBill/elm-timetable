@@ -7,6 +7,7 @@ import Date exposing (Date)
 import Dict exposing (Dict)
 import Dict.Extra
 import Duration exposing (Seconds)
+import Feed exposing (Feed)
 import GTFS exposing (Calendar, CalendarDate, Stop, StopTime, Trip)
 import Graph
 import Html exposing (Html)
@@ -641,13 +642,7 @@ viewDAG toName edgeList =
 
 build :
     Date
-    ->
-        { trips : IdDict TripId Trip
-        , stopTimes : List StopTime
-        , calendarDates : IdDict ServiceId (Dict Int CalendarDate)
-        , stops : IdDict StopId Stop
-        , calendars : IdDict ServiceId Calendar
-        }
+    -> Feed
     -> Timetable
 build today { trips, stopTimes, calendarDates, stops, calendars } =
     let

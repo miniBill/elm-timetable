@@ -1,4 +1,4 @@
-module RemoteData exposing (RemoteData(..), map5)
+module RemoteData exposing (RemoteData(..), map, map2, map3, map4, map5)
 
 import Http
 
