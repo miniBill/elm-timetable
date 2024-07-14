@@ -12,7 +12,7 @@ import TypedSvg exposing (circle, g, line, style, svg, text_, title)
 import TypedSvg.Attributes exposing (class, id, stroke, textAnchor, transform, viewBox)
 import TypedSvg.Attributes.InPx exposing (cx, cy, x1, x2, y, y1, y2)
 import TypedSvg.Core exposing (Svg, text)
-import TypedSvg.Types exposing (AnchorAlignment(..), Paint(..), Transform(..), percent)
+import TypedSvg.Types exposing (AnchorAlignment(..), Paint(..), Transform(..))
 import Types exposing (Event(..), Station, Timetable)
 
 
@@ -261,11 +261,11 @@ viewTimeGrid timeRange fullHeight =
             let
                 from : Int
                 from =
-                    ceiling <| Duration.inHours <| Quantity.toFloatQuantity minTime
+                    floor <| Duration.inHours <| Quantity.toFloatQuantity minTime
 
                 to : Int
                 to =
-                    floor <| Duration.inHours <| Quantity.toFloatQuantity maxTime
+                    ceiling <| Duration.inHours <| Quantity.toFloatQuantity maxTime
             in
             List.range from to
                 |> List.map
@@ -286,7 +286,7 @@ viewTimeGrid timeRange fullHeight =
                                     , x1 0
                                     , x2 0
                                     , y1 0
-                                    , TypedSvg.Attributes.y2 (percent 1)
+                                    , y2 fullHeight
                                     ]
                                     []
 
@@ -313,12 +313,7 @@ viewTimeGrid timeRange fullHeight =
                             [ id <| String.fromInt hour ++ ":00"
                             , transform [ Translate timeX 0 ]
                             ]
-                            (if hour == from then
-                                verticalLine :: label
-
-                             else
-                                verticalLine :: label
-                            )
+                            (verticalLine :: label)
                     )
 
         _ ->
