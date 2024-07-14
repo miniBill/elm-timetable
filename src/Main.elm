@@ -2,12 +2,10 @@ module Main exposing (main)
 
 import Browser
 import Csv.Decode
-import Dagre.Attributes
 import Date exposing (Date)
 import Dict exposing (Dict)
 import Dict.Extra
 import GTFS exposing (Calendar, CalendarDate, Feed, Pathway, Stop, StopTime, Trip)
-import Graph
 import Html exposing (Html)
 import Html.Attributes
 import Http
@@ -17,10 +15,6 @@ import IdDict.Extra
 import IdSet exposing (IdSet)
 import Quantity
 import RemoteData
-import Render
-import Render.StandardDrawers
-import Render.StandardDrawers.Attributes
-import Render.StandardDrawers.Types
 import Set
 import Table
 import Theme
@@ -359,6 +353,12 @@ view model =
                 [ Ui.scrollableX
                 , Theme.padding
                 ]
+        , Timetable.viewGraph model.timetable
+            |> Ui.html
+            |> Ui.el
+                [ Ui.scrollableX
+                , Theme.padding
+                ]
         , Theme.button []
             { onPress = Reload
             , label = Ui.text "Reload"
@@ -690,8 +690,8 @@ viewStops stops filteredStops =
 viewPathways : IdDict StopId Stop -> List Pathway -> Element msg
 viewPathways stops filteredPathways =
     let
-        stop : Id StopId -> String
-        stop id =
+        stopName : Id StopId -> String
+        stopName id =
             case IdDict.get id stops of
                 Nothing ->
                     Id.toString id
@@ -704,77 +704,11 @@ viewPathways stops filteredPathways =
                         |> List.filterMap identity
                         |> String.join " - "
 
-        stopIds : List (Id StopId)
-        stopIds =
-            filteredPathways
-                |> List.concatMap
-                    (\pathway ->
-                        [ pathway.from_stop_id
-                        , pathway.to_stop_id
-                        ]
-                    )
-                |> IdSet.fromList
-                |> IdSet.toList
-
-        stopIdToNodeId : IdDict StopId Int
-        stopIdToNodeId =
-            stopIds
-                |> List.indexedMap (\i id -> ( id, i ))
-                |> IdDict.fromList
-
-        graph : Graph.Graph (Id StopId) ()
-        graph =
-            let
-                edges : List (Graph.Edge ())
-                edges =
-                    filteredPathways
-                        |> List.concatMap
-                            (\pathway ->
-                                case
-                                    ( IdDict.get pathway.from_stop_id stopIdToNodeId
-                                    , IdDict.get pathway.to_stop_id stopIdToNodeId
-                                    )
-                                of
-                                    ( Just fromId, Just toId ) ->
-                                        if pathway.is_bidirectional then
-                                            [ { from = fromId
-                                              , to = toId
-                                              , label = ()
-                                              }
-                                            , { from = toId
-                                              , to = fromId
-                                              , label = ()
-                                              }
-                                            ]
-
-                                        else
-                                            [ { from = fromId
-                                              , to = toId
-                                              , label = ()
-                                              }
-                                            ]
-
-                                    _ ->
-                                        []
-                            )
-
-                nodes : List (Graph.Node (Id StopId))
-                nodes =
-                    stopIds
-                        |> List.indexedMap
-                            (\i id ->
-                                { id = i
-                                , label = id
-                                }
-                            )
-            in
-            Graph.fromNodesAndEdges nodes edges
-
         viewPathway : Pathway -> Html msg
         viewPathway pathway =
             [ Table.id pathway.id
-            , Table.string (stop pathway.from_stop_id)
-            , Table.string (stop pathway.to_stop_id)
+            , Table.string (stopName pathway.from_stop_id)
+            , Table.string (stopName pathway.to_stop_id)
             , Table.debug pathway.mode
             , Table.debug pathway.is_bidirectional
             , Table.maybe Table.length pathway.length
@@ -812,44 +746,23 @@ viewPathways stops filteredPathways =
                 , Html.Attributes.style "padding" "8px"
                 ]
             |> Ui.html
-        , if False then
-            Render.draw
-                [ Dagre.Attributes.rankDir Dagre.Attributes.LR
-
-                -- , Dagre.Attributes.widthDict
-                --     (stopIds
-                --         |> List.map
-                --             (\id ->
-                --                 ( Dict.get id stopIdToNodeId
-                --                     |> Maybe.withDefault -1
-                --                 , (10 * String.length (stop id))
-                --                     |> toFloat
-                --                 )
-                --             )
-                --         |> Dict.fromList
-                --     )
-                , Dagre.Attributes.width 300
-                ]
-                [ Render.nodeDrawer
-                    (Render.StandardDrawers.svgDrawNode
-                        [ Render.StandardDrawers.Attributes.title (\{ label } -> stop label)
-                        , Render.StandardDrawers.Attributes.label (\{ label } -> stop label)
+        , filteredPathways
+            |> List.concatMap
+                (\{ from_stop_id, to_stop_id, is_bidirectional } ->
+                    if is_bidirectional then
+                        [ ( from_stop_id, to_stop_id )
+                        , ( to_stop_id, from_stop_id )
                         ]
-                    )
-                , Render.edgeDrawer
-                    (Render.StandardDrawers.svgDrawEdge
-                        [ Render.StandardDrawers.Attributes.arrowHead
-                            Render.StandardDrawers.Types.Vee
-                        , Render.StandardDrawers.Attributes.strokeWidth (\_ -> 4)
-                        ]
-                    )
-                , Render.style "width: 100%;max-height:100vh;max-width:100vw"
-                ]
-                graph
-                |> Ui.html
 
-          else
-            Ui.none
+                    else
+                        [ ( from_stop_id, to_stop_id ) ]
+                )
+            |> Timetable.viewDAG stopName
+            |> Ui.html
+            |> Ui.el
+                [ Theme.padding
+                , Ui.scrollableX
+                ]
         ]
 
 

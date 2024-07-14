@@ -1,13 +1,23 @@
-module Timetable exposing (view)
+module Timetable exposing (view, viewDAG, viewGraph)
 
 import Clock exposing (Clock)
 import Color
+import Dagre.Attributes
 import Dict exposing (Dict)
 import Duration exposing (Duration, Seconds)
+import Graph
+import Html exposing (Html)
 import Html.Attributes
+import Id exposing (Id)
+import IdDict exposing (IdDict)
+import IdSet
 import List.Extra
 import Quantity
 import QuantityDict exposing (QuantityDict)
+import Render
+import Render.StandardDrawers
+import Render.StandardDrawers.Attributes
+import Render.StandardDrawers.Types
 import TypedSvg exposing (circle, g, line, style, svg, text_, title)
 import TypedSvg.Attributes exposing (class, id, stroke, textAnchor, transform, viewBox)
 import TypedSvg.Attributes.InPx exposing (cx, cy, x1, x2, y, y1, y2)
@@ -511,6 +521,9 @@ stationOrder station =
         "Tarvisio Citta Boscoverde" ->
             12
 
+        "Tarvisio Boscoverde" ->
+            12
+
         "Villach Hauptbahnhof" ->
             18
 
@@ -525,3 +538,103 @@ stationOrder station =
 
         _ ->
             999
+
+
+viewGraph : Timetable -> Html msg
+viewGraph timetable =
+    timetable
+        |> List.filterMap
+            (\{ from, to, links } ->
+                if List.isEmpty links then
+                    Nothing
+
+                else
+                    Just ( Id.fromString from, Id.fromString to )
+            )
+        |> viewDAG Id.toString
+
+
+viewDAG :
+    (Id kind -> String)
+    -> List ( Id kind, Id kind )
+    -> Html msg
+viewDAG toName edgeList =
+    let
+        ids : List (Id kind)
+        ids =
+            edgeList
+                |> Debug.log "edgeList"
+                |> List.concatMap (\( from, to ) -> [ from, to ])
+                |> IdSet.fromList
+                |> IdSet.toList
+
+        idToNodeId : IdDict kind Int
+        idToNodeId =
+            ids
+                |> List.indexedMap (\i id -> ( id, i ))
+                |> IdDict.fromList
+
+        edges : List (Graph.Edge ())
+        edges =
+            edgeList
+                |> List.filterMap
+                    (\( from, to ) ->
+                        Maybe.map2
+                            (\fromId toId ->
+                                { from = fromId
+                                , to = toId
+                                , label = ()
+                                }
+                            )
+                            (IdDict.get from idToNodeId)
+                            (IdDict.get to idToNodeId)
+                    )
+
+        nodes : List (Graph.Node String)
+        nodes =
+            ids
+                |> List.indexedMap
+                    (\i id ->
+                        { id = i
+                        , label = toName id
+                        }
+                    )
+
+        graph : Graph.Graph String ()
+        graph =
+            Graph.fromNodesAndEdges nodes edges
+    in
+    Render.draw
+        [ Dagre.Attributes.rankDir Dagre.Attributes.LR
+
+        -- , Dagre.Attributes.widthDict
+        --     (stopIds
+        --         |> List.map
+        --             (\id ->
+        --                 ( Dict.get id stopIdToNodeId
+        --                     |> Maybe.withDefault -1
+        --                 , (10 * String.length (stop id))
+        --                     |> toFloat
+        --                 )
+        --             )
+        --         |> Dict.fromList
+        --     )
+        , Dagre.Attributes.width 300
+        ]
+        [ Render.nodeDrawer
+            (Render.StandardDrawers.svgDrawNode
+                [ Render.StandardDrawers.Attributes.title .label
+                , Render.StandardDrawers.Attributes.label .label
+                ]
+            )
+        , Render.edgeDrawer
+            (Render.StandardDrawers.svgDrawEdge
+                [ Render.StandardDrawers.Attributes.arrowHead
+                    Render.StandardDrawers.Types.Vee
+                , Render.StandardDrawers.Attributes.strokeWidth (\_ -> 4)
+                ]
+            )
+
+        -- , Render.style "width: 100%;max-height:100vh;max-width:100vw"
+        ]
+        graph
