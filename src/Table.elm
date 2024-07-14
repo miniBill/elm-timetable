@@ -1,9 +1,9 @@
-module Table exposing (angle, bool, debug, duration, float, id, int, length, maybe, string, time, url)
+module Table exposing (angle, bool, clock, debug, duration, float, id, int, length, maybe, string, url)
 
 import Angle exposing (Angle)
+import Clock exposing (Clock)
 import Duration
 import Float.Extra
-import GTFS exposing (Time)
 import Html exposing (Attribute, Html)
 import Html.Attributes exposing (style)
 import Id exposing (Id)
@@ -103,9 +103,9 @@ debug v =
     string (Debug.toString v)
 
 
-time : Time -> Html msg
-time t =
-    string (GTFS.timeToHumanString t)
+clock : Clock -> Html msg
+clock t =
+    string (Clock.toHumanString t)
 
 
 id : Id kind -> Html msg

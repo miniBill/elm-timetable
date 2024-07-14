@@ -1,8 +1,9 @@
 module Types exposing (Event(..), Model, Msg(..), Station, Timetable)
 
+import Clock exposing (Clock)
 import Date exposing (Date)
 import Dict exposing (Dict)
-import GTFS exposing (Calendar, CalendarDate, Feed, Pathway, Stop, StopTime, Time, Trip)
+import GTFS exposing (Calendar, CalendarDate, Feed, Pathway, Stop, StopTime, Trip)
 import Http
 import Id exposing (Id, PathwayId, ServiceId, StopId, TripId)
 import IdDict exposing (IdDict)
@@ -27,7 +28,7 @@ type alias Timetable =
     List
         { from : Station
         , to : Station
-        , links : List { from : Time, to : Time }
+        , links : List { from : Clock, to : Clock }
         }
 
 

@@ -1,14 +1,14 @@
-module GTFS exposing (Accessibility(..), Calendar, CalendarDate, ExceptionType(..), Feed, Latitude, LocationType(..), Longitude, Pathway, PathwayMode(..), PickupDropOffType, Stop, StopTime, Time, Timezone, Trip, calendarDateDecoder, calendarDecoder, dateToInt, pathwayDecoder, stopDecoder, stopTimeDecoder, timeToHumanString, timeToString, tripDecoder)
+module GTFS exposing (Accessibility(..), Calendar, CalendarDate, ExceptionType(..), Feed, Latitude, LocationType(..), Longitude, Pathway, PathwayMode(..), PickupDropOffType, Stop, StopTime, Timezone, Trip, calendarDateDecoder, calendarDecoder, dateToInt, pathwayDecoder, stopDecoder, stopTimeDecoder, tripDecoder)
 
 import Angle exposing (Angle)
+import Clock exposing (Clock)
 import Csv.Decode
 import Date exposing (Date)
-import Duration exposing (Duration, Seconds)
+import Duration exposing (Duration)
 import Id exposing (BlockId, Id, LevelId, LocationGroupId, LocationId, PathwayId, RouteId, ServiceId, ShapeId, StopId, TripId, ZoneId)
 import Length exposing (Length)
 import Maybe.Extra
 import Parser exposing ((|.), (|=), Parser)
-import Quantity exposing (Quantity)
 import Url exposing (Url)
 
 
@@ -28,15 +28,6 @@ type alias Longitude =
     Angle
 
 
-{-| A time of day, represented as the offset _from noon_.
-
-Can be negative for mornings, and can be more than 12 hours for trip finishing the following day.
-
--}
-type alias Time =
-    Quantity Int Seconds
-
-
 
 -------------------
 -- Feed decoders --
@@ -45,15 +36,15 @@ type alias Time =
 
 type alias StopTime =
     { trip_id : Id TripId
-    , arrival_time : Maybe Time
-    , departure_time : Maybe Time
+    , arrival_time : Maybe Clock
+    , departure_time : Maybe Clock
     , stop_id : Maybe (Id StopId)
     , location_group_id : Maybe (Id LocationGroupId)
     , location_id : Maybe (Id LocationId)
     , stop_sequence : Int
     , stop_headsign : Maybe String
-    , start_pickup_drop_off_window : Maybe Time
-    , end_pickup_drop_off_window : Maybe Time
+    , start_pickup_drop_off_window : Maybe Clock
+    , end_pickup_drop_off_window : Maybe Clock
     , pickup_type : Maybe PickupDropOffType
     , drop_off_type : Maybe PickupDropOffType
     , continuous_pickup : Maybe PickupDropOffType
@@ -444,25 +435,21 @@ id =
     Csv.Decode.map Id.fromString Csv.Decode.string
 
 
-timeDecoder : Csv.Decode.Decoder Time
+timeDecoder : Csv.Decode.Decoder Clock
 timeDecoder =
     parsed timeParser
 
 
-timeParser : String -> Maybe Time
+timeParser : String -> Maybe Clock
 timeParser input =
     input
         |> Parser.run timeInnerParser
         |> Result.toMaybe
 
 
-timeInnerParser : Parser Time
+timeInnerParser : Parser Clock
 timeInnerParser =
     let
-        noon : Int
-        noon =
-            12 * 60 * 60
-
         int =
             (Parser.chompIf Char.isDigit
                 |. Parser.chompWhile Char.isDigit
@@ -478,88 +465,12 @@ timeInnerParser =
                                 Parser.problem (r ++ " is not a valid number")
                     )
     in
-    Parser.succeed
-        (\h m s ->
-            let
-                raw : Int
-                raw =
-                    h * 3600 + m * 60 + s
-
-                offset : Int
-                offset =
-                    raw - noon
-            in
-            Quantity.unsafe offset
-        )
+    Parser.succeed Clock.fromHoursMinutesSeconds
         |= int
         |. Parser.symbol ":"
         |= int
         |. Parser.symbol ":"
         |= int
-
-
-timeToString : Time -> String
-timeToString t =
-    let
-        fromStartOfDay : Int
-        fromStartOfDay =
-            12 * 60 * 60 + Quantity.unwrap t
-
-        allMinutes : Int
-        allMinutes =
-            fromStartOfDay // 60
-
-        hour : Int
-        hour =
-            allMinutes // 60
-
-        minute : Int
-        minute =
-            modBy 60 allMinutes
-
-        second : Int
-        second =
-            modBy 60 fromStartOfDay
-
-        pad : Int -> String
-        pad x =
-            x
-                |> String.fromInt
-                |> String.padLeft 2 '0'
-    in
-    pad hour ++ ":" ++ pad minute ++ ":" ++ pad second
-
-
-timeToHumanString : Time -> String
-timeToHumanString t =
-    let
-        fromStartOfDay : Int
-        fromStartOfDay =
-            12 * 60 * 60 + Quantity.unwrap t
-
-        allMinutes : Int
-        allMinutes =
-            fromStartOfDay // 60
-
-        hour : Int
-        hour =
-            allMinutes // 60
-
-        minute : Int
-        minute =
-            modBy 60 allMinutes
-
-        pad : Int -> String
-        pad x =
-            x
-                |> String.fromInt
-                |> String.padLeft 2 '0'
-    in
-    if hour >= 24 then
-        pad (modBy 24 hour) ++ ":" ++ pad minute ++ "(+" ++ String.fromInt (hour // 24) ++ ")"
-
-    else
-        pad hour ++ ":" ++ pad minute
 
 
 boolDecoder : Csv.Decode.Decoder Bool

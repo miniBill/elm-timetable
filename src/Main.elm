@@ -1,6 +1,7 @@
 module Main exposing (main)
 
 import Browser
+import Clock exposing (Clock)
 import Color
 import Csv.Decode
 import Dagre.Attributes
@@ -8,7 +9,7 @@ import Date exposing (Date)
 import Dict exposing (Dict)
 import Dict.Extra
 import Duration exposing (Duration, Seconds)
-import GTFS exposing (Calendar, CalendarDate, Feed, Pathway, Stop, StopTime, Time, Trip)
+import GTFS exposing (Calendar, CalendarDate, Feed, Pathway, Stop, StopTime, Trip)
 import Graph
 import Html exposing (Html)
 import Html.Attributes
@@ -890,15 +891,15 @@ viewStopTimes stops filteredTrips filteredStopTimes =
         viewStopTime : StopTime -> Html msg
         viewStopTime stopTime =
             [ Table.string (trip stopTime.trip_id)
-            , Table.maybe Table.time stopTime.arrival_time
-            , Table.maybe Table.time stopTime.departure_time
+            , Table.maybe Table.clock stopTime.arrival_time
+            , Table.maybe Table.clock stopTime.departure_time
             , Table.maybe Table.string (Maybe.map stop stopTime.stop_id)
             , Table.maybe Table.id stopTime.location_group_id
             , Table.maybe Table.id stopTime.location_id
             , Table.int stopTime.stop_sequence
             , Table.maybe Table.string stopTime.stop_headsign
-            , Table.maybe Table.time stopTime.start_pickup_drop_off_window
-            , Table.maybe Table.time stopTime.end_pickup_drop_off_window
+            , Table.maybe Table.clock stopTime.start_pickup_drop_off_window
+            , Table.maybe Table.clock stopTime.end_pickup_drop_off_window
             , Table.maybe Table.debug stopTime.pickup_type
             , Table.maybe Table.debug stopTime.drop_off_type
             , Table.maybe Table.debug stopTime.continuous_pickup
@@ -951,10 +952,10 @@ viewGraphs model =
             timesHeight * 2 + lineHeight * toFloat (Dict.size stations - 1)
 
         liftTime :
-            (Time -> Time -> Time)
-            -> Maybe Time
-            -> Time
-            -> Time
+            (Clock -> Clock -> Clock)
+            -> Maybe Clock
+            -> Clock
+            -> Clock
         liftTime op acc e =
             case acc of
                 Nothing ->
@@ -965,20 +966,20 @@ viewGraphs model =
 
         addStation :
             Station
-            -> Time
+            -> Clock
             -> Event
             ->
                 Dict
                     Station
-                    { min : Time
-                    , max : Time
+                    { min : Clock
+                    , max : Clock
                     , events : QuantityDict Int Seconds Event
                     }
             ->
                 Dict
                     Station
-                    { min : Time
-                    , max : Time
+                    { min : Clock
+                    , max : Clock
                     , events : QuantityDict Int Seconds Event
                     }
         addStation station time event dict =
@@ -1001,7 +1002,7 @@ viewGraphs model =
             in
             Dict.insert station new dict
 
-        times : List ( Time, Time )
+        times : List ( Clock, Clock )
         times =
             model.timetable
                 |> List.concatMap
@@ -1013,7 +1014,7 @@ viewGraphs model =
                             links
                     )
 
-        timeRange : { minTime : Maybe Time, maxTime : Maybe Time }
+        timeRange : { minTime : Maybe Clock, maxTime : Maybe Clock }
         timeRange =
             List.foldl
                 (\( from, to ) acc ->
@@ -1031,8 +1032,8 @@ viewGraphs model =
         stations :
             Dict
                 Station
-                { min : Time
-                , max : Time
+                { min : Clock
+                , max : Clock
                 , events : QuantityDict Int Seconds Event
                 }
         stations =
@@ -1054,8 +1055,8 @@ viewGraphs model =
             List
                 ( Station
                 , { events : QuantityDict Int Seconds Event
-                  , min : Time
-                  , max : Time
+                  , min : Clock
+                  , max : Clock
                   }
                 )
         sortedStations =
@@ -1100,9 +1101,9 @@ viewGraphs model =
                                         ]
                                         [ title []
                                             [ text
-                                                (GTFS.timeToHumanString link.from
+                                                (Clock.toHumanString link.from
                                                     ++ " - "
-                                                    ++ GTFS.timeToHumanString link.to
+                                                    ++ Clock.toHumanString link.to
                                                 )
                                             ]
                                         ]
@@ -1172,7 +1173,7 @@ viewGraphs model =
                                                 , Rotate 90 0 0
                                                 ]
                                             ]
-                                            [ GTFS.timeToHumanString time
+                                            [ Clock.toHumanString time
                                                 |> text
                                             ]
                                 in
@@ -1318,10 +1319,10 @@ namesWidth =
 
 
 timeToX :
-    { minTime : Maybe Time
-    , maxTime : Maybe Time
+    { minTime : Maybe Clock
+    , maxTime : Maybe Clock
     }
-    -> Time
+    -> Clock
     -> Float
 timeToX { minTime, maxTime } time =
     case ( minTime, maxTime ) of
@@ -1339,9 +1340,9 @@ timeToX { minTime, maxTime } time =
 
 
 viewStation :
-    { minTime : Maybe Time, maxTime : Maybe Time }
+    { minTime : Maybe Clock, maxTime : Maybe Clock }
     -> Dict Station Int
-    -> ( Station, { events : QuantityDict Int Seconds Event, min : Time, max : Time } )
+    -> ( Station, { events : QuantityDict Int Seconds Event, min : Clock, max : Clock } )
     -> Svg msg
 viewStation timeRange stationPositions ( name, { events } ) =
     let
@@ -1354,7 +1355,7 @@ viewStation timeRange stationPositions ( name, { events } ) =
         waitLines : List (Svg msg)
         waitLines =
             let
-                go : List ( Time, Event ) -> List (Svg msg) -> List (Svg msg)
+                go : List ( Clock, Event ) -> List (Svg msg) -> List (Svg msg)
                 go queue acc =
                     case queue of
                         [] ->
@@ -1362,7 +1363,7 @@ viewStation timeRange stationPositions ( name, { events } ) =
 
                         ( at, _ ) :: tail ->
                             let
-                                nextDeparture : Maybe Time
+                                nextDeparture : Maybe Clock
                                 nextDeparture =
                                     List.Extra.findMap
                                         (\( dep, kind ) ->
