@@ -267,8 +267,8 @@ init _ =
 loadData : Cmd Msg
 loadData =
     [ -- "de" ,
-      --   "oebb-2024",
-      "micotra-2024"
+      "oebb-2024"
+    , "micotra-2024"
     ]
         |> List.concatMap
             (\feed ->
