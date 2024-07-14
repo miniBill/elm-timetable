@@ -1,14 +1,11 @@
 module Main exposing (main)
 
 import Browser
-import Color
 import Csv.Decode
 import Date exposing (Date)
 import Dict exposing (Dict)
 import Dict.Extra
 import GTFS exposing (Calendar, CalendarDate, Feed, Pathway, Stop, StopTime, Trip)
-import Html exposing (Html)
-import Html.Attributes
 import Http
 import Id exposing (Id, PathwayId, ServiceId, StopId, TripId)
 import IdDict exposing (IdDict)
@@ -632,6 +629,18 @@ filterStops stops =
 viewStops : IdDict StopId Stop -> List Stop -> Element msg
 viewStops stops filteredStops =
     let
+        maybeColumn :
+            String
+            -> (Stop -> Maybe value)
+            -> (value -> Ui.Table.Cell msg)
+            -> Maybe (Ui.Table.Column globalState rowState Stop msg)
+        maybeColumn header prop viewItem =
+            if List.any (\value -> prop value /= Nothing) data then
+                Theme.tableColumn header prop (Table.maybe viewItem)
+
+            else
+                Nothing
+
         stopName : Id StopId -> String
         stopName id =
             case IdDict.get id stops of
@@ -646,38 +655,8 @@ viewStops stops filteredStops =
                         |> List.filterMap identity
                         |> String.join " - "
 
-        tableConfig : Ui.Table.Config globalState Int Stop msg
-        tableConfig =
-            let
-                column :
-                    String
-                    -> (Stop -> value)
-                    -> (value -> Ui.Table.Cell msg)
-                    -> Maybe (Ui.Table.Column globalState rowState Stop msg)
-                column header prop viewItem =
-                    Ui.Table.column
-                        { header = Ui.Table.header header
-                        , view = \value -> viewItem (prop value)
-                        }
-                        |> Just
-
-                maybeColumn :
-                    String
-                    -> (Stop -> Maybe value)
-                    -> (value -> Ui.Table.Cell msg)
-                    -> Maybe (Ui.Table.Column globalState rowState Stop msg)
-                maybeColumn header prop viewItem =
-                    if List.any (\value -> prop value /= Nothing) data then
-                        Ui.Table.column
-                            { header = Ui.Table.header header
-                            , view = \value -> Table.maybe viewItem (prop value)
-                            }
-                            |> Just
-
-                    else
-                        Nothing
-            in
-            [ column "id" .id Table.id
+        columns =
+            [ Theme.tableColumn "id" .id Table.id
             , maybeColumn "code" .code Table.string
             , maybeColumn "name" .name Table.string
             , maybeColumn "tts_name" .tts_name Table.string
@@ -686,45 +665,37 @@ viewStops stops filteredStops =
             , maybeColumn "lon" .lon Table.angle
             , maybeColumn "zone_id" .zone_id Table.id
             , maybeColumn "url" .url Table.url
-            , column "location_type" .location_type (Table.string << GTFS.locationTypeToString)
+            , Theme.tableColumn "location_type" .location_type (Table.string << GTFS.locationTypeToString)
             , maybeColumn "parent_station" .parent_station (Table.string << stopName)
             , maybeColumn "timezone" .timezone Table.string
             , maybeColumn "wheelchair_boarding" .wheelchair_boarding Table.debug
             , maybeColumn "level_id" .level_id Table.id
             , maybeColumn "platform_code" .platform_code Table.string
             ]
-                |> List.filterMap identity
-                |> Ui.Table.columns
-                |> Ui.Table.withScrollable { stickFirstColumn = True }
-                |> Ui.Table.withRowKey (\{ id } -> Id.toString id)
-                |> Ui.Table.withRowState (\_ index _ -> Just index)
-                |> Ui.Table.withRowAttributes
-                    (\maybeIndex _ ->
-                        case modBy 2 (Maybe.withDefault 0 maybeIndex) of
-                            0 ->
-                                [ Ui.background Color.grey ]
-
-                            _ ->
-                                []
-                    )
 
         data : List Stop
         data =
             filteredStops
                 |> List.filter (\stop -> stop.parent_station == Nothing)
     in
-    Ui.Table.viewWithState
-        [ Ui.border 1
-        , Ui.padding 0
-        ]
-        tableConfig
-        ()
-        data
+    Theme.table [] columns data
 
 
 viewPathways : IdDict StopId Stop -> List Pathway -> Element msg
 viewPathways stops filteredPathways =
     let
+        maybeColumn :
+            String
+            -> (Pathway -> Maybe value)
+            -> (value -> Ui.Table.Cell msg)
+            -> Maybe (Ui.Table.Column globalState rowState Pathway msg)
+        maybeColumn header prop viewItem =
+            if List.any (\value -> prop value /= Nothing) data then
+                Theme.tableColumn header prop (Table.maybe viewItem)
+
+            else
+                Nothing
+
         stopName : Id StopId -> String
         stopName id =
             case IdDict.get id stops of
@@ -739,46 +710,28 @@ viewPathways stops filteredPathways =
                         |> List.filterMap identity
                         |> String.join " - "
 
-        viewPathway : Pathway -> Element msg
-        viewPathway pathway =
-            [ Table.id pathway.id
-            , Table.string (stopName pathway.from_stop_id)
-            , Table.string (stopName pathway.to_stop_id)
-            , Table.debug pathway.mode
-            , Table.debug pathway.is_bidirectional
-            , Table.maybe Table.length pathway.length
-            , Table.maybe Table.duration pathway.traversal_time
-            , Table.maybe Table.int pathway.stair_count
-            , Table.maybe Table.float pathway.max_slope
-            , Table.maybe Table.length pathway.min_width
-            , Table.maybe Table.string pathway.signposted_as
-            , Table.maybe Table.string pathway.reversed_signposted_as
+        data : List Pathway
+        data =
+            filteredPathways
+
+        columns : List (Maybe (Ui.Table.Column globalState rowState Pathway msg))
+        columns =
+            [ Theme.tableColumn "id" .id Table.id
+            , Theme.tableColumn "from" .from_stop_id (Table.string << stopName)
+            , Theme.tableColumn "to" .to_stop_id (Table.string << stopName)
+            , Theme.tableColumn "mode" .mode Table.debug
+            , Theme.tableColumn "is_bidirectional" .is_bidirectional Table.debug
+            , maybeColumn "length" .length Table.length
+            , maybeColumn "traversal_time" .traversal_time Table.duration
+            , maybeColumn "stair_count" .stair_count Table.int
+            , maybeColumn "max_slope" .max_slope Table.float
+            , maybeColumn "min_width" .min_width Table.length
+            , maybeColumn "signposted_as" .signposted_as Table.string
+            , maybeColumn "reversed_signposted_as" .reversed_signposted_as Table.string
             ]
-                |> List.map (\{ attrs, children } -> Ui.row attrs children)
-                |> Ui.row []
     in
     Theme.column []
-        [ filteredPathways
-            |> List.map viewPathway
-            |> (::)
-                ([ "id"
-                 , "from"
-                 , "to"
-                 , "mode"
-                 , "is_bidirectional"
-                 , "length"
-                 , "traversal_time"
-                 , "stair_count"
-                 , "max_slope"
-                 , "min_width"
-                 , "signposted_as"
-                 , "reversed_signposted_as"
-                 ]
-                    |> List.map Ui.Table.header
-                    |> List.map (\{ attrs, children } -> Ui.row attrs children)
-                    |> Ui.row []
-                )
-            |> Ui.column []
+        [ Theme.table [] columns data
         , filteredPathways
             |> List.concatMap
                 (\{ from_stop_id, to_stop_id, is_bidirectional } ->
@@ -802,6 +755,22 @@ viewPathways stops filteredPathways =
 viewStopTimes : IdDict StopId Stop -> IdDict TripId Trip -> List StopTime -> Element msg
 viewStopTimes stops filteredTrips filteredStopTimes =
     let
+        maybeColumn :
+            String
+            -> (StopTime -> Maybe value)
+            -> (value -> Ui.Table.Cell msg)
+            -> Maybe (Ui.Table.Column globalState rowState StopTime msg)
+        maybeColumn header prop viewItem =
+            if List.any (\value -> prop value /= Nothing) data then
+                Theme.tableColumn header prop (Table.maybe viewItem)
+
+            else
+                Nothing
+
+        data : List StopTime
+        data =
+            filteredStopTimes
+
         trip : Id TripId -> String
         trip id =
             case IdDict.get id filteredTrips of
@@ -815,8 +784,8 @@ viewStopTimes stops filteredTrips filteredStopTimes =
                         |> List.filterMap identity
                         |> String.join " - "
 
-        stop : Id StopId -> String
-        stop id =
+        stopName : Id StopId -> String
+        stopName id =
             case IdDict.get id stops of
                 Nothing ->
                     Id.toString id
@@ -829,57 +798,29 @@ viewStopTimes stops filteredTrips filteredStopTimes =
                         |> List.filterMap identity
                         |> String.join " - "
 
-        viewStopTime : StopTime -> Element msg
-        viewStopTime stopTime =
-            [ Table.string (trip stopTime.trip_id)
-            , Table.maybe Table.clock stopTime.arrival_time
-            , Table.maybe Table.clock stopTime.departure_time
-            , Table.maybe Table.string (Maybe.map stop stopTime.stop_id)
-            , Table.maybe Table.id stopTime.location_group_id
-            , Table.maybe Table.id stopTime.location_id
-            , Table.int stopTime.stop_sequence
-            , Table.maybe Table.string stopTime.stop_headsign
-            , Table.maybe Table.clock stopTime.start_pickup_drop_off_window
-            , Table.maybe Table.clock stopTime.end_pickup_drop_off_window
-            , Table.maybe Table.debug stopTime.pickup_type
-            , Table.maybe Table.debug stopTime.drop_off_type
-            , Table.maybe Table.debug stopTime.continuous_pickup
-            , Table.maybe Table.debug stopTime.continuous_drop_off
-            , Table.maybe Table.float stopTime.shape_dist_traveled
-            , Table.maybe Table.bool stopTime.timepoint
-            , Table.maybe Table.id stopTime.pickup_booking_rule_id
-            , Table.maybe Table.id stopTime.drop_off_booking_rule_id
+        columns : List (Maybe (Ui.Table.Column globalState rowState StopTime msg))
+        columns =
+            [ Theme.tableColumn "trip_id" .trip_id (Table.string << trip)
+            , maybeColumn "arrival_time" .arrival_time Table.clock
+            , maybeColumn "departure_time" .departure_time Table.clock
+            , maybeColumn "stop_id" .stop_id (Table.string << stopName)
+            , maybeColumn "location_group_id" .location_group_id Table.id
+            , maybeColumn "location_id" .location_id Table.id
+            , Theme.tableColumn "stop_sequence" .stop_sequence Table.int
+            , maybeColumn "stop_headsign" .stop_headsign Table.string
+            , maybeColumn "start_pickup_drop_off_window" .start_pickup_drop_off_window Table.clock
+            , maybeColumn "end_pickup_drop_off_window" .end_pickup_drop_off_window Table.clock
+            , maybeColumn "pickup_type" .pickup_type Table.debug
+            , maybeColumn "drop_off_type" .drop_off_type Table.debug
+            , maybeColumn "continuous_pickup" .continuous_pickup Table.debug
+            , maybeColumn "continuous_drop_off" .continuous_drop_off Table.debug
+            , maybeColumn "shape_dist_traveled" .shape_dist_traveled Table.float
+            , maybeColumn "timepoint" .timepoint Table.bool
+            , maybeColumn "pickup_booking_rule_id" .pickup_booking_rule_id Table.id
+            , maybeColumn "drop_off_booking_rule_id" .drop_off_booking_rule_id Table.id
             ]
-                |> List.map (\{ attrs, children } -> Ui.row attrs children)
-                |> Ui.row []
     in
-    filteredStopTimes
-        |> List.map viewStopTime
-        |> (::)
-            ([ "trip_id"
-             , "arrival_time"
-             , "departure_time"
-             , "stop_id"
-             , "location_group_id"
-             , "location_id"
-             , "stop_sequence"
-             , "stop_headsign"
-             , "start_pickup_drop_off_window"
-             , "end_pickup_drop_off_window"
-             , "pickup_type"
-             , "drop_off_type"
-             , "continuous_pickup"
-             , "continuous_drop_off"
-             , "shape_dist_traveled"
-             , "timepoint"
-             , "pickup_booking_rule_id"
-             , "drop_off_booking_rule_id"
-             ]
-                |> List.map Ui.Table.header
-                |> List.map (\{ attrs, children } -> Ui.row attrs children)
-                |> Ui.row []
-            )
-        |> Ui.column []
+    Theme.table [] columns data
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
