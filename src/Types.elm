@@ -28,7 +28,7 @@ type alias Timetable =
     List
         { from : Station
         , to : Station
-        , links : List { from : Clock, to : Clock }
+        , links : List { from : Clock, label : String, to : Clock }
         }
 
 

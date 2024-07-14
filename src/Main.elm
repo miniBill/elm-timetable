@@ -107,21 +107,26 @@ rebuildTimetable model =
                 timetable =
                     filteredStopTimes
                         |> List.concatMap
-                            (\trip ->
-                                trip
+                            (\tripStopTimes ->
+                                tripStopTimes
                                     |> List.filterMap
                                         (\stopTime ->
-                                            Maybe.map3
-                                                (\stop_id departure_time arrival_time ->
+                                            Maybe.map4
+                                                (\stop_id departure_time arrival_time trip ->
                                                     { stop_id = stop_id
                                                     , departure_time = departure_time
                                                     , arrival_time = arrival_time
                                                     , trip_id = stopTime.trip_id
+                                                    , trip_label =
+                                                        Maybe.withDefault
+                                                            (Id.toString stopTime.trip_id)
+                                                            trip.short_name
                                                     }
                                                 )
                                                 stopTime.stop_id
                                                 stopTime.departure_time
                                                 stopTime.arrival_time
+                                                (IdDict.get stopTime.trip_id trips)
                                         )
                                     |> List.foldl
                                         (\stopTime ( last, acc ) ->
@@ -133,6 +138,7 @@ rebuildTimetable model =
                                                           , to = stopName stopTime
                                                           , departure = previous.departure_time
                                                           , arrival = stopTime.arrival_time
+                                                          , label = stopTime.trip_label
                                                           }
                                                             :: acc
                                                         )
@@ -156,8 +162,9 @@ rebuildTimetable model =
                                     links
                                         |> Quantity.sortBy (\{ departure } -> departure)
                                         |> List.map
-                                            (\{ departure, arrival } ->
+                                            (\{ departure, label, arrival } ->
                                                 { from = departure
+                                                , label = label
                                                 , to = arrival
                                                 }
                                             )

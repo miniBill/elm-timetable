@@ -223,13 +223,7 @@ viewLinks timeRange stationToY timetable =
                                 , y1 <| stationToY from
                                 , y2 <| stationToY to
                                 ]
-                                [ title []
-                                    [ text
-                                        (Clock.toHumanString link.from
-                                            ++ " - "
-                                            ++ Clock.toHumanString link.to
-                                        )
-                                    ]
+                                [ title [] [ text link.label ]
                                 ]
                         )
             )
