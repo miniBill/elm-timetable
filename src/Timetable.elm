@@ -446,7 +446,7 @@ styleNode =
 
             .endpoint {
                 fill: green;
-                r: 5px;
+                r: 2px;
             }
             """
         ]
