@@ -4,7 +4,7 @@ import Browser
 import Color
 import Csv.Decode
 import Dagre.Attributes
-import Date exposing (Date, Interval(..))
+import Date exposing (Date)
 import Dict exposing (Dict)
 import Dict.Extra
 import Duration exposing (Duration, Seconds)
@@ -524,14 +524,6 @@ viewFeed today ( feed, ( calendarDates, ( stopTimes, ( trips, ( calendars, ( sto
                         IdSet.member walkway.from_stop_id stopIds
                             && IdSet.member walkway.to_stop_id stopIds
                     )
-
-        filteredTrips : IdDict TripId Trip
-        filteredTrips =
-            filterTrips today calendarDates calendars trips
-
-        filteredStopTimes : List (List StopTime)
-        filteredStopTimes =
-            filterStopTimes filteredTrips filteredStops stopTimes
     in
     Html.div
         [ Html.Attributes.style "display" "flex"
@@ -548,6 +540,15 @@ viewFeed today ( feed, ( calendarDates, ( stopTimes, ( trips, ( calendars, ( sto
           else
             Html.text ""
         , if False then
+            let
+                filteredTrips : IdDict TripId Trip
+                filteredTrips =
+                    filterTrips today calendarDates calendars trips
+
+                filteredStopTimes : List (List StopTime)
+                filteredStopTimes =
+                    filterStopTimes filteredTrips filteredStops stopTimes
+            in
             filteredStopTimes
                 |> List.filterMap
                     (\tripStops ->
@@ -1088,9 +1089,9 @@ viewGraphs model =
                 |> List.concatMap
                     (\{ from, to, links } ->
                         links
-                            |> List.concatMap
+                            |> List.map
                                 (\link ->
-                                    [ line
+                                    line
                                         [ class [ "link" ]
                                         , x1 <| timeToX timeRange link.from
                                         , x2 <| timeToX timeRange link.to
@@ -1105,7 +1106,6 @@ viewGraphs model =
                                                 )
                                             ]
                                         ]
-                                    ]
                                 )
                     )
 

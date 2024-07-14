@@ -1,14 +1,13 @@
-module Table exposing (angle, bool, debug, duration, float, id, int, length, maybe, seconds, string, time, url)
+module Table exposing (angle, bool, debug, duration, float, id, int, length, maybe, string, time, url)
 
 import Angle exposing (Angle)
-import Duration exposing (Seconds)
+import Duration
 import Float.Extra
 import GTFS exposing (Time)
 import Html exposing (Attribute, Html)
 import Html.Attributes exposing (style)
 import Id exposing (Id)
 import Length
-import Quantity exposing (Quantity)
 import Url exposing (Url)
 
 
@@ -85,11 +84,6 @@ float f =
     cell
         [ style "text-align" "right" ]
         (String.fromFloat f)
-
-
-seconds : Quantity Int Seconds -> Html msg
-seconds f =
-    duration (Duration.seconds (toFloat (Quantity.unwrap f)))
 
 
 int : Int -> Html msg
