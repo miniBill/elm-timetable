@@ -15,6 +15,7 @@ type alias Model =
     , feeds : IdDict FeedId (RemoteData Feed)
     , from : Id StopId
     , to : Id StopId
+    , search : String
     }
 
 
@@ -46,3 +47,4 @@ type Event
 type Msg
     = Reload
     | GotFeed (Id FeedId) (Result Http.Error Feed)
+    | Search String

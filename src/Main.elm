@@ -6,6 +6,7 @@ import Date exposing (Date)
 import Dict
 import Feed exposing (Feed)
 import GTFS exposing (Pathway, Stop, StopTime, Trip)
+import Html.Lazy
 import Http
 import Id exposing (FeedId, Id, StopId, TripId)
 import IdDict exposing (IdDict)
@@ -19,7 +20,8 @@ import Theme
 import Time
 import Timetable
 import Types exposing (Model, Msg(..))
-import Ui exposing (Element)
+import Ui exposing (Element, fill, shrink, width)
+import Ui.Input as Input
 import Ui.Table
 import Url.Builder
 
@@ -64,16 +66,21 @@ init _ =
               Id.fromString "oebb-2024"
             , Id.fromString "micotra-2024"
             ]
+
+        model : Model
+        model =
+            { today = Date.fromCalendarDate 2024 Time.Jul 9
+            , timetable = []
+            , feeds =
+                feeds
+                    |> List.map (\feed -> ( feed, RemoteData.Loading ))
+                    |> IdDict.fromList
+            , from = Id.fromString "Pde:09162:100"
+            , to = Id.fromString "Pit:22095:7049"
+            , search = ""
+            }
     in
-    ( { today = Date.fromCalendarDate 2024 Time.Jul 9
-      , timetable = []
-      , feeds =
-            feeds
-                |> List.map (\feed -> ( feed, RemoteData.Loading ))
-                |> IdDict.fromList
-      , from = Id.fromString "Pde:09162:100"
-      , to = Id.fromString "Pit:22095:7049"
-      }
+    ( model
     , feeds
         |> List.map
             (\feed ->
@@ -197,27 +204,27 @@ view model =
     let
         shared : List (Element Msg)
         shared =
-            [ Timetable.view model.timetable
+            [ Html.Lazy.lazy Timetable.viewGraph model.timetable
                 |> Ui.html
-                |> Ui.el
-                    [ Ui.scrollableX
-                    , Theme.padding
-                    ]
-            , Timetable.viewGraph model.timetable
-                |> Ui.html
-                |> Ui.el
-                    [ Ui.scrollableX
-                    , Ui.paddingWith { left = Theme.rhythm, bottom = Theme.rhythm, right = Theme.rhythm, top = 0 }
-                    ]
-            , Ui.el
-                [ Ui.scrollableX
-                , Ui.paddingWith { left = Theme.rhythm, bottom = Theme.rhythm, right = Theme.rhythm, top = 0 }
-                ]
-                (Theme.button []
-                    { onPress = Reload
-                    , label = Ui.text "Reload"
+                |> Ui.el []
+            , Theme.button []
+                { onPress = Reload
+                , label = Ui.text "Reload"
+                }
+            , Theme.row [] <|
+                let
+                    label : { element : Element msg, id : Input.Label }
+                    label =
+                        Input.label "search" [ width shrink ] (Ui.text "Search")
+                in
+                [ label.element
+                , Input.text [ width fill ]
+                    { label = label.id
+                    , onChange = Search
+                    , placeholder = Nothing
+                    , text = model.search
                     }
-                )
+                ]
             ]
 
         feedViews : List (Element msg)
@@ -234,23 +241,31 @@ view model =
                                 Ui.text ("Feed " ++ Id.toString feedId ++ " loading...")
 
                             RemoteData.Loaded loaded ->
-                                loaded
-                                    |> viewFeed model.today feedId
-                                    |> Ui.el
-                                        [ Ui.scrollableX
-                                        , Ui.paddingWith { left = Theme.rhythm, bottom = Theme.rhythm, right = Theme.rhythm, top = 0 }
-                                        ]
+                                viewFeed model.search model.today feedId loaded
                     )
     in
-    Theme.column [] (shared ++ feedViews)
+    Theme.column []
+        [ Html.Lazy.lazy Timetable.view model.timetable
+            |> Ui.html
+            |> Ui.el
+                [ Ui.scrollableX
+                , Theme.padding
+                ]
+        , Theme.column
+            [ Theme.padding ]
+            (shared
+                ++ feedViews
+            )
+        ]
 
 
 viewFeed :
-    Date
+    String
+    -> Date
     -> Id FeedId
     -> Feed
     -> Element msg
-viewFeed today feed { calendarDates, stopTimes, trips, calendars, stops, pathways } =
+viewFeed search today feed { calendarDates, stopTimes, trips, calendars, stops, pathways } =
     let
         filteredStops : List Stop
         filteredStops =
@@ -260,7 +275,7 @@ viewFeed today feed { calendarDates, stopTimes, trips, calendars, stops, pathway
         [ Ui.text (Id.toString feed)
 
         -- , pathfinder stops filteredPathways
-        , viewStops stops filteredStops
+        , viewStops search stops filteredStops
         , if False then
             let
                 stopIds : IdSet StopId
@@ -309,8 +324,8 @@ viewFeed today feed { calendarDates, stopTimes, trips, calendars, stops, pathway
         ]
 
 
-viewStops : IdDict StopId Stop -> List Stop -> Element msg
-viewStops stops filteredStops =
+viewStops : String -> IdDict StopId Stop -> List Stop -> Element msg
+viewStops search stops filteredStops =
     let
         maybeColumn :
             String
@@ -360,7 +375,11 @@ viewStops stops filteredStops =
         data : List Stop
         data =
             filteredStops
-                |> List.filter (\stop -> stop.parent_station == Nothing)
+                |> List.filter
+                    (\stop ->
+                        (stop.parent_station == Nothing)
+                            && String.contains search (Maybe.withDefault "" stop.name)
+                    )
     in
     Theme.table [] columns data
 
@@ -518,6 +537,9 @@ update msg model =
 
         Reload ->
             init {}
+
+        Search search ->
+            ( { model | search = search }, Cmd.none )
 
 
 subscriptions : model -> Sub msg
