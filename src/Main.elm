@@ -120,6 +120,15 @@ rebuildTimetable model =
                                                         Maybe.withDefault
                                                             (Id.toString stopTime.trip_id)
                                                             trip.short_name
+                                                    , train =
+                                                        case trip.block_id of
+                                                            Nothing ->
+                                                                Id.toString trip.id
+
+                                                            Just block_id ->
+                                                                Id.toString trip.route_id
+                                                                    ++ " - "
+                                                                    ++ Id.toString block_id
                                                     }
                                                 )
                                                 stopTime.stop_id
@@ -138,6 +147,7 @@ rebuildTimetable model =
                                                           , departure = previous.departure_time
                                                           , arrival = stopTime.arrival_time
                                                           , label = stopTime.trip_label
+                                                          , train = stopTime.train
                                                           }
                                                             :: acc
                                                         )
@@ -161,9 +171,10 @@ rebuildTimetable model =
                                     links
                                         |> Quantity.sortBy (\{ departure } -> departure)
                                         |> List.map
-                                            (\{ departure, label, arrival } ->
+                                            (\{ departure, label, train, arrival } ->
                                                 { from = departure
                                                 , label = label
+                                                , train = train
                                                 , to = arrival
                                                 }
                                             )
