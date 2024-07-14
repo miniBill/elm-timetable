@@ -60,10 +60,6 @@ tableHorizontalMargin =
 view : Timetable -> Svg msg
 view timetable =
     let
-        fullHeight : Float
-        fullHeight =
-            timesHeight * 2 + lineHeight * toFloat (Dict.size stations - 1)
-
         liftTime :
             (Clock -> Clock -> Clock)
             -> Maybe Clock
@@ -194,6 +190,10 @@ view timetable =
     case ( timeRange.minTime, timeRange.maxTime ) of
         ( Just minTime, Just maxTime ) ->
             let
+                fullHeight : Float
+                fullHeight =
+                    timesHeight * 2 + lineHeight * toFloat (Dict.size stations - 1)
+
                 timeRange_ : { minTime : Clock, maxTime : Clock }
                 timeRange_ =
                     { minTime =

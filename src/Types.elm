@@ -1,4 +1,4 @@
-module Types exposing (Event(..), Model, Msg(..), Station, Timetable)
+module Types exposing (Event(..), Link, Model, Msg(..), Station, Timetable)
 
 import Clock exposing (Clock)
 import Date exposing (Date)
