@@ -301,6 +301,7 @@ viewFeed search today feed { calendarDates, stopTimes, trips, calendars, stops, 
             filteredStopTimes =
                 Pathfinding.filterStopTimes filteredTrips filteredStops stopTimes
 
+            raw : List (Element msg)
             raw =
                 filteredStopTimes
                     |> List.filterMap
@@ -331,6 +332,7 @@ viewFeed search today feed { calendarDates, stopTimes, trips, calendars, stops, 
                                     )
                         )
 
+            count : Int
             count =
                 List.length raw
           in
