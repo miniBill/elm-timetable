@@ -292,29 +292,58 @@ viewFeed search today feed { calendarDates, stopTimes, trips, calendars, stops, 
 
           else
             Ui.none
-        , if False then
-            let
-                filteredTrips : IdDict TripId Trip
-                filteredTrips =
-                    Pathfinding.filterTrips today calendarDates calendars trips
+        , let
+            filteredTrips : IdDict TripId Trip
+            filteredTrips =
+                Pathfinding.filterTrips today calendarDates calendars trips
 
-                filteredStopTimes : List ( Id TripId, List StopTime )
-                filteredStopTimes =
-                    Pathfinding.filterStopTimes filteredTrips filteredStops stopTimes
-            in
-            filteredStopTimes
-                |> List.filterMap
-                    (\( _, tripStops ) ->
-                        if List.length tripStops < 2 then
-                            Nothing
+            filteredStopTimes : List ( Id TripId, List StopTime )
+            filteredStopTimes =
+                Pathfinding.filterStopTimes filteredTrips filteredStops stopTimes
 
-                        else
-                            Just (viewStopTimes stops filteredTrips tripStops)
-                    )
-                |> Theme.column []
+            raw =
+                filteredStopTimes
+                    |> List.filterMap
+                        (\( trip_id, tripStops ) ->
+                            -- if List.length tripStops < 2 then
+                            --     Nothing
+                            -- else
+                            IdDict.get trip_id filteredTrips
+                                |> Maybe.andThen
+                                    (\trip ->
+                                        if
+                                            fuzzyMatch search (Id.toString trip.id)
+                                                || fuzzyMatch search (Maybe.withDefault "" trip.short_name)
+                                                || List.any
+                                                    (\{ stop_id } ->
+                                                        case stop_id of
+                                                            Nothing ->
+                                                                False
+
+                                                            Just id ->
+                                                                fuzzyMatch search (stopName stops id)
+                                                    )
+                                                    tripStops
+                                        then
+                                            Just (viewStopTimes trip stops tripStops)
+
+                                        else
+                                            Nothing
+                                    )
+                        )
+
+            count =
+                List.length raw
+          in
+          if count > 10 then
+            Theme.column []
+                (List.take 10 raw
+                    ++ [ Ui.text ("Showing  10 out of " ++ String.fromInt count ++ " trips") ]
+                )
 
           else
-            Ui.none
+            raw
+                |> Theme.column []
         ]
 
 
@@ -333,20 +362,6 @@ viewStops search stops filteredStops =
             else
                 Nothing
 
-        stopName : Id StopId -> String
-        stopName id =
-            case IdDict.get id stops of
-                Nothing ->
-                    Id.toString id
-
-                Just found ->
-                    [ found.name
-                    , found.description
-                    , Maybe.map (\n -> "(" ++ n ++ ")") found.platform_code
-                    ]
-                        |> List.filterMap identity
-                        |> String.join " - "
-
         columns : List (Maybe (Ui.Table.Column globalState rowState Stop msg))
         columns =
             [ Theme.tableColumn "id" .id Table.id
@@ -359,7 +374,7 @@ viewStops search stops filteredStops =
             , maybeColumn "zone_id" .zone_id Table.id
             , maybeColumn "url" .url Table.url
             , Theme.tableColumn "location_type" .location_type (Table.string << GTFS.locationTypeToString)
-            , maybeColumn "parent_station" .parent_station (Table.string << stopName)
+            , maybeColumn "parent_station" .parent_station (Table.string << stopName stops)
             , maybeColumn "timezone" .timezone Table.string
             , maybeColumn "wheelchair_boarding" .wheelchair_boarding Table.accessibility
             , maybeColumn "level_id" .level_id Table.id
@@ -372,12 +387,32 @@ viewStops search stops filteredStops =
                 |> List.filter
                     (\stop ->
                         (stop.parent_station == Nothing)
-                            && String.contains
-                                (String.toLower search)
-                                (String.toLower (Maybe.withDefault "" stop.name))
+                            && fuzzyMatch search (Maybe.withDefault "" stop.name)
                     )
     in
     Theme.table [] columns data
+
+
+stopName : IdDict StopId Stop -> Id StopId -> String
+stopName stops id =
+    case IdDict.get id stops of
+        Nothing ->
+            Id.toString id
+
+        Just found ->
+            [ found.name
+            , found.description
+            , Maybe.map (\n -> "(" ++ n ++ ")") found.platform_code
+            ]
+                |> List.filterMap identity
+                |> String.join " - "
+
+
+fuzzyMatch : String -> String -> Bool
+fuzzyMatch needle haystack =
+    String.contains
+        (String.toLower needle)
+        (String.toLower haystack)
 
 
 viewPathways : IdDict StopId Stop -> List Pathway -> Element msg
@@ -395,20 +430,6 @@ viewPathways stops filteredPathways =
             else
                 Nothing
 
-        stopName : Id StopId -> String
-        stopName id =
-            case IdDict.get id stops of
-                Nothing ->
-                    Id.toString id
-
-                Just found ->
-                    [ found.name
-                    , found.description
-                    , Maybe.map (\n -> "(" ++ n ++ ")") found.platform_code
-                    ]
-                        |> List.filterMap identity
-                        |> String.join " - "
-
         data : List Pathway
         data =
             filteredPathways
@@ -416,8 +437,8 @@ viewPathways stops filteredPathways =
         columns : List (Maybe (Ui.Table.Column globalState rowState Pathway msg))
         columns =
             [ Theme.tableColumn "id" .id Table.id
-            , Theme.tableColumn "from" .from_stop_id (Table.string << stopName)
-            , Theme.tableColumn "to" .to_stop_id (Table.string << stopName)
+            , Theme.tableColumn "from" .from_stop_id (Table.string << stopName stops)
+            , Theme.tableColumn "to" .to_stop_id (Table.string << stopName stops)
             , Theme.tableColumn "mode" .mode Table.pathwayMode
             , Theme.tableColumn "is_bidirectional" .is_bidirectional Table.bool
             , maybeColumn "length" .length Table.length
@@ -442,7 +463,7 @@ viewPathways stops filteredPathways =
                     else
                         [ ( from_stop_id, to_stop_id ) ]
                 )
-            |> Timetable.viewDAG stopName
+            |> Timetable.viewDAG (stopName stops)
             |> Ui.html
             |> Ui.el
                 [ Theme.padding
@@ -451,8 +472,8 @@ viewPathways stops filteredPathways =
         ]
 
 
-viewStopTimes : IdDict StopId Stop -> IdDict TripId Trip -> List StopTime -> Element msg
-viewStopTimes stops filteredTrips filteredStopTimes =
+viewStopTimes : Trip -> IdDict StopId Stop -> List StopTime -> Element msg
+viewStopTimes trip stops filteredStopTimes =
     let
         maybeColumn :
             String
@@ -470,39 +491,20 @@ viewStopTimes stops filteredTrips filteredStopTimes =
         data =
             filteredStopTimes
 
-        trip : Id TripId -> String
-        trip id =
-            case IdDict.get id filteredTrips of
-                Nothing ->
-                    Id.toString id
-
-                Just found ->
-                    [ found.short_name
-                    , Just (Id.toString id)
-                    ]
-                        |> List.filterMap identity
-                        |> String.join " - "
-
-        stopName : Id StopId -> String
-        stopName id =
-            case IdDict.get id stops of
-                Nothing ->
-                    Id.toString id
-
-                Just found ->
-                    [ found.name
-                    , found.description
-                    , Maybe.map (\n -> "(" ++ n ++ ")") found.platform_code
-                    ]
-                        |> List.filterMap identity
-                        |> String.join " - "
+        tripName : String
+        tripName =
+            [ trip.short_name
+            , Just ("(" ++ Id.toString trip.id ++ ")")
+            ]
+                |> List.filterMap identity
+                |> String.join " "
 
         columns : List (Maybe (Ui.Table.Column globalState rowState StopTime msg))
         columns =
-            [ Theme.tableColumn "trip_id" .trip_id (Table.string << trip)
+            [ Theme.tableColumn "trip_id" (\_ -> tripName) Table.string
             , maybeColumn "arrival_time" .arrival_time Table.clock
             , maybeColumn "departure_time" .departure_time Table.clock
-            , maybeColumn "stop_id" .stop_id (Table.string << stopName)
+            , maybeColumn "stop_id" .stop_id (Table.string << stopName stops)
             , maybeColumn "location_group_id" .location_group_id Table.id
             , maybeColumn "location_id" .location_id Table.id
             , Theme.tableColumn "stop_sequence" .stop_sequence Table.int
