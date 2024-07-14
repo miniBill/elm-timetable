@@ -9,3 +9,5 @@ same for selecting a station: it forces "via" that station
 every item has hover and select, hover grays out the rest, select whites out the rest
 
 graph of cities only, for easier viz and selection
+
+Clock.toString should take timezones into account
