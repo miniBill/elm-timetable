@@ -306,12 +306,6 @@ viewFeed today ( feed, ( calendarDates, ( stopTimes, ( trips, ( calendars, ( sto
         filteredStops : List Stop
         filteredStops =
             Pathfinding.filterStops stops
-
-        stopIds : IdSet StopId
-        stopIds =
-            filteredStops
-                |> List.map .id
-                |> IdSet.fromList
     in
     Theme.column []
         [ Ui.text feed
@@ -320,6 +314,12 @@ viewFeed today ( feed, ( calendarDates, ( stopTimes, ( trips, ( calendars, ( sto
         , viewStops stops filteredStops
         , if False then
             let
+                stopIds : IdSet StopId
+                stopIds =
+                    filteredStops
+                        |> List.map .id
+                        |> IdSet.fromList
+
                 filteredPathways : List Pathway
                 filteredPathways =
                     pathways
