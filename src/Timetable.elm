@@ -557,7 +557,6 @@ viewDAG toName edgeList =
         ids : List (Id kind)
         ids =
             edgeList
-                |> Debug.log "edgeList"
                 |> List.concatMap (\( from, to ) -> [ from, to ])
                 |> IdSet.fromList
                 |> IdSet.toList

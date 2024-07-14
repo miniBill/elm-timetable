@@ -1,8 +1,6 @@
 module Theme exposing (button, column, padding, row, spacing, table, tableColumn)
 
 import Color
-import Id
-import Table
 import Ui exposing (Attribute, Element)
 import Ui.Input
 import Ui.Table
