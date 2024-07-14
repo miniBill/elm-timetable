@@ -21,6 +21,7 @@ import IdSet exposing (IdSet)
 import List.Extra
 import Quantity
 import QuantityDict exposing (QuantityDict)
+import QuantitySet
 import RemoteData
 import Render
 import Render.StandardDrawers
@@ -1137,18 +1138,14 @@ viewGraphs model =
             times
                 |> List.concatMap
                     (\( from, to ) ->
-                        [ Quantity.unwrap from
-                        , Quantity.unwrap to
+                        [ from
+                        , to
                         ]
                     )
-                |> Set.fromList
-                |> Set.foldr
-                    (\t ( last, acc ) ->
+                |> QuantitySet.fromList
+                |> QuantitySet.foldr
+                    (\time ( last, acc ) ->
                         let
-                            time : Time
-                            time =
-                                Quantity.unsafe t
-
                             timeX : Float
                             timeX =
                                 timeToX timeRange time
