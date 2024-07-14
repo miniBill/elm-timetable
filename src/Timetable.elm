@@ -18,12 +18,14 @@ import Render
 import Render.StandardDrawers
 import Render.StandardDrawers.Attributes
 import Render.StandardDrawers.Types
+import Set
 import TypedSvg exposing (circle, g, line, style, svg, text_, title)
 import TypedSvg.Attributes exposing (class, id, stroke, textAnchor, transform, viewBox)
 import TypedSvg.Attributes.InPx exposing (cx, cy, x1, x2, y, y1, y2)
 import TypedSvg.Core exposing (Svg, text)
 import TypedSvg.Types exposing (AnchorAlignment(..), Paint(..), Transform(..))
 import Types exposing (Event(..), Station, Timetable)
+import Ui
 
 
 lineHeight : number
@@ -198,7 +200,7 @@ view timetable =
     in
     svg
         [ Html.Attributes.style "width" (String.fromInt fullWidth ++ "px")
-        , viewBox -5 -5 (fullWidth + 10) (fullHeight + 10)
+        , viewBox 0 0 fullWidth fullHeight
         ]
         [ styleNode
         , g [ id "Stations" ] stationsViews
@@ -210,6 +212,22 @@ view timetable =
 
 viewLinks : { minTime : Maybe Clock, maxTime : Maybe Clock } -> (Station -> Float) -> Timetable -> List (Svg msg)
 viewLinks timeRange stationToY timetable =
+    let
+        colorDict : Dict String Color.Color
+        colorDict =
+            timetable
+                |> List.concatMap .links
+                |> List.map .label
+                |> Set.fromList
+                |> Set.toList
+                |> pairWithColors
+                |> Dict.fromList
+
+        toColor : String -> Color.Color
+        toColor label =
+            Dict.get label colorDict
+                |> Maybe.withDefault Color.blue
+    in
     timetable
         |> List.concatMap
             (\{ from, to, links } ->
@@ -222,11 +240,51 @@ viewLinks timeRange stationToY timetable =
                                 , x2 <| timeToX timeRange link.to
                                 , y1 <| stationToY from
                                 , y2 <| stationToY to
+                                , stroke (Paint (toColor link.label))
                                 ]
                                 [ title [] [ text link.label ]
                                 ]
                         )
             )
+
+
+pairWithColors : List a -> List ( a, Color.Color )
+pairWithColors list =
+    let
+        colors : List Ui.Color
+        colors =
+            tab10
+
+        go : List a -> List Color.Color -> List ( a, Color.Color ) -> List ( a, Color.Color )
+        go queue cqueue acc =
+            case queue of
+                [] ->
+                    List.reverse acc
+
+                head :: tail ->
+                    case cqueue of
+                        [] ->
+                            go queue colors acc
+
+                        chead :: ctail ->
+                            go tail ctail (( head, chead ) :: acc)
+    in
+    go list colors []
+
+
+tab10 : List Ui.Color
+tab10 =
+    [ Ui.rgb 0x04 0x58 0x93
+    , Ui.rgb 0xDB 0x61 0x00
+    , Ui.rgb 0x10 0x80 0x10
+    , Ui.rgb 0xB4 0x0C 0x0D
+    , Ui.rgb 0x74 0x49 0x9C
+    , Ui.rgb 0x6D 0x39 0x2E
+    , Ui.rgb 0xC1 0x58 0xA0
+    , Ui.rgb 0x61 0x61 0x61
+    , Ui.rgb 0x9A 0x9C 0x07
+    , Ui.rgb 0x00 0x9D 0xAE
+    ]
 
 
 viewEndpoints :
@@ -265,59 +323,68 @@ viewTimeGrid timeRange fullHeight =
             let
                 from : Int
                 from =
-                    floor <| Duration.inHours <| Quantity.toFloatQuantity minTime
+                    floor <| 4 * (Duration.inHours <| Quantity.toFloatQuantity minTime)
 
                 to : Int
                 to =
-                    ceiling <| Duration.inHours <| Quantity.toFloatQuantity maxTime
+                    ceiling <| 4 * (Duration.inHours <| Quantity.toFloatQuantity maxTime)
             in
             List.range from to
                 |> List.map
-                    (\hour ->
+                    (\quarterHour ->
                         let
                             time : Clock
                             time =
-                                Clock.fromHoursMinutesSeconds hour 0 0
+                                Clock.fromHoursMinutesSeconds 0 (quarterHour * 15) 0
 
                             timeX : Float
                             timeX =
                                 timeToX timeRange time
 
-                            verticalLine : Svg msg
-                            verticalLine =
-                                line
-                                    [ class [ "grid" ]
-                                    , x1 0
-                                    , x2 0
-                                    , y1 0
-                                    , y2 fullHeight
-                                    ]
-                                    []
-
-                            label : List (Svg msg)
-                            label =
-                                let
-                                    inner anchor transformation =
-                                        text_
-                                            [ textAnchor anchor
-                                            , transform
-                                                [ Translate 5 transformation
-                                                , Rotate 90 0 0
+                            children : List (Svg msg)
+                            children =
+                                if modBy 4 quarterHour == 0 then
+                                    let
+                                        inner anchor transformation =
+                                            text_
+                                                [ textAnchor anchor
+                                                , transform
+                                                    [ Translate 5 transformation
+                                                    , Rotate 90 0 0
+                                                    ]
                                                 ]
-                                            ]
-                                            [ Clock.toHumanString time
-                                                |> text
-                                            ]
-                                in
-                                [ inner AnchorStart 0
-                                , inner AnchorEnd fullHeight
-                                ]
+                                                [ Clock.toHumanString time
+                                                    |> text
+                                                ]
+                                    in
+                                    [ line
+                                        [ class [ "grid" ]
+                                        , x1 0
+                                        , x2 0
+                                        , y1 0
+                                        , y2 fullHeight
+                                        ]
+                                        []
+                                    , inner AnchorStart 0
+                                    , inner AnchorEnd fullHeight
+                                    ]
+
+                                else
+                                    [ line
+                                        [ class [ "grid", "secondary" ]
+                                        , x1 0
+                                        , x2 0
+                                        , y1 timesHeight
+                                        , y2 (fullHeight - timesHeight)
+                                        ]
+                                        []
+                                    ]
                         in
                         g
-                            [ id <| String.fromInt hour ++ ":00"
+                            [ id <| Clock.toHumanString time
                             , transform [ Translate timeX 0 ]
                             ]
-                            (verticalLine :: label)
+                            children
                     )
 
         _ ->
@@ -329,31 +396,33 @@ styleNode =
     style []
         [ text
             """
-                    .horiz {
-                        stroke: black;
-                        stroke-width: 2px;
-                    }
+            .stationLine {
+                stroke: gray;
+                stroke-width: 1px;
+            }
 
-                    .link {
-                        stroke: blue;
-                        stroke-width: 2px;
-                    }
+            .link {
+                stroke-width: 2px;
+            }
 
-                    .grid {
-                        stroke: gray;
-                        stroke-width: 1px;
-                        stroke-dasharray: 4;
-                    }
+            .grid {
+                stroke: gray;
+                stroke-width: 1px;
+            }
 
-                    .wait {
-                        stroke-width: 2px;
-                    }
+            .secondary {
+                stroke-dasharray: 4;
+            }
 
-                    .endpoint {
-                        fill: green;
-                        r: 5px;
-                    }
-                    """
+            .wait {
+                stroke-width: 2px;
+            }
+
+            .endpoint {
+                fill: green;
+                r: 5px;
+            }
+            """
         ]
 
 
@@ -461,7 +530,7 @@ viewStation timeRange stationPositions ( name, { events } ) =
     in
     g [ id <| "Station - " ++ name ]
         ([ line
-            [ class [ "horiz" ]
+            [ class [ "stationLine" ]
             , x1 namesWidth
             , x2 fullWidth
             , y1 stationY
