@@ -13,7 +13,6 @@ import GTFS exposing (Calendar, CalendarDate, Feed, Pathway, Stop, StopTime, Tri
 import Graph
 import Html exposing (Html)
 import Html.Attributes
-import Html.Events
 import Http
 import Id exposing (Id, PathwayId, ServiceId, StopId, TripId)
 import IdDict exposing (IdDict)
@@ -29,6 +28,7 @@ import Render.StandardDrawers.Attributes
 import Render.StandardDrawers.Types
 import Set
 import Table
+import Theme
 import Time exposing (Weekday(..))
 import TypedSvg exposing (circle, g, line, svg, text_, title)
 import TypedSvg.Attributes exposing (class, stroke, textAnchor, transform, viewBox)
@@ -36,6 +36,7 @@ import TypedSvg.Attributes.InPx exposing (cx, cy, x1, x2, y, y1, y2)
 import TypedSvg.Core exposing (Svg, text)
 import TypedSvg.Types exposing (AnchorAlignment(..), Paint(..), Transform(..))
 import Types exposing (Event(..), Model, Msg(..), Station, Timetable)
+import Ui exposing (Element)
 import Url.Builder
 
 
@@ -43,7 +44,7 @@ main : Program () Model Msg
 main =
     Browser.element
         { init = init
-        , view = view
+        , view = \model -> Ui.layout [] (view model)
         , update =
             \msg model ->
                 let
@@ -358,83 +359,83 @@ expectCsv toMsg feed filename decoder =
         )
 
 
-view : Model -> Html Msg
+view : Model -> Element Msg
 view model =
-    Html.div []
+    Theme.column []
         [ viewGraphs model
-        , Html.button
-            [ Html.Events.onClick Reload ]
-            [ Html.text "Reload" ]
-        , Html.div
-            [ Html.Attributes.style "border" "1px solid black"
-            , Html.Attributes.style "padding" "8px"
-            , Html.Attributes.style "margin-top" "8px"
+        , Theme.button []
+            { onPress = Reload
+            , label = Ui.text "Reload"
+            }
+        , Theme.column
+            [ Ui.border 1
+            , Theme.padding
             ]
           <|
             case model.stops of
                 RemoteData.Error e ->
-                    [ Html.text (Debug.toString e) ]
+                    [ Ui.text (Debug.toString e) ]
 
                 RemoteData.NotAsked ->
-                    [ Html.text "Stops not asked" ]
+                    [ Ui.text "Stops not asked" ]
 
                 RemoteData.Loading ->
-                    [ Html.text "Stops loading..." ]
+                    [ Ui.text "Stops loading..." ]
 
                 RemoteData.Loaded stops ->
                     case model.pathways of
                         RemoteData.Error e ->
-                            [ Html.text (Debug.toString e) ]
+                            [ Ui.text (Debug.toString e) ]
 
                         RemoteData.NotAsked ->
-                            [ Html.text "Pathways not asked" ]
+                            [ Ui.text "Pathways not asked" ]
 
                         RemoteData.Loading ->
-                            [ Html.text "Pathways loading..." ]
+                            [ Ui.text "Pathways loading..." ]
 
                         RemoteData.Loaded pathways ->
                             case model.stopTimes of
                                 RemoteData.Error e ->
-                                    [ Html.text (Debug.toString e) ]
+                                    [ Ui.text (Debug.toString e) ]
 
                                 RemoteData.NotAsked ->
-                                    [ Html.text "Stop times not asked" ]
+                                    [ Ui.text "Stop times not asked" ]
 
                                 RemoteData.Loading ->
-                                    [ Html.text "Stop times loading..." ]
+                                    [ Ui.text "Stop times loading..." ]
 
                                 RemoteData.Loaded stopTimes ->
                                     case model.trips of
                                         RemoteData.Error e ->
-                                            [ Html.text (Debug.toString e) ]
+                                            [ Ui.text (Debug.toString e) ]
 
                                         RemoteData.NotAsked ->
-                                            [ Html.text "Trips not asked" ]
+                                            [ Ui.text "Trips not asked" ]
 
                                         RemoteData.Loading ->
-                                            [ Html.text "Trips loading..." ]
+                                            [ Ui.text "Trips loading..." ]
 
                                         RemoteData.Loaded trips ->
                                             case model.calendars of
                                                 RemoteData.Error e ->
-                                                    [ Html.text (Debug.toString e) ]
+                                                    [ Ui.text (Debug.toString e) ]
 
                                                 RemoteData.NotAsked ->
-                                                    [ Html.text "Calendars not asked" ]
+                                                    [ Ui.text "Calendars not asked" ]
 
                                                 RemoteData.Loading ->
-                                                    [ Html.text "Calendars loading..." ]
+                                                    [ Ui.text "Calendars loading..." ]
 
                                                 RemoteData.Loaded calendars ->
                                                     case model.calendarDates of
                                                         RemoteData.Error e ->
-                                                            [ Html.text (Debug.toString e) ]
+                                                            [ Ui.text (Debug.toString e) ]
 
                                                         RemoteData.NotAsked ->
-                                                            [ Html.text "Calendar dates not asked" ]
+                                                            [ Ui.text "Calendar dates not asked" ]
 
                                                         RemoteData.Loading ->
-                                                            [ Html.text "Calendar dates loading..." ]
+                                                            [ Ui.text "Calendar dates loading..." ]
 
                                                         RemoteData.Loaded calendarDates ->
                                                             pathways
@@ -502,7 +503,7 @@ viewFeed :
             )
           )
         )
-    -> Html msg
+    -> Element msg
 viewFeed today ( feed, ( calendarDates, ( stopTimes, ( trips, ( calendars, ( stops, pathways ) ) ) ) ) ) =
     let
         filteredStops : List Stop
@@ -525,12 +526,8 @@ viewFeed today ( feed, ( calendarDates, ( stopTimes, ( trips, ( calendars, ( sto
                             && IdSet.member walkway.to_stop_id stopIds
                     )
     in
-    Html.div
-        [ Html.Attributes.style "display" "flex"
-        , Html.Attributes.style "flex-direction" "column"
-        , Html.Attributes.style "gap" "8px"
-        ]
-        [ Html.text feed
+    Theme.column []
+        [ Ui.text feed
 
         -- , pathfinder stops pathways
         , viewStops stops filteredStops
@@ -538,7 +535,7 @@ viewFeed today ( feed, ( calendarDates, ( stopTimes, ( trips, ( calendars, ( sto
             viewPathways stops filteredPathways
 
           else
-            Html.text ""
+            Ui.none
         , if False then
             let
                 filteredTrips : IdDict TripId Trip
@@ -558,10 +555,10 @@ viewFeed today ( feed, ( calendarDates, ( stopTimes, ( trips, ( calendars, ( sto
                         else
                             Just (viewStopTimes stops filteredTrips tripStops)
                     )
-                |> Html.div []
+                |> Theme.column []
 
           else
-            Html.text ""
+            Ui.none
         ]
 
 
@@ -627,7 +624,7 @@ filterStops stops =
         |> List.take 1000
 
 
-viewStops : IdDict StopId Stop -> List Stop -> Html msg
+viewStops : IdDict StopId Stop -> List Stop -> Element msg
 viewStops stops filteredStops =
     let
         stopName : Id StopId -> String
@@ -691,9 +688,10 @@ viewStops stops filteredStops =
             [ Html.Attributes.style "border" "1px solid black"
             , Html.Attributes.style "padding" "8px"
             ]
+        |> Ui.html
 
 
-viewPathways : IdDict StopId Stop -> List Pathway -> Html msg
+viewPathways : IdDict StopId Stop -> List Pathway -> Element msg
 viewPathways stops filteredPathways =
     let
         stop : Id StopId -> String
@@ -793,7 +791,7 @@ viewPathways stops filteredPathways =
             ]
                 |> Html.tr []
     in
-    Html.div []
+    Theme.column []
         [ filteredPathways
             |> List.map viewPathway
             |> (::)
@@ -817,6 +815,7 @@ viewPathways stops filteredPathways =
                 [ Html.Attributes.style "border" "1px solid black"
                 , Html.Attributes.style "padding" "8px"
                 ]
+            |> Ui.html
         , if False then
             Render.draw
                 [ Dagre.Attributes.rankDir Dagre.Attributes.LR
@@ -851,13 +850,14 @@ viewPathways stops filteredPathways =
                 , Render.style "width: 100%;max-height:100vh;max-width:100vw"
                 ]
                 graph
+                |> Ui.html
 
           else
-            Html.text ""
+            Ui.none
         ]
 
 
-viewStopTimes : IdDict StopId Stop -> IdDict TripId Trip -> List StopTime -> Html msg
+viewStopTimes : IdDict StopId Stop -> IdDict TripId Trip -> List StopTime -> Element msg
 viewStopTimes stops filteredTrips filteredStopTimes =
     let
         trip : Id TripId -> String
@@ -910,40 +910,39 @@ viewStopTimes stops filteredTrips filteredStopTimes =
             ]
                 |> Html.tr []
     in
-    Html.div []
-        [ filteredStopTimes
-            |> List.map viewStopTime
-            |> (::)
-                ([ "trip_id"
-                 , "arrival_time"
-                 , "departure_time"
-                 , "stop_id"
-                 , "location_group_id"
-                 , "location_id"
-                 , "stop_sequence"
-                 , "stop_headsign"
-                 , "start_pickup_drop_off_window"
-                 , "end_pickup_drop_off_window"
-                 , "pickup_type"
-                 , "drop_off_type"
-                 , "continuous_pickup"
-                 , "continuous_drop_off"
-                 , "shape_dist_traveled"
-                 , "timepoint"
-                 , "pickup_booking_rule_id"
-                 , "drop_off_booking_rule_id"
-                 ]
-                    |> List.map (\col -> Html.th [] [ Html.text col ])
-                    |> Html.tr []
-                )
-            |> Html.table
-                [ Html.Attributes.style "border" "1px solid black"
-                , Html.Attributes.style "padding" "8px"
-                ]
-        ]
+    filteredStopTimes
+        |> List.map viewStopTime
+        |> (::)
+            ([ "trip_id"
+             , "arrival_time"
+             , "departure_time"
+             , "stop_id"
+             , "location_group_id"
+             , "location_id"
+             , "stop_sequence"
+             , "stop_headsign"
+             , "start_pickup_drop_off_window"
+             , "end_pickup_drop_off_window"
+             , "pickup_type"
+             , "drop_off_type"
+             , "continuous_pickup"
+             , "continuous_drop_off"
+             , "shape_dist_traveled"
+             , "timepoint"
+             , "pickup_booking_rule_id"
+             , "drop_off_booking_rule_id"
+             ]
+                |> List.map (\col -> Html.th [] [ Html.text col ])
+                |> Html.tr []
+            )
+        |> Html.table
+            [ Html.Attributes.style "border" "1px solid black"
+            , Html.Attributes.style "padding" "8px"
+            ]
+        |> Ui.html
 
 
-viewGraphs : Model -> Html msg
+viewGraphs : Model -> Element msg
 viewGraphs model =
     let
         fullHeight : Float
@@ -1164,8 +1163,8 @@ viewGraphs model =
                                             [ class [ "grid" ]
                                             , x1 0
                                             , x2 0
-                                            , y1 (timesHeight - pushUp)
-                                            , y2 (fullHeight - timesHeight + pushUp)
+                                            , y1 0
+                                            , y2 fullHeight
                                             ]
                                             []
 
@@ -1184,12 +1183,9 @@ viewGraphs model =
                                                         |> text
                                                     ]
                                         in
-                                        [ inner AnchorStart (timesHeight - pushUp)
-                                        , inner AnchorEnd (fullHeight - timesHeight + pushUp)
+                                        [ inner AnchorStart 0
+                                        , inner AnchorEnd fullHeight
                                         ]
-
-                                    pushUp =
-                                        timesHeight / 2
                                 in
                                 g
                                     [ transform [ Translate timeX 0 ] ]
@@ -1235,18 +1231,15 @@ viewGraphs model =
                     """
                 ]
     in
-    Html.div
-        [ Html.Attributes.style "width" "100%"
-        , Html.Attributes.style "overflow" "scroll"
-        ]
-        [ svg
-            [ Html.Attributes.style "width" "100%"
-            , Html.Attributes.style "padding" "1vmin 1vmin"
-            , Html.Attributes.style "min-width" "1500px"
-            , viewBox -5 -5 (fullWidth + 10) (fullHeight + 10)
-            ]
-            (styleNode :: stationsViews ++ linksViews ++ timesViews ++ endpointsViews)
-        ]
+    Ui.el [ Ui.scrollableX ] <|
+        Ui.html <|
+            svg
+                [ Html.Attributes.style "width" "100%"
+                , Html.Attributes.style "padding" "1vmin 1vmin"
+                , Html.Attributes.style "min-width" "1500px"
+                , viewBox -5 -5 (fullWidth + 10) (fullHeight + 10)
+                ]
+                (styleNode :: stationsViews ++ linksViews ++ timesViews ++ endpointsViews)
 
 
 stationOrder : Station -> Int
@@ -1309,7 +1302,7 @@ lineHeight =
 
 timesHeight : number
 timesHeight =
-    100
+    50
 
 
 namesWidth : number
