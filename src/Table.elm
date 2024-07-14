@@ -45,12 +45,15 @@ length l =
 duration : Duration.Duration -> Ui.Table.Cell msg
 duration l =
     let
+        raw : Float
         raw =
             Duration.inSeconds l
 
+        s : Float
         s =
             Float.Extra.modBy 60 raw
 
+        m : Int
         m =
             floor (raw / 60)
     in
@@ -82,9 +85,27 @@ bool b =
 
 float : Float -> Ui.Table.Cell msg
 float f =
+    let
+        precision : number
+        precision =
+            4
+
+        rounded : Float
+        rounded =
+            toFloat (round (f * (10 ^ precision))) / (10 ^ precision)
+
+        str : String
+        str =
+            String.fromFloat rounded
+    in
     cell
         [ Ui.Font.alignRight ]
-        (String.fromFloat f)
+        (if String.contains "." str then
+            String.padRight (3 + precision) '0' str
+
+         else
+            str
+        )
 
 
 int : Int -> Ui.Table.Cell msg
