@@ -219,7 +219,8 @@ view timetable =
                     }
             in
             svg
-                [ Html.Attributes.style "width" (String.fromFloat (fullWidth * 2) ++ "px")
+                [ Html.Attributes.style "min-width" (String.fromFloat fullWidth ++ "px")
+                , Html.Attributes.style "width" "100%"
                 , viewBox 0 0 fullWidth fullHeight
                 ]
                 [ styleNode
