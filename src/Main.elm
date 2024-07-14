@@ -1121,13 +1121,13 @@ viewGraphs model =
                                         , cx <| timeToX timeRange link.from
                                         , cy <| stationToY from
                                         ]
-                                        []
+                                        [ title [] [ text (Clock.toHumanString link.from) ] ]
                                     , circle
                                         [ class [ "endpoint" ]
                                         , cx <| timeToX timeRange link.to
                                         , cy <| stationToY to
                                         ]
-                                        []
+                                        [ title [] [ text (Clock.toHumanString link.to) ] ]
                                     ]
                                 )
                     )
@@ -1231,15 +1231,16 @@ viewGraphs model =
                     """
                 ]
     in
-    Ui.el [ Ui.scrollableX ] <|
-        Ui.html <|
-            svg
-                [ Html.Attributes.style "width" "100%"
-                , Html.Attributes.style "padding" "1vmin 1vmin"
-                , Html.Attributes.style "min-width" "1500px"
-                , viewBox -5 -5 (fullWidth + 10) (fullHeight + 10)
-                ]
-                (styleNode :: stationsViews ++ linksViews ++ timesViews ++ endpointsViews)
+    (styleNode :: stationsViews ++ linksViews ++ timesViews ++ endpointsViews)
+        |> svg
+            [ Html.Attributes.style "width" (String.fromInt fullWidth ++ "px")
+            , viewBox -5 -5 (fullWidth + 10) (fullHeight + 10)
+            ]
+        |> Ui.html
+        |> Ui.el
+            [ Ui.scrollableX
+            , Theme.padding
+            ]
 
 
 stationOrder : Station -> Int
