@@ -291,9 +291,6 @@ viewTrips search today { calendarDates, stopTimes, trips, calendars, stops } =
     filteredStopTimes
         |> List.filterMap
             (\( trip_id, tripStops ) ->
-                -- if List.length tripStops < 2 then
-                --     Nothing
-                -- else
                 IdDict.get trip_id filteredTrips
                     |> Maybe.andThen
                         (\trip ->
@@ -425,8 +422,16 @@ tripName trip =
 fuzzyMatch : String -> String -> Bool
 fuzzyMatch needle haystack =
     String.contains
-        (String.toLower needle)
-        (String.toLower haystack)
+        (normalize needle)
+        (normalize haystack)
+
+
+normalize : String -> String
+normalize s =
+    s
+        |> String.toLower
+        |> String.replace "ü" "u"
+        |> String.replace " " ""
 
 
 viewPathways : Feed -> Element msg
