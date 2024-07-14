@@ -1383,8 +1383,7 @@ viewStation timeRange stationPositions ( name, { events } ) =
                                     let
                                         duration : Duration
                                         duration =
-                                            Quantity.difference dep at
-                                                |> Quantity.toFloatQuantity
+                                            Clock.duration dep at
 
                                         timeString : String
                                         timeString =
