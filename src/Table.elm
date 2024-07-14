@@ -1,9 +1,10 @@
-module Table exposing (angle, bool, clock, debug, duration, float, id, int, length, maybe, string, url)
+module Table exposing (accessibility, angle, bool, clock, debug, duration, float, id, int, length, maybe, string, url)
 
 import Angle exposing (Angle)
 import Clock exposing (Clock)
 import Duration
 import Float.Extra
+import GTFS exposing (Accessibility(..))
 import Id exposing (Id)
 import Length
 import Ui exposing (Attribute)
@@ -133,3 +134,18 @@ clock t =
 id : Id kind -> Ui.Table.Cell msg
 id v =
     string (Id.toString v)
+
+
+accessibility : Accessibility -> Ui.Table.Cell msg
+accessibility value =
+    string
+        (case value of
+            NotAccessible ->
+                "Not accessible"
+
+            NoAccessibilityInformation ->
+                "No info"
+
+            Accessibly ->
+                "Accessible"
+        )

@@ -408,7 +408,7 @@ viewStops stops filteredStops =
             , Theme.tableColumn "location_type" .location_type (Table.string << GTFS.locationTypeToString)
             , maybeColumn "parent_station" .parent_station (Table.string << stopName)
             , maybeColumn "timezone" .timezone Table.string
-            , maybeColumn "wheelchair_boarding" .wheelchair_boarding Table.debug
+            , maybeColumn "wheelchair_boarding" .wheelchair_boarding Table.accessibility
             , maybeColumn "level_id" .level_id Table.id
             , maybeColumn "platform_code" .platform_code Table.string
             ]
