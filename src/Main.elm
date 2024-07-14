@@ -312,8 +312,7 @@ viewFeed search today feed { calendarDates, stopTimes, trips, calendars, stops, 
                                 |> Maybe.andThen
                                     (\trip ->
                                         if
-                                            fuzzyMatch search (Id.toString trip.id)
-                                                || fuzzyMatch search (Maybe.withDefault "" trip.short_name)
+                                            fuzzyMatch search (tripName trip)
                                                 || List.any
                                                     (\{ stop_id } ->
                                                         case stop_id of
@@ -408,6 +407,15 @@ stopName stops id =
                 |> String.join " - "
 
 
+tripName : Trip -> String
+tripName trip =
+    [ trip.short_name
+    , Just ("(" ++ Id.toString trip.id ++ ")")
+    ]
+        |> List.filterMap identity
+        |> String.join " "
+
+
 fuzzyMatch : String -> String -> Bool
 fuzzyMatch needle haystack =
     String.contains
@@ -491,17 +499,9 @@ viewStopTimes trip stops filteredStopTimes =
         data =
             filteredStopTimes
 
-        tripName : String
-        tripName =
-            [ trip.short_name
-            , Just ("(" ++ Id.toString trip.id ++ ")")
-            ]
-                |> List.filterMap identity
-                |> String.join " "
-
         columns : List (Maybe (Ui.Table.Column globalState rowState StopTime msg))
         columns =
-            [ Theme.tableColumn "trip_id" (\_ -> tripName) Table.string
+            [ Theme.tableColumn "trip_id" (\_ -> tripName trip) Table.string
             , maybeColumn "arrival_time" .arrival_time Table.clock
             , maybeColumn "departure_time" .departure_time Table.clock
             , maybeColumn "stop_id" .stop_id (Table.string << stopName stops)
