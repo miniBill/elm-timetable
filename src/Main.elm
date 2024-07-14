@@ -1136,77 +1136,74 @@ viewGraphs model =
 
         timesViews : List (Svg msg)
         timesViews =
-            times
-                |> List.concatMap
-                    (\( from, to ) ->
-                        [ from
-                        , to
-                        ]
-                    )
-                |> QuantitySet.fromList
-                |> QuantitySet.foldr
-                    (\time ( last, acc ) ->
-                        let
-                            timeX : Float
-                            timeX =
-                                timeToX timeRange time
+            case ( timeRange.minTime, timeRange.maxTime ) of
+                ( Just minTime, Just maxTime ) ->
+                    let
+                        from : Int
+                        from =
+                            ceiling <| Duration.inHours <| Quantity.toFloatQuantity minTime
 
-                            verticalLine : Svg msg
-                            verticalLine =
-                                line
-                                    [ class [ "grid" ]
-                                    , x1 0
-                                    , x2 0
-                                    , y1 (timesHeight - pushUp)
-                                    , y2 (fullHeight - timesHeight + pushUp)
-                                    ]
-                                    []
-
-                            label : List (Svg msg)
-                            label =
+                        to : Int
+                        to =
+                            floor <| Duration.inHours <| Quantity.toFloatQuantity maxTime
+                    in
+                    List.range from to
+                        |> List.map
+                            (\hour ->
                                 let
-                                    inner anchor transformation =
-                                        text_
-                                            [ textAnchor anchor
-                                            , transform
-                                                [ Translate 5 transformation
-                                                , Rotate 90 0 0
-                                                ]
-                                            ]
-                                            [ Clock.toHumanString time
-                                                |> text
-                                            ]
-                                in
-                                [ inner AnchorStart (timesHeight - pushUp)
-                                , inner AnchorEnd (fullHeight - timesHeight + pushUp)
-                                ]
+                                    time : Clock
+                                    time =
+                                        Clock.fromHoursMinutesSeconds hour 0 0
 
-                            pushUp =
-                                case last of
-                                    Nothing ->
+                                    timeX : Float
+                                    timeX =
+                                        timeToX timeRange time
+
+                                    verticalLine : Svg msg
+                                    verticalLine =
+                                        line
+                                            [ class [ "grid" ]
+                                            , x1 0
+                                            , x2 0
+                                            , y1 (timesHeight - pushUp)
+                                            , y2 (fullHeight - timesHeight + pushUp)
+                                            ]
+                                            []
+
+                                    label : List (Svg msg)
+                                    label =
+                                        let
+                                            inner anchor transformation =
+                                                text_
+                                                    [ textAnchor anchor
+                                                    , transform
+                                                        [ Translate 5 transformation
+                                                        , Rotate 90 0 0
+                                                        ]
+                                                    ]
+                                                    [ Clock.toHumanString time
+                                                        |> text
+                                                    ]
+                                        in
+                                        [ inner AnchorStart (timesHeight - pushUp)
+                                        , inner AnchorEnd (fullHeight - timesHeight + pushUp)
+                                        ]
+
+                                    pushUp =
                                         timesHeight / 2
-
-                                    Just lastTime ->
-                                        if
-                                            Quantity.difference time lastTime
-                                                |> Quantity.toFloatQuantity
-                                                |> Quantity.greaterThan
-                                                    (Duration.minutes 30)
-                                        then
-                                            timesHeight / 2
-
-                                        else
-                                            timesHeight
-
-                            next =
+                                in
                                 g
                                     [ transform [ Translate timeX 0 ] ]
-                                    (verticalLine :: label)
-                        in
-                        ( Just time, next :: acc )
-                    )
-                    ( Nothing, [] )
-                |> Tuple.second
+                                    (if hour == from then
+                                        verticalLine :: label
+
+                                     else
+                                        verticalLine :: label
+                                    )
+                            )
+
+                _ ->
+                    []
 
         styleNode =
             TypedSvg.style []
@@ -1239,15 +1236,18 @@ viewGraphs model =
                     """
                 ]
     in
-    svg
+    Html.div
         [ Html.Attributes.style "width" "100%"
-        , Html.Attributes.style "margin-top" "5vmin"
-        , Html.Attributes.style "margin-left" "5vmin"
-        , Html.Attributes.style "max-height" "90vh"
-        , Html.Attributes.style "max-width" "90vw"
-        , viewBox -5 -5 (fullWidth + 10) (fullHeight + 10)
+        , Html.Attributes.style "overflow" "scroll"
         ]
-        (styleNode :: stationsViews ++ linksViews ++ timesViews ++ endpointsViews)
+        [ svg
+            [ Html.Attributes.style "width" "100%"
+            , Html.Attributes.style "padding" "1vmin 1vmin"
+            , Html.Attributes.style "min-width" "1500px"
+            , viewBox -5 -5 (fullWidth + 10) (fullHeight + 10)
+            ]
+            (styleNode :: stationsViews ++ linksViews ++ timesViews ++ endpointsViews)
+        ]
 
 
 stationOrder : Station -> Int
@@ -1315,7 +1315,12 @@ timesHeight =
 
 namesWidth : number
 namesWidth =
-    150
+    let
+        _ =
+            -- Calculate this from timetable
+            Debug.todo
+    in
+    250
 
 
 timeToX :
