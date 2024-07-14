@@ -8,11 +8,11 @@ import Dict exposing (Dict)
 import Dict.Extra
 import Duration exposing (Seconds)
 import Feed exposing (Feed)
-import GTFS exposing (Calendar, CalendarDate, Stop, StopTime, Trip)
+import GTFS exposing (Stop, StopTime, Trip)
 import Graph
 import Html exposing (Html)
 import Html.Attributes
-import Id exposing (Id, ServiceId, StopId, TripId)
+import Id exposing (Id, StopId, TripId)
 import IdDict exposing (IdDict)
 import IdSet
 import Pathfinding

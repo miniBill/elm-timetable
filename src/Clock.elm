@@ -1,6 +1,6 @@
-module Clock exposing (Clock, duration, fromHoursMinutesSeconds, toHumanString, toString)
+module Clock exposing (Clock, fromHoursMinutesSeconds, toHumanString, toString)
 
-import Duration exposing (Duration, Seconds)
+import Duration exposing (Seconds)
 import Quantity exposing (Quantity(..))
 
 
@@ -67,12 +67,6 @@ toHumanString (Quantity fromStartOfDay) =
 
     else
         pad hour ++ ":" ++ pad minute
-
-
-duration : Clock -> Clock -> Duration
-duration from to =
-    Quantity.difference from to
-        |> Quantity.toFloatQuantity
 
 
 fromHoursMinutesSeconds : Int -> Int -> Int -> Clock

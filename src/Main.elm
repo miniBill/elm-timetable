@@ -79,30 +79,25 @@ init _ =
             (\feed ->
                 Task.map2
                     (\( stops, pathways, stopTimes ) ( trips, calendars, calendarDates ) ->
-                        let
-                            q : Feed
-                            q =
-                                { stops = stops
-                                , pathways = pathways
-                                , stopTimes = stopTimes
-                                , trips = trips
-                                , calendars = calendars
-                                , calendarDates =
-                                    calendarDates
-                                        |> List.foldl
-                                            (\calendarDate acc ->
-                                                IdDict.insert calendarDate.service_id
-                                                    (IdDict.get calendarDate.service_id acc
-                                                        |> Maybe.withDefault Dict.empty
-                                                        |> Dict.insert (GTFS.dateToInt calendarDate.date)
-                                                            calendarDate
-                                                    )
-                                                    acc
+                        { stops = stops
+                        , pathways = pathways
+                        , stopTimes = stopTimes
+                        , trips = trips
+                        , calendars = calendars
+                        , calendarDates =
+                            calendarDates
+                                |> List.foldl
+                                    (\calendarDate acc ->
+                                        IdDict.insert calendarDate.service_id
+                                            (IdDict.get calendarDate.service_id acc
+                                                |> Maybe.withDefault Dict.empty
+                                                |> Dict.insert (GTFS.dateToInt calendarDate.date)
+                                                    calendarDate
                                             )
-                                            IdDict.empty
-                                }
-                        in
-                        q
+                                            acc
+                                    )
+                                    IdDict.empty
+                        }
                     )
                     (Task.map3 (\l m r -> ( l, m, r ))
                         (getCSVId feed "stops.txt" GTFS.stopDecoder)
