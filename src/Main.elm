@@ -31,13 +31,7 @@ main =
     Browser.element
         { init = init
         , view = \model -> Ui.layout [] (view model)
-        , update =
-            \msg model ->
-                let
-                    ( newModel, cmd ) =
-                        update msg model
-                in
-                ( rebuildTimetable newModel, cmd )
+        , update = update
         , subscriptions = subscriptions
         }
 
@@ -378,7 +372,9 @@ viewStops search stops filteredStops =
                 |> List.filter
                     (\stop ->
                         (stop.parent_station == Nothing)
-                            && String.contains search (Maybe.withDefault "" stop.name)
+                            && String.contains
+                                (String.toLower search)
+                                (String.toLower (Maybe.withDefault "" stop.name))
                     )
     in
     Theme.table [] columns data
@@ -530,10 +526,16 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         GotFeed feed (Ok res) ->
-            ( { model | feeds = IdDict.insert feed (RemoteData.Loaded res) model.feeds }, Cmd.none )
+            ( { model | feeds = IdDict.insert feed (RemoteData.Loaded res) model.feeds }
+                |> rebuildTimetable
+            , Cmd.none
+            )
 
         GotFeed feed (Err e) ->
-            ( { model | feeds = IdDict.insert feed (RemoteData.Error e) model.feeds }, Cmd.none )
+            ( { model | feeds = IdDict.insert feed (RemoteData.Error e) model.feeds }
+                |> rebuildTimetable
+            , Cmd.none
+            )
 
         Reload ->
             init {}
