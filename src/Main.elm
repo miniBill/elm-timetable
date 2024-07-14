@@ -338,27 +338,29 @@ expectCsv :
 expectCsv toMsg feed filename decoder =
     Http.expectString
         (\got ->
-            case got of
-                Ok res ->
-                    case Csv.Decode.decodeCsv Csv.Decode.FieldNamesFromFirstRow decoder res of
-                        Ok val ->
-                            toMsg feed (Ok val)
+            toMsg feed
+                (case got of
+                    Ok res ->
+                        case Csv.Decode.decodeCsv Csv.Decode.FieldNamesFromFirstRow decoder res of
+                            Ok val ->
+                                Ok val
 
-                        Err err ->
-                            let
-                                msg : String
-                                msg =
-                                    "While decoding "
-                                        ++ feed
-                                        ++ "/"
-                                        ++ filename
-                                        ++ ", "
-                                        ++ Csv.Decode.errorToString err
-                            in
-                            toMsg feed (Err (Http.BadBody msg))
+                            Err err ->
+                                let
+                                    msg : String
+                                    msg =
+                                        "While decoding "
+                                            ++ feed
+                                            ++ "/"
+                                            ++ filename
+                                            ++ ", "
+                                            ++ Csv.Decode.errorToString err
+                                in
+                                Err (Http.BadBody msg)
 
-                Err e ->
-                    toMsg feed (Err e)
+                    Err e ->
+                        Err e
+                )
         )
 
 
