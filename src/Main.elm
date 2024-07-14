@@ -22,6 +22,7 @@ import Timetable
 import Types exposing (Model, Msg(..))
 import Ui exposing (Element, fill, shrink, width)
 import Ui.Input as Input
+import Ui.Lazy
 import Ui.Table
 import Url.Builder
 
@@ -259,98 +260,101 @@ viewFeed :
     -> Id FeedId
     -> Feed
     -> Element msg
-viewFeed search today feed { calendarDates, stopTimes, trips, calendars, stops, pathways } =
+viewFeed search today feedId feed =
+    Theme.column []
+        [ Ui.text (Id.toString feedId)
+        , Ui.Lazy.lazy2 viewStops search feed
+        , if False then
+            Ui.Lazy.lazy viewPathways feed
+
+          else
+            Ui.none
+        , Ui.Lazy.lazy3 viewTrips search today feed
+        ]
+
+
+viewTrips : String -> Date -> Feed -> Element msg
+viewTrips search today { calendarDates, stopTimes, trips, calendars, stops } =
     let
         filteredStops : List Stop
         filteredStops =
             Pathfinding.filterStops stops
+
+        filteredTrips : IdDict TripId Trip
+        filteredTrips =
+            Pathfinding.filterTrips today calendarDates calendars trips
+
+        filteredStopTimes : List ( Id TripId, List StopTime )
+        filteredStopTimes =
+            Pathfinding.filterStopTimes filteredTrips filteredStops stopTimes
     in
-    Theme.column []
-        [ Ui.text (Id.toString feed)
+    filteredStopTimes
+        |> List.filterMap
+            (\( trip_id, tripStops ) ->
+                -- if List.length tripStops < 2 then
+                --     Nothing
+                -- else
+                IdDict.get trip_id filteredTrips
+                    |> Maybe.andThen
+                        (\trip ->
+                            if
+                                fuzzyMatch search (tripName trip)
+                                    || List.any
+                                        (\{ stop_id } ->
+                                            case stop_id of
+                                                Nothing ->
+                                                    False
 
-        -- , pathfinder stops filteredPathways
-        , viewStops search stops filteredStops
-        , if False then
-            let
-                stopIds : IdSet StopId
-                stopIds =
-                    filteredStops
-                        |> List.map .id
-                        |> IdSet.fromList
+                                                Just id ->
+                                                    fuzzyMatch search (stopName stops id)
+                                        )
+                                        tripStops
+                            then
+                                Just (viewStopTimes trip stops tripStops)
 
-                filteredPathways : List Pathway
-                filteredPathways =
-                    pathways
-                        |> IdDict.values
-                        |> List.filter
-                            (\walkway ->
-                                IdSet.member walkway.from_stop_id stopIds
-                                    && IdSet.member walkway.to_stop_id stopIds
-                            )
-            in
-            viewPathways stops filteredPathways
-
-          else
-            Ui.none
-        , let
-            filteredTrips : IdDict TripId Trip
-            filteredTrips =
-                Pathfinding.filterTrips today calendarDates calendars trips
-
-            filteredStopTimes : List ( Id TripId, List StopTime )
-            filteredStopTimes =
-                Pathfinding.filterStopTimes filteredTrips filteredStops stopTimes
-
-            raw : List (Element msg)
-            raw =
-                filteredStopTimes
-                    |> List.filterMap
-                        (\( trip_id, tripStops ) ->
-                            -- if List.length tripStops < 2 then
-                            --     Nothing
-                            -- else
-                            IdDict.get trip_id filteredTrips
-                                |> Maybe.andThen
-                                    (\trip ->
-                                        if
-                                            fuzzyMatch search (tripName trip)
-                                                || List.any
-                                                    (\{ stop_id } ->
-                                                        case stop_id of
-                                                            Nothing ->
-                                                                False
-
-                                                            Just id ->
-                                                                fuzzyMatch search (stopName stops id)
-                                                    )
-                                                    tripStops
-                                        then
-                                            Just (viewStopTimes trip stops tripStops)
-
-                                        else
-                                            Nothing
-                                    )
+                            else
+                                Nothing
                         )
-
-            count : Int
-            count =
-                List.length raw
-          in
-          if count > 10 then
-            Theme.column []
-                (List.take 10 raw
-                    ++ [ Ui.text ("Showing  10 out of " ++ String.fromInt count ++ " trips") ]
-                )
-
-          else
-            raw
-                |> Theme.column []
-        ]
+            )
+        |> showUpTo 10 "trips"
 
 
-viewStops : String -> IdDict StopId Stop -> List Stop -> Element msg
-viewStops search stops filteredStops =
+showUpTo : Int -> String -> List (Element msg) -> Element msg
+showUpTo limit label raw =
     let
+        count : Int
+        count =
+            List.length raw
+    in
+    if count > limit then
+        let
+            message : String
+            message =
+                "Showing "
+                    ++ String.fromInt limit
+                    ++ " out of "
+                    ++ String.fromInt count
+                    ++ " "
+                    ++ label
+        in
+        Theme.column []
+            (List.take limit raw
+                ++ [ Ui.text message
+                   ]
+            )
+
+    else
+        raw
+            |> Theme.column []
+
+
+viewStops : String -> Feed -> Element msg
+viewStops search { stops } =
+    let
+        filteredStops : List Stop
+        filteredStops =
+            Pathfinding.filterStops stops
+
         maybeColumn :
             String
             -> (Stop -> Maybe value)
@@ -425,9 +429,29 @@ fuzzyMatch needle haystack =
         (String.toLower haystack)
 
 
-viewPathways : IdDict StopId Stop -> List Pathway -> Element msg
-viewPathways stops filteredPathways =
+viewPathways : Feed -> Element msg
+viewPathways { pathways, stops } =
     let
+        filteredStops : List Stop
+        filteredStops =
+            Pathfinding.filterStops stops
+
+        stopIds : IdSet StopId
+        stopIds =
+            filteredStops
+                |> List.map .id
+                |> IdSet.fromList
+
+        filteredPathways : List Pathway
+        filteredPathways =
+            pathways
+                |> IdDict.values
+                |> List.filter
+                    (\walkway ->
+                        IdSet.member walkway.from_stop_id stopIds
+                            && IdSet.member walkway.to_stop_id stopIds
+                    )
+
         maybeColumn :
             String
             -> (Pathway -> Maybe value)
