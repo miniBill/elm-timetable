@@ -4,14 +4,13 @@ import Clock exposing (Clock)
 import Color
 import Dagre.Attributes
 import Dict exposing (Dict)
-import Duration exposing (Duration, Seconds)
+import Duration exposing (Seconds)
 import Graph
 import Html exposing (Html)
 import Html.Attributes
 import Id exposing (Id)
 import IdDict exposing (IdDict)
 import IdSet
-import List.Extra
 import Quantity
 import QuantityDict exposing (QuantityDict)
 import Render
@@ -55,7 +54,7 @@ fullWidth =
 
 tableHorizontalMargin : number
 tableHorizontalMargin =
-    50
+    8
 
 
 view : Timetable -> Svg msg
@@ -186,46 +185,70 @@ view timetable =
                     (\i ( name, _ ) -> ( name, timesHeight + i * lineHeight ))
                 |> Dict.fromList
 
-        stationsViews : List (Svg msg)
-        stationsViews =
-            List.map
-                (viewStation timeRange stationPositions)
-                sortedStations
-
         stationToY : Station -> Float
         stationToY station =
             Dict.get station stationPositions
                 |> Maybe.withDefault -1
                 |> toFloat
     in
-    svg
-        [ Html.Attributes.style "width" (String.fromInt fullWidth ++ "px")
-        , viewBox 0 0 fullWidth fullHeight
-        ]
-        [ styleNode
-        , g [ id "Stations" ] stationsViews
-        , g [ id "Links" ] (viewLinks timeRange stationToY timetable)
-        , g [ id "Time Grid" ] (viewTimeGrid timeRange fullHeight)
-        , g [ id "Endpoints" ] (viewEndpoints timeRange stationToY timetable)
-        ]
+    case ( timeRange.minTime, timeRange.maxTime ) of
+        ( Just minTime, Just maxTime ) ->
+            let
+                timeRange_ : { minTime : Clock, maxTime : Clock }
+                timeRange_ =
+                    { minTime =
+                        Quantity.multiplyBy
+                            (Quantity.ratio
+                                (minTime
+                                    |> Quantity.toFloatQuantity
+                                )
+                                (Duration.minutes 15)
+                                |> floor
+                            )
+                            (Clock.fromHoursMinutesSeconds 0 15 0)
+                    , maxTime =
+                        Quantity.multiplyBy
+                            (Quantity.ratio
+                                (maxTime
+                                    |> Quantity.toFloatQuantity
+                                )
+                                (Duration.minutes 15)
+                                |> ceiling
+                            )
+                            (Clock.fromHoursMinutesSeconds 0 15 0)
+                    }
+            in
+            svg
+                [ Html.Attributes.style "width" (String.fromInt fullWidth ++ "px")
+                , viewBox 0 0 fullWidth fullHeight
+                ]
+                [ styleNode
+                , g [ id "Stations" ] (List.map (viewStation timeRange_ stationPositions) sortedStations)
+                , g [ id "Links" ] (viewLinks timeRange_ stationToY timetable)
+                , g [ id "Time Grid" ] (viewTimeGrid timeRange_ fullHeight)
+                , g [ id "Endpoints" ] (viewEndpoints timeRange_ stationToY timetable)
+                ]
+
+        _ ->
+            Html.text "Empty timetable"
 
 
-viewLinks : { minTime : Maybe Clock, maxTime : Maybe Clock } -> (Station -> Float) -> Timetable -> List (Svg msg)
+viewLinks : { minTime : Clock, maxTime : Clock } -> (Station -> Float) -> Timetable -> List (Svg msg)
 viewLinks timeRange stationToY timetable =
     let
         colorDict : Dict String Color.Color
         colorDict =
             timetable
                 |> List.concatMap .links
-                |> List.map .label
+                |> List.map .train
                 |> Set.fromList
                 |> Set.toList
                 |> pairWithColors
                 |> Dict.fromList
 
         toColor : String -> Color.Color
-        toColor label =
-            Dict.get label colorDict
+        toColor train =
+            Dict.get train colorDict
                 |> Maybe.withDefault Color.blue
     in
     timetable
@@ -240,7 +263,7 @@ viewLinks timeRange stationToY timetable =
                                 , x2 <| timeToX timeRange link.to
                                 , y1 <| stationToY from
                                 , y2 <| stationToY to
-                                , stroke (Paint (toColor link.label))
+                                , stroke (Paint (toColor link.train))
                                 ]
                                 [ title [] [ text link.label ]
                                 ]
@@ -288,7 +311,7 @@ tab10 =
 
 
 viewEndpoints :
-    { minTime : Maybe Clock, maxTime : Maybe Clock }
+    { minTime : Clock, maxTime : Clock }
     -> (Station -> Float)
     -> Timetable
     -> List (Svg msg)
@@ -316,79 +339,74 @@ viewEndpoints timeRange stationToY timetable =
             )
 
 
-viewTimeGrid : { minTime : Maybe Clock, maxTime : Maybe Clock } -> Float -> List (Svg msg)
-viewTimeGrid timeRange fullHeight =
-    case ( timeRange.minTime, timeRange.maxTime ) of
-        ( Just minTime, Just maxTime ) ->
-            let
-                from : Int
-                from =
-                    floor <| 4 * (Duration.inHours <| Quantity.toFloatQuantity minTime)
+viewTimeGrid : { minTime : Clock, maxTime : Clock } -> Float -> List (Svg msg)
+viewTimeGrid ({ minTime, maxTime } as timeRange) fullHeight =
+    let
+        from : Int
+        from =
+            floor <| 4 * (Duration.inHours <| Quantity.toFloatQuantity minTime)
 
-                to : Int
-                to =
-                    ceiling <| 4 * (Duration.inHours <| Quantity.toFloatQuantity maxTime)
-            in
-            List.range from to
-                |> List.map
-                    (\quarterHour ->
-                        let
-                            time : Clock
-                            time =
-                                Clock.fromHoursMinutesSeconds 0 (quarterHour * 15) 0
+        to : Int
+        to =
+            ceiling <| 4 * (Duration.inHours <| Quantity.toFloatQuantity maxTime)
+    in
+    List.range from to
+        |> List.map
+            (\quarterHour ->
+                let
+                    time : Clock
+                    time =
+                        Clock.fromHoursMinutesSeconds 0 (quarterHour * 15) 0
 
-                            timeX : Float
-                            timeX =
-                                timeToX timeRange time
+                    timeX : Float
+                    timeX =
+                        timeToX timeRange time
 
-                            children : List (Svg msg)
-                            children =
-                                if modBy 4 quarterHour == 0 then
-                                    let
-                                        inner anchor transformation =
-                                            text_
-                                                [ textAnchor anchor
-                                                , transform
-                                                    [ Translate 5 transformation
-                                                    , Rotate 90 0 0
-                                                    ]
-                                                ]
-                                                [ Clock.toHumanString time
-                                                    |> text
-                                                ]
-                                    in
-                                    [ line
-                                        [ class [ "grid" ]
-                                        , x1 0
-                                        , x2 0
-                                        , y1 0
-                                        , y2 fullHeight
+                    children : List (Svg msg)
+                    children =
+                        if modBy 4 quarterHour == 0 then
+                            let
+                                inner anchor transformation =
+                                    text_
+                                        [ textAnchor anchor
+                                        , transform
+                                            [ Translate 5 transformation
+                                            , Rotate 90 0 0
+                                            ]
                                         ]
-                                        []
-                                    , inner AnchorStart 0
-                                    , inner AnchorEnd fullHeight
-                                    ]
-
-                                else
-                                    [ line
-                                        [ class [ "grid", "secondary" ]
-                                        , x1 0
-                                        , x2 0
-                                        , y1 timesHeight
-                                        , y2 (fullHeight - timesHeight)
+                                        [ Clock.toHumanString time
+                                            |> text
                                         ]
-                                        []
-                                    ]
-                        in
-                        g
-                            [ id <| Clock.toHumanString time
-                            , transform [ Translate timeX 0 ]
+                            in
+                            [ line
+                                [ class [ "grid" ]
+                                , x1 0
+                                , x2 0
+                                , y1 0
+                                , y2 fullHeight
+                                ]
+                                []
+                            , inner AnchorStart 0
+                            , inner AnchorEnd fullHeight
                             ]
-                            children
-                    )
 
-        _ ->
-            []
+                        else
+                            [ line
+                                [ class [ "grid", "secondary" ]
+                                , x1 0
+                                , x2 0
+                                , y1 timesHeight
+                                , y2 (fullHeight - timesHeight)
+                                ]
+                                []
+                            ]
+                in
+                g
+                    [ id <| Clock.toHumanString time
+                    , transform [ Translate timeX 0 ]
+                    ]
+                    children
+            )
 
 
 styleNode : Svg msg
@@ -414,10 +432,6 @@ styleNode =
                 stroke-dasharray: 4;
             }
 
-            .wait {
-                stroke-width: 2px;
-            }
-
             .endpoint {
                 fill: green;
                 r: 5px;
@@ -427,28 +441,22 @@ styleNode =
 
 
 timeToX :
-    { minTime : Maybe Clock
-    , maxTime : Maybe Clock
+    { minTime : Clock
+    , maxTime : Clock
     }
     -> Clock
     -> Float
 timeToX { minTime, maxTime } time =
-    case ( minTime, maxTime ) of
-        ( Just min, Just max ) ->
-            namesWidth
-                + tableHorizontalMargin
-                + (fullWidth - namesWidth - tableHorizontalMargin * 2)
-                * Quantity.ratio
-                    (Quantity.toFloatQuantity <| Quantity.difference time min)
-                    (Quantity.toFloatQuantity <| Quantity.difference max min)
-
-        _ ->
-            -- This never happens but we're going to force a mislayout if the assumptions are wrong
-            namesWidth / 2
+    namesWidth
+        + tableHorizontalMargin
+        + (fullWidth - namesWidth - tableHorizontalMargin * 2)
+        * Quantity.ratio
+            (Quantity.toFloatQuantity <| Quantity.difference time minTime)
+            (Quantity.toFloatQuantity <| Quantity.difference maxTime minTime)
 
 
 viewStation :
-    { minTime : Maybe Clock, maxTime : Maybe Clock }
+    { minTime : Clock, maxTime : Clock }
     -> Dict Station Int
     -> ( Station, { events : QuantityDict Int Seconds Event, min : Clock, max : Clock } )
     -> Svg msg
@@ -459,102 +467,20 @@ viewStation timeRange stationPositions ( name, { events } ) =
             Dict.get name stationPositions
                 |> Maybe.withDefault -1
                 |> toFloat
-
-        waitLines : List (Svg msg)
-        waitLines =
-            let
-                go : List ( Clock, Event ) -> List (Svg msg) -> List (Svg msg)
-                go queue acc =
-                    case queue of
-                        [] ->
-                            List.reverse acc
-
-                        ( at, _ ) :: tail ->
-                            let
-                                nextDeparture : Maybe Clock
-                                nextDeparture =
-                                    List.Extra.findMap
-                                        (\( dep, kind ) ->
-                                            if kind == Departure then
-                                                Just dep
-
-                                            else
-                                                Nothing
-                                        )
-                                        tail
-                            in
-                            case nextDeparture of
-                                Nothing ->
-                                    List.reverse acc
-
-                                Just dep ->
-                                    let
-                                        duration : Duration
-                                        duration =
-                                            Clock.duration dep at
-
-                                        timeString : String
-                                        timeString =
-                                            let
-                                                rawMins : Int
-                                                rawMins =
-                                                    Duration.inMinutes duration
-                                                        |> floor
-                                            in
-                                            if rawMins > 60 then
-                                                String.fromInt (rawMins // 60)
-                                                    ++ "h "
-                                                    ++ String.padLeft 2 '0' (String.fromInt (modBy 60 rawMins))
-                                                    ++ "m"
-
-                                            else
-                                                String.fromInt rawMins ++ "m"
-                                    in
-                                    go tail
-                                        (line
-                                            [ class [ "wait" ]
-                                            , x1 <| timeToX timeRange at
-                                            , x2 <| timeToX timeRange dep
-                                            , y1 stationY
-                                            , y2 stationY
-                                            , stroke (Paint (waitTimeToColor duration))
-                                            ]
-                                            [ title []
-                                                [ text timeString
-                                                ]
-                                            ]
-                                            :: acc
-                                        )
-            in
-            go (QuantityDict.toList events) []
     in
     g [ id <| "Station - " ++ name ]
-        ([ line
+        [ line
             [ class [ "stationLine" ]
-            , x1 namesWidth
-            , x2 fullWidth
+            , x1 (timeToX timeRange timeRange.minTime - 1)
+            , x2 (timeToX timeRange timeRange.maxTime + 1)
             , y1 stationY
             , y2 stationY
             ]
             []
-         , text_
+        , text_
             [ y stationY ]
             [ text name ]
-         ]
-            ++ waitLines
-        )
-
-
-waitTimeToColor : Duration -> Color.Color
-waitTimeToColor f =
-    if Quantity.lessThan (Duration.minutes 10) f then
-        Color.red
-
-    else if Quantity.lessThan (Duration.minutes 60) f then
-        Color.orange
-
-    else
-        Color.green
+        ]
 
 
 stationOrder : Station -> Int
