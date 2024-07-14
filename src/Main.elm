@@ -22,7 +22,6 @@ import IdSet exposing (IdSet)
 import List.Extra
 import Quantity
 import QuantityDict exposing (QuantityDict)
-import QuantitySet
 import RemoteData
 import Render
 import Render.StandardDrawers
