@@ -257,8 +257,8 @@ init _ =
       , calendars = RemoteData.Loading
       , trips = RemoteData.Loading
       , calendarDates = RemoteData.Loading
-      , from = Id.fromString "Pit:22095:7049"
-      , to = Id.fromString "Pde:09162:100"
+      , from = Id.fromString "Pde:09162:100"
+      , to = Id.fromString "Pit:22095:7049"
       }
     , loadData
     )
