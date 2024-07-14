@@ -11,7 +11,7 @@ import IdDict exposing (IdDict)
 import IdDict.Extra
 import IdSet exposing (IdSet)
 import Pathfinding
-import RemoteData
+import RemoteData exposing (RemoteData)
 import Result.Extra
 import Table
 import Theme
@@ -211,6 +211,7 @@ view model =
             ]
           <|
             let
+                toResult : String -> RemoteData a -> Result (List (Element msg)) a
                 toResult label data =
                     case data of
                         RemoteData.Error e ->
@@ -393,6 +394,7 @@ viewStops stops filteredStops =
                         |> List.filterMap identity
                         |> String.join " - "
 
+        columns : List (Maybe (Ui.Table.Column globalState rowState Stop msg))
         columns =
             [ Theme.tableColumn "id" .id Table.id
             , maybeColumn "code" .code Table.string
