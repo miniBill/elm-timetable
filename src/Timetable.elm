@@ -644,7 +644,7 @@ build :
     -> Timetable
 build today { trips, stopTimes, calendarDates, stops, calendars } =
     let
-        filteredStops : List Stop
+        filteredStops : IdDict StopId Stop
         filteredStops =
             Pathfinding.filterStops stops
 

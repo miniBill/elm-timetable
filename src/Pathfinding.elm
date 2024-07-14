@@ -9,14 +9,13 @@ import IdDict exposing (IdDict)
 import IdDict.Extra
 import IdSet exposing (IdSet)
 import List.Extra
-import Set exposing (Set)
 import Time exposing (Weekday(..))
 
 
-filterStops : IdDict StopId Stop -> List Stop
+filterStops : IdDict StopId Stop -> IdDict StopId Stop
 filterStops stops =
     let
-        stations : Set String
+        stations : IdSet StopId
         stations =
             [ "Pde:09162:100" -- München Hbf - ÖBB
             , "Pit:22095:7049" -- Udine - ÖBB
@@ -30,30 +29,32 @@ filterStops stops =
 
             -- "Pde:09162:10" -- Pasing - ÖBB
             ]
-                |> Set.fromList
+                |> List.map Id.fromString
+                |> IdSet.fromList
     in
     stops
-        |> IdDict.values
+        |> IdDict.toList
         |> List.filter
-            (\stop ->
-                Set.member (Id.toString stop.id) stations
+            (\( _, stop ) ->
+                IdSet.member stop.id stations
                     || (case stop.parent_station of
                             Nothing ->
                                 False
 
                             Just parent_id ->
-                                Set.member (Id.toString parent_id) stations
+                                IdSet.member parent_id stations
                        )
             )
         |> List.take 1000
+        |> IdDict.fromList
 
 
-filterStopTimes : IdDict TripId Trip -> List Stop -> List StopTime -> List ( Id TripId, List StopTime )
-filterStopTimes filteredTrips filteredStops stopTimes =
+filterStopTimes : IdDict TripId Trip -> IdDict StopId Stop -> List StopTime -> List ( Id TripId, List StopTime )
+filterStopTimes filteredTrips stops stopTimes =
     let
         stopIds : IdSet StopId
         stopIds =
-            IdSet.fromList (List.map (\stop -> stop.id) filteredStops)
+            IdSet.fromList (IdDict.keys stops)
     in
     stopTimes
         |> List.filter

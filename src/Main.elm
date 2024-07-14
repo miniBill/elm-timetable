@@ -64,7 +64,7 @@ init _ =
 
         model : Model
         model =
-            { today = Date.fromCalendarDate 2024 Time.Jul 9
+            { today = Date.fromCalendarDate 2024 Time.Jul 30
             , timetable = []
             , feeds =
                 feeds
@@ -248,9 +248,7 @@ view model =
                 ]
         , Theme.column
             [ Theme.padding ]
-            (shared
-                ++ feedViews
-            )
+            (shared ++ feedViews)
         ]
 
 
@@ -276,17 +274,13 @@ viewFeed search today feedId feed =
 viewTrips : String -> Date -> Feed -> Element msg
 viewTrips search today { calendarDates, stopTimes, trips, calendars, stops } =
     let
-        filteredStops : List Stop
-        filteredStops =
-            Pathfinding.filterStops stops
-
         filteredTrips : IdDict TripId Trip
         filteredTrips =
             Pathfinding.filterTrips today calendarDates calendars trips
 
         filteredStopTimes : List ( Id TripId, List StopTime )
         filteredStopTimes =
-            Pathfinding.filterStopTimes filteredTrips filteredStops stopTimes
+            Pathfinding.filterStopTimes filteredTrips stops stopTimes
     in
     filteredStopTimes
         |> List.filterMap
@@ -348,10 +342,6 @@ showUpTo limit label raw =
 viewStops : String -> Feed -> Element msg
 viewStops search { stops } =
     let
-        filteredStops : List Stop
-        filteredStops =
-            Pathfinding.filterStops stops
-
         maybeColumn :
             String
             -> (Stop -> Maybe value)
@@ -385,11 +375,12 @@ viewStops search { stops } =
 
         data : List Stop
         data =
-            filteredStops
+            stops
+                |> IdDict.values
                 |> List.filter
                     (\stop ->
-                        (stop.parent_station == Nothing)
-                            && fuzzyMatch search (Maybe.withDefault "" stop.name)
+                        fuzzyMatch search (Maybe.withDefault "" stop.name)
+                            || fuzzyMatch search (Id.toString stop.id)
                     )
     in
     Theme.table [] columns data
@@ -437,14 +428,10 @@ normalize s =
 viewPathways : Feed -> Element msg
 viewPathways { pathways, stops } =
     let
-        filteredStops : List Stop
-        filteredStops =
-            Pathfinding.filterStops stops
-
         stopIds : IdSet StopId
         stopIds =
-            filteredStops
-                |> List.map .id
+            stops
+                |> IdDict.keys
                 |> IdSet.fromList
 
         filteredPathways : List Pathway

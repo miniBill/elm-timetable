@@ -51,6 +51,14 @@ table :
     -> Element msg
 table attrs columns data =
     let
+        count : Int
+        count =
+            List.length data
+
+        limit : number
+        limit =
+            100
+
         tableConfig : Ui.Table.Config () Int a msg
         tableConfig =
             columns
@@ -68,7 +76,20 @@ table attrs columns data =
                                 []
                     )
     in
-    Ui.Table.viewWithState (Ui.border 1 :: Ui.padding 0 :: attrs) tableConfig () data
+    if count < limit then
+        Ui.Table.viewWithState (Ui.border 1 :: Ui.padding 0 :: attrs)
+            tableConfig
+            ()
+            data
+
+    else
+        column []
+            [ Ui.Table.viewWithState (Ui.border 1 :: Ui.padding 0 :: attrs)
+                tableConfig
+                ()
+                (List.take limit data)
+            , Ui.text <| "Showing " ++ String.fromInt limit ++ " out of " ++ String.fromInt count ++ " results"
+            ]
 
 
 tableColumn :
