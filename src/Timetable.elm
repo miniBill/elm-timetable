@@ -185,56 +185,6 @@ view timetable =
             Dict.get station stationPositions
                 |> Maybe.withDefault -1
                 |> toFloat
-
-        linksViews : List (Svg msg)
-        linksViews =
-            timetable
-                |> List.concatMap
-                    (\{ from, to, links } ->
-                        links
-                            |> List.map
-                                (\link ->
-                                    line
-                                        [ class [ "link" ]
-                                        , x1 <| timeToX timeRange link.from
-                                        , x2 <| timeToX timeRange link.to
-                                        , y1 <| stationToY from
-                                        , y2 <| stationToY to
-                                        ]
-                                        [ title []
-                                            [ text
-                                                (Clock.toHumanString link.from
-                                                    ++ " - "
-                                                    ++ Clock.toHumanString link.to
-                                                )
-                                            ]
-                                        ]
-                                )
-                    )
-
-        endpointsViews : List (Svg msg)
-        endpointsViews =
-            timetable
-                |> List.concatMap
-                    (\{ from, to, links } ->
-                        links
-                            |> List.concatMap
-                                (\link ->
-                                    [ circle
-                                        [ class [ "endpoint" ]
-                                        , cx <| timeToX timeRange link.from
-                                        , cy <| stationToY from
-                                        ]
-                                        [ title [] [ text (Clock.toHumanString link.from) ] ]
-                                    , circle
-                                        [ class [ "endpoint" ]
-                                        , cx <| timeToX timeRange link.to
-                                        , cy <| stationToY to
-                                        ]
-                                        [ title [] [ text (Clock.toHumanString link.to) ] ]
-                                    ]
-                                )
-                    )
     in
     svg
         [ Html.Attributes.style "width" (String.fromInt fullWidth ++ "px")
@@ -242,14 +192,70 @@ view timetable =
         ]
         [ styleNode
         , g [ id "Stations" ] stationsViews
-        , g [ id "Links" ] linksViews
-        , g [ id "Time Grid" ] (timeGridView timeRange fullHeight)
-        , g [ id "Endpoints" ] endpointsViews
+        , g [ id "Links" ] (viewLinks timeRange stationToY timetable)
+        , g [ id "Time Grid" ] (viewTimeGrid timeRange fullHeight)
+        , g [ id "Endpoints" ] (viewEndpoints timeRange stationToY timetable)
         ]
 
 
-timeGridView : { minTime : Maybe Clock, maxTime : Maybe Clock } -> Float -> List (Svg msg)
-timeGridView timeRange fullHeight =
+viewLinks : { minTime : Maybe Clock, maxTime : Maybe Clock } -> (Station -> Float) -> Timetable -> List (Svg msg)
+viewLinks timeRange stationToY timetable =
+    timetable
+        |> List.concatMap
+            (\{ from, to, links } ->
+                links
+                    |> List.map
+                        (\link ->
+                            line
+                                [ class [ "link" ]
+                                , x1 <| timeToX timeRange link.from
+                                , x2 <| timeToX timeRange link.to
+                                , y1 <| stationToY from
+                                , y2 <| stationToY to
+                                ]
+                                [ title []
+                                    [ text
+                                        (Clock.toHumanString link.from
+                                            ++ " - "
+                                            ++ Clock.toHumanString link.to
+                                        )
+                                    ]
+                                ]
+                        )
+            )
+
+
+viewEndpoints :
+    { minTime : Maybe Clock, maxTime : Maybe Clock }
+    -> (Station -> Float)
+    -> Timetable
+    -> List (Svg msg)
+viewEndpoints timeRange stationToY timetable =
+    timetable
+        |> List.concatMap
+            (\{ from, to, links } ->
+                links
+                    |> List.concatMap
+                        (\link ->
+                            [ circle
+                                [ class [ "endpoint" ]
+                                , cx <| timeToX timeRange link.from
+                                , cy <| stationToY from
+                                ]
+                                [ title [] [ text (Clock.toHumanString link.from) ] ]
+                            , circle
+                                [ class [ "endpoint" ]
+                                , cx <| timeToX timeRange link.to
+                                , cy <| stationToY to
+                                ]
+                                [ title [] [ text (Clock.toHumanString link.to) ] ]
+                            ]
+                        )
+            )
+
+
+viewTimeGrid : { minTime : Maybe Clock, maxTime : Maybe Clock } -> Float -> List (Svg msg)
+viewTimeGrid timeRange fullHeight =
     case ( timeRange.minTime, timeRange.maxTime ) of
         ( Just minTime, Just maxTime ) ->
             let
