@@ -579,7 +579,8 @@ filterStops stops =
             , "Pat:45:50002" -- Salzburg Hbf - ÖBB
             , "Pde:09162:5" -- München Ost - ÖBB
             , "Pit:22095:7068" -- Tarvisio - ÖBB
-            , "Pde:09172:42293" -- Freilassing - ÖBB
+
+            -- , "Pde:09172:42293" -- Freilassing - ÖBB
             , "Pit:22095:7068" -- Tarvisio Boscoverde - ÖBB
 
             -- "Pde:09162:10" -- Pasing
