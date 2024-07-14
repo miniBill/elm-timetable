@@ -580,6 +580,7 @@ filterStops stops =
             , "Pde:09162:5" -- München Ost - ÖBB
             , "Pit:22095:7068" -- Tarvisio - ÖBB
             , "Pde:09172:42293" -- Freilassing - ÖBB
+            , "Pit:22095:7068" -- Tarvisio Boscoverde - ÖBB
 
             -- "Pde:09162:10" -- Pasing
             --     , "de:09162:6:40:81"
@@ -599,7 +600,6 @@ filterStops stops =
                             Just parent_id ->
                                 Set.member (Id.toString parent_id) stations
                        )
-                    || True
             )
         |> List.take 1000
 
