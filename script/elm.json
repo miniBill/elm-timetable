@@ -6,6 +6,7 @@
     "elm-version": "0.19.1",
     "dependencies": {
         "direct": {
+            "BrianHicks/elm-csv": "4.0.1",
             "NoRedInk/elm-json-decode-pipeline": "1.0.1",
             "dillonkearns/elm-cli-options-parser": "3.2.0",
             "dillonkearns/elm-pages": "10.1.0",
