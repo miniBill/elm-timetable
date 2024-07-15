@@ -1,33 +1,33 @@
 module TransitLand exposing (run)
 
 import BackendTask exposing (BackendTask)
+import BackendTask.File as File
 import BackendTask.Http as Http
 import Cli.Option
 import Cli.OptionsParser
-import Cli.Program exposing (Config)
+import Cli.Program
 import FatalError exposing (FatalError)
 import Json.Decode
 import Json.Decode.Pipeline
 import Pages.Script as Script exposing (Script)
+import SHA256
 import Url.Builder
 
 
 run : Script
 run =
-    Script.withCliOptions config task
+    Script.withCliOptions
+        (Cli.Program.config
+            |> Cli.Program.add
+                (Cli.OptionsParser.build CliOptions
+                    |> Cli.OptionsParser.with (Cli.Option.requiredKeywordArg "apikey")
+                )
+        )
+        task
 
 
 type alias CliOptions =
     { apikey : String }
-
-
-config : Config CliOptions
-config =
-    Cli.Program.config
-        |> Cli.Program.add
-            (Cli.OptionsParser.build CliOptions
-                |> Cli.OptionsParser.with (Cli.Option.requiredKeywordArg "apikey")
-            )
 
 
 task : CliOptions -> BackendTask FatalError ()
@@ -38,7 +38,6 @@ task cliOptions =
         , key = "feeds"
         , decoder = feedInfoDecoder
         }
-        |> BackendTask.allowFatal
         |> BackendTask.andThen (Debug.toString >> Script.log)
 
 
@@ -50,23 +49,17 @@ paginated :
         , key : String
         , decoder : Json.Decode.Decoder value
         }
-    -> BackendTask { fatal : FatalError, recoverable : Http.Error } (List value)
+    -> BackendTask FatalError (List value)
 paginated { apikey } { headers, path, key, decoder } =
     let
         go url =
-            Http.getWithOptions
+            getWithOptionsCached
                 { url = url
                 , headers = ( "apikey", apikey ) :: headers
-                , expect =
-                    Http.expectJson
-                        (Json.Decode.map2 (\list next -> { list = list, next = next })
-                            (Json.Decode.field key (Json.Decode.list decoder))
-                            (Json.Decode.maybe (Json.Decode.at [ "meta", "next" ] Json.Decode.string))
-                        )
-                , timeoutInMs = Nothing
-                , retries = Nothing
-                , cacheStrategy = Just Http.ForceCache
-                , cachePath = Just ".cache"
+                , decoder =
+                    Json.Decode.map2 (\list next -> { list = list, next = next })
+                        (Json.Decode.field key (Json.Decode.list decoder))
+                        (Json.Decode.maybe (Json.Decode.at [ "meta", "next" ] Json.Decode.string))
                 }
                 |> BackendTask.andThen
                     (\{ list, next } ->
@@ -80,6 +73,46 @@ paginated { apikey } { headers, path, key, decoder } =
                     )
     in
     go (Url.Builder.crossOrigin "https://transit.land/api/v2/rest" path [ Url.Builder.int "limit" 100 ])
+
+
+getWithOptionsCached :
+    { url : String
+    , decoder : Json.Decode.Decoder value
+    , headers : List ( String, String )
+    }
+    -> BackendTask FatalError value
+getWithOptionsCached config =
+    let
+        path : String
+        path =
+            ".cache/" ++ (SHA256.fromString config.url |> SHA256.toHex) ++ ".json"
+    in
+    File.jsonFile config.decoder path
+        |> BackendTask.onError
+            (\err ->
+                case err.recoverable of
+                    File.FileDoesntExist ->
+                        Http.getWithOptions
+                            { url = config.url
+                            , expect = Http.expectString
+                            , headers = config.headers
+                            , timeoutInMs = Nothing
+                            , retries = Nothing
+                            , cacheStrategy = Nothing
+                            , cachePath = Nothing
+                            }
+                            |> BackendTask.allowFatal
+                            |> BackendTask.andThen
+                                (\res ->
+                                    Script.writeFile { path = path, body = res }
+                                        |> BackendTask.allowFatal
+                                        |> BackendTask.andThen
+                                            (\_ -> getWithOptionsCached config)
+                                )
+
+                    _ ->
+                        BackendTask.fail err.fatal
+            )
 
 
 type alias FeedInfo =
