@@ -364,10 +364,10 @@ viewTimeGrid ({ minTime, maxTime } as timeRange) fullHeight =
                     children =
                         if modBy 4 quarterHour == 0 then
                             let
-                                inner : AnchorAlignment -> Float -> Svg msg
-                                inner anchor transformation =
+                                inner : Float -> Svg msg
+                                inner transformation =
                                     text_
-                                        [ textAnchor anchor
+                                        [ textAnchor AnchorStart
                                         , transform
                                             [ Translate 5 transformation
                                             , Rotate 90 0 0
@@ -397,8 +397,8 @@ viewTimeGrid ({ minTime, maxTime } as timeRange) fullHeight =
                                     , y2 fullHeight
                                     ]
                                     []
-                                , inner AnchorStart 0
-                                , inner AnchorEnd fullHeight
+                                , inner 0
+                                , inner (fullHeight - timesHeight + 6)
                                 ]
 
                         else
