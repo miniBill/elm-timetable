@@ -128,7 +128,22 @@ components:
           type: integer
         localita:
           $ref: "#/components/schemas/Localita"
+        codiceStazione:
+          type: string
+        codStazione:
+          type: string
+        lat:
+          type: number
+        lon:
+          type: number
+        esterno:
+          type: boolean
       required:
         - codReg
         - tipoStazione
         - localita
+        - codiceStazione
+        - codStazione
+        - lat
+        - lon
+        - esterno
