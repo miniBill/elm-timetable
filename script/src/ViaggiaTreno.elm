@@ -3,6 +3,7 @@ module ViaggiaTreno exposing (run)
 import BackendTask exposing (BackendTask)
 import BackendTask.Do as Do
 import BackendTask.Http as Http
+import Dict exposing (Dict)
 import FatalError exposing (FatalError)
 import Pages.Script as Script exposing (Script)
 import Set exposing (Set)
@@ -17,13 +18,47 @@ run =
 task : BackendTask FatalError ()
 task =
     Do.allowFatal stationIdsFromAutocomplete <| \fromAutocomplete ->
-    Script.log ("Got " ++ String.fromInt (Set.size fromAutocomplete) ++ " train stations from autocomplete")
+    Do.allowFatal stationIdsFromRegions <| \fromRegions ->
+    Script.log ("Got " ++ String.fromInt (Dict.size fromAutocomplete) ++ " train stations from autocomplete, " ++ String.fromInt (Set.size fromRegions) ++ " from regions")
 
 
-stationIdsFromAutocomplete : BackendTask { fatal : FatalError, recoverable : Http.Error } (Set String)
+stationIdsFromRegions : BackendTask { fatal : FatalError, recoverable : Http.Error } (Set String)
+stationIdsFromRegions =
+    List.range 0 22
+        |> List.map
+            (\idRegione ->
+                Viaggiatreno.Api.elencoStazioniIdRegione
+                    { params =
+                        { idRegione = idRegione }
+                    }
+                    |> BackendTask.quiet
+            )
+        |> BackendTask.combine
+        |> BackendTask.map
+            (\res ->
+                res
+                    |> List.concat
+                    |> List.map
+                        (\station ->
+                            station.codiceStazione
+                        )
+                    |> Set.fromList
+            )
+
+
+stationIdsFromAutocomplete : BackendTask { fatal : FatalError, recoverable : Http.Error } (Dict String String)
 stationIdsFromAutocomplete =
     List.range (Char.toCode 'A') (Char.toCode 'Z')
-        |> List.map (\code -> searchLetter (Char.fromCode code))
+        |> List.map
+            (\code ->
+                Viaggiatreno.Api.autocompletaStazioneInput
+                    { params =
+                        { input =
+                            String.fromChar (Char.fromCode code)
+                        }
+                    }
+                    |> BackendTask.quiet
+            )
         |> BackendTask.combine
         |> BackendTask.map
             (\res ->
@@ -38,24 +73,11 @@ stationIdsFromAutocomplete =
                                 [ "" ] ->
                                     Nothing
 
-                                [ _, codice ] ->
-                                    Just codice
+                                [ nome, codice ] ->
+                                    Just ( codice, nome )
 
                                 _ ->
                                     Debug.todo <| "Invalid row: \"" ++ line ++ "\""
                         )
-                    |> Set.fromList
+                    |> Dict.fromList
             )
-
-
-searchLetter : Char -> BackendTask { fatal : FatalError, recoverable : Http.Error } String
-searchLetter letter =
-    let
-        str : String
-        str =
-            String.fromChar letter
-    in
-    Viaggiatreno.Api.autocompletaStazioneInput
-        { params = { input = str }
-        }
-        |> BackendTask.quiet
