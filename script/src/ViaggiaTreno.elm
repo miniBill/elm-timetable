@@ -33,7 +33,6 @@ stationIdsFromRegions dict =
             Dict.keys dict
     in
     ids
-        |> List.Extra.remove "S00000"
         |> List.map
             (\idStazione ->
                 wrapCache
@@ -43,6 +42,8 @@ stationIdsFromRegions dict =
                         }
                         |> BackendTask.quiet
                     )
+                    |> BackendTask.map Just
+                    |> BackendTask.onError (\_ -> BackendTask.succeed Nothing)
             )
         |> List.Extra.greedyGroupsOf 10
         |> List.map BackendTask.combine
@@ -51,6 +52,7 @@ stationIdsFromRegions dict =
             (\regionIds ->
                 regionIds
                     |> List.concat
+                    |> List.filterMap identity
                     |> Set.fromList
                     |> Set.toList
                     |> Debug.log "regionIds"
@@ -97,6 +99,7 @@ wrapCache task =
                 Http.BadStatus metadata _ ->
                     if metadata.statusCode == 404 then
                         Do.log ("Cache miss " ++ metadata.url) <| \_ ->
+                        Do.do (Script.sleep 1000) <| \_ ->
                         Do.do
                             (Http.get
                                 (metadata.url
