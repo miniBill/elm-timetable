@@ -359,6 +359,9 @@ elm-codegen@^0.5.3:
     commander "^8.3.0"
     node-elm-compiler "^5.0.6"
 
+elm-open-api@../elm-open-api-cli:
+  version "0.6.0"
+
 elm-open-api@^0.6.0:
   version "0.6.0"
   resolved "https://registry.yarnpkg.com/elm-open-api/-/elm-open-api-0.6.0.tgz#a7cd7e37a25ccc4594604b94ce7e88553b1f0ecf"

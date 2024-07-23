@@ -2,7 +2,7 @@
     "devDependencies": {
         "elm": "^0.19.1-6",
         "elm-codegen": "^0.5.3",
-        "elm-open-api": "^0.6.0",
+        "elm-open-api": "../elm-open-api-cli",
         "elm-review": "^2.12.0",
         "elm-watch": "^2.0.0-beta.3"
     },
