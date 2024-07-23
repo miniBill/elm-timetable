@@ -76,7 +76,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/SearchResult'
+                  $ref: '#/components/schemas/Localita'
   /elencoStazioni/{idRegione}:
     get:
       tags:
@@ -101,8 +101,7 @@ paths:
                   $ref: '#/components/schemas/StationDetails'
 components:
   schemas:
-    SearchResult:
-      description: Details of a station when searching
+    Localita:
       type: object
       properties:
         nomeLungo:
@@ -125,5 +124,11 @@ components:
       properties:
         codReg:
           type: integer
+        tipoStazione:
+          type: integer
+        localita:
+          $ref: "#/components/schemas/Localita"
       required:
         - codReg
+        - tipoStazione
+        - localita
