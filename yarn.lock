@@ -359,13 +359,10 @@ elm-codegen@^0.5.3:
     commander "^8.3.0"
     node-elm-compiler "^5.0.6"
 
-elm-open-api@../elm-open-api-cli:
-  version "0.6.0"
-
-elm-open-api@^0.6.0:
-  version "0.6.0"
-  resolved "https://registry.yarnpkg.com/elm-open-api/-/elm-open-api-0.6.0.tgz#a7cd7e37a25ccc4594604b94ce7e88553b1f0ecf"
-  integrity sha512-Jqgc8Jr28CXMJlPsfH7C70oUYZVtr39Xh0l6AIxtCYPaDp6Xx3jkbL5kVeXiXxWW+N+TsyhhwrZ8Plj8nAwiXA==
+elm-open-api@^0.6.1:
+  version "0.6.1"
+  resolved "https://registry.yarnpkg.com/elm-open-api/-/elm-open-api-0.6.1.tgz#95871360ac620f6726e1bf885832a2bd78adf3ad"
+  integrity sha512-i7oxcgPDgQs5NvUbNKnHr5Zx4ddL8fxKS9CDfad0Rd4C+MsLd0Z55bxNwBChE1PmGM4Rxap0rx14pFN7Nwcf/g==
 
 elm-review@^2.12.0:
   version "2.12.0"
