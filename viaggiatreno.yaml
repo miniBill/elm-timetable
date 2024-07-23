@@ -3,7 +3,6 @@ info:
   title: ViaggiaTreno
   description: |-
     Reverse engineered ViaggiaTreno APIs - real time information on Trenitalia's trains.
-
     Research done by [sabas](https://github.com/sabas/trenitalia).
   version: 0.1.0
 externalDocs:
@@ -76,7 +75,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Localita'
+                  $ref: "#/components/schemas/Localita"
   /elencoStazioni/{idRegione}:
     get:
       tags:
@@ -96,7 +95,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/StationDetails'
+                  $ref: "#/components/schemas/StationDetails"
   /regione/{idStazione}:
     get:
       tags:
@@ -137,7 +136,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/StationDetails'
+                $ref: "#/components/schemas/StationDetails"
 components:
   schemas:
     Localita:
