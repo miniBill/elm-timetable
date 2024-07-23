@@ -75,23 +75,8 @@ paths:
             application/json:
               schema:
                 type: array
-                item:
-                  type: object
-                  properties:
-                    nomeLungo:
-                      type: string
-                    nomeBreve:
-                      type: string
-                    label:
-                      type: string
-                      nullable: true
-                    id:
-                      type: string
-                  required:
-                    - nomeLungo
-                    - nomeBreve
-                    - label
-                    - id
+                items:
+                  $ref: '#/components/schemas/SearchResult'
   /elencoStazioni/{idRegione}:
     get:
       tags:
@@ -112,30 +97,33 @@ paths:
             application/json:
               schema:
                 type: array
-                item:
-                  type: object
-                  properties:
-                    nomeLungo:
-                      type: string
-                    nomeBreve:
-                      type: string
-                    label:
-                      type: string
-                      nullable: true
-                    id:
-                      type: string
-                  required:
-                    - nomeLungo
-                    - nomeBreve
-                    - label
-                    - id
+                items:
+                  $ref: '#/components/schemas/StationDetails'
 components:
   schemas:
-    UserArray:
-      description: List of user object
-      content:
-        application/json:
-          schema:
-            type: array
-            items:
-              type: string
+    SearchResult:
+      description: Details of a station when searching
+      type: object
+      properties:
+        nomeLungo:
+          type: string
+        nomeBreve:
+          type: string
+        label:
+          type: string
+          nullable: true
+        id:
+          type: string
+      required:
+        - nomeLungo
+        - nomeBreve
+        - label
+        - id
+    StationDetails:
+      description: Details of a station when listing
+      type: object
+      properties:
+        codReg:
+          type: integer
+      required:
+        - codReg
