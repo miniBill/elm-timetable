@@ -39,7 +39,7 @@ autocompletaStazioneInput config =
     BackendTask.Http.request
         { url =
             Url.Builder.crossOrigin
-                "http://www.viaggiatreno.it/infomobilita/resteasy/viaggiatreno"
+                "http://localhost:9000/cache"
                 [ "autocompletaStazione", config.params.input ]
                 []
         , method = "GET"
@@ -68,7 +68,7 @@ autocompletaStazioneNTSInput config =
     BackendTask.Http.request
         { url =
             Url.Builder.crossOrigin
-                "http://www.viaggiatreno.it/infomobilita/resteasy/viaggiatreno"
+                "http://localhost:9000/cache"
                 [ "autocompletaStazioneNTS", config.params.input ]
                 []
         , method = "GET"
@@ -97,7 +97,7 @@ cercaStazioneInput config =
     BackendTask.Http.request
         { url =
             Url.Builder.crossOrigin
-                "http://www.viaggiatreno.it/infomobilita/resteasy/viaggiatreno"
+                "http://localhost:9000/cache"
                 [ "cercaStazione", config.params.input ]
                 []
         , method = "GET"
@@ -125,7 +125,7 @@ dettaglioStazioneIdStazioneIdRegione config =
     BackendTask.Http.request
         { url =
             Url.Builder.crossOrigin
-                "http://www.viaggiatreno.it/infomobilita/resteasy/viaggiatreno"
+                "http://localhost:9000/cache"
                 [ "dettaglioStazione"
                 , config.params.idStazione
                 , String.fromInt config.params.idRegione
@@ -154,7 +154,7 @@ elencoStazioniIdRegione config =
     BackendTask.Http.request
         { url =
             Url.Builder.crossOrigin
-                "http://www.viaggiatreno.it/infomobilita/resteasy/viaggiatreno"
+                "http://localhost:9000/cache"
                 [ "elencoStazioni", String.fromInt config.params.idRegione ]
                 []
         , method = "GET"
@@ -182,7 +182,7 @@ regioneIdStazione config =
     BackendTask.Http.request
         { url =
             Url.Builder.crossOrigin
-                "http://www.viaggiatreno.it/infomobilita/resteasy/viaggiatreno"
+                "http://localhost:9000/cache"
                 [ "regione", config.params.idStazione ]
                 []
         , method = "GET"
