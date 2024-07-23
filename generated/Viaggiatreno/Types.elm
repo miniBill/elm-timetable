@@ -1,18 +1,23 @@
-module Viaggiatreno.Types exposing (AutocompletaStazioneInput_Error, AutocompletaStazioneNTSInput_Error, CercaStazioneInput_Error, DettaglioStazioneIdStazioneIdRegione_Error, ElencoStazioniIdRegione_Error, Localita, RegioneIdStazione_Error, StationDetails)
+module Viaggiatreno.Types exposing
+    ( Localita, StationDetails
+    , AutocompletaStazioneInput_Error, AutocompletaStazioneNTSInput_Error, CercaStazioneInput_Error
+    , DettaglioStazioneIdStazioneIdRegione_Error, ElencoStazioniIdRegione_Error, RegioneIdStazione_Error
+    )
 
-{-| 
+{-|
+
+
 ## Aliases
-
 
 @docs Localita, StationDetails
 
-## Errors
 
+## Errors
 
 @docs AutocompletaStazioneInput_Error, AutocompletaStazioneNTSInput_Error, CercaStazioneInput_Error
 @docs DettaglioStazioneIdStazioneIdRegione_Error, ElencoStazioniIdRegione_Error, RegioneIdStazione_Error
--}
 
+-}
 
 import OpenApi.Common
 

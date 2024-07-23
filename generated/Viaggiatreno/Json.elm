@@ -1,17 +1,21 @@
-module Viaggiatreno.Json exposing (decodeLocalita, decodeStationDetails, encodeLocalita, encodeStationDetails)
+module Viaggiatreno.Json exposing
+    ( encodeLocalita, encodeStationDetails
+    , decodeLocalita, decodeStationDetails
+    )
 
-{-| 
+{-|
+
+
 ## Encoders
-
 
 @docs encodeLocalita, encodeStationDetails
 
+
 ## Decoders
 
-
 @docs decodeLocalita, decodeStationDetails
--}
 
+-}
 
 import Json.Decode
 import Json.Encode
@@ -23,51 +27,59 @@ decodeStationDetails : Json.Decode.Decoder Viaggiatreno.Types.StationDetails
 decodeStationDetails =
     Json.Decode.succeed
         (\codReg codStazione codiceStazione esterno lat localita lon nomeCitta tipoStazione ->
-             { codReg = codReg
-             , codStazione = codStazione
-             , codiceStazione = codiceStazione
-             , esterno = esterno
-             , lat = lat
-             , localita = localita
-             , lon = lon
-             , nomeCitta = nomeCitta
-             , tipoStazione = tipoStazione
-             }
-        ) |> OpenApi.Common.jsonDecodeAndMap
-                     (Json.Decode.field "codReg" Json.Decode.int
-                     ) |> OpenApi.Common.jsonDecodeAndMap
-                                  (Json.Decode.field
-                                           "codStazione"
-                                           Json.Decode.string
-                                  ) |> OpenApi.Common.jsonDecodeAndMap
-                                               (Json.Decode.field
-                                                        "codiceStazione"
-                                                        Json.Decode.string
-                                               ) |> OpenApi.Common.jsonDecodeAndMap
-                                                            (Json.Decode.field
-                                                                     "esterno"
-                                                                     Json.Decode.bool
-                                                            ) |> OpenApi.Common.jsonDecodeAndMap
-                                                                         (Json.Decode.field
-                                                                                  "lat"
-                                                                                  Json.Decode.float
-                                                                         ) |> OpenApi.Common.jsonDecodeAndMap
-                                                                                      (Json.Decode.field
-                                                                                               "localita"
-                                                                                               decodeLocalita
-                                                                                      ) |> OpenApi.Common.jsonDecodeAndMap
-                                                                                                   (Json.Decode.field
-                                                                                                            "lon"
-                                                                                                            Json.Decode.float
-                                                                                                   ) |> OpenApi.Common.jsonDecodeAndMap
-                                                                                                                (Json.Decode.field
-                                                                                                                         "nomeCitta"
-                                                                                                                         Json.Decode.string
-                                                                                                                ) |> OpenApi.Common.jsonDecodeAndMap
-                                                                                                                             (Json.Decode.field
-                                                                                                                                      "tipoStazione"
-                                                                                                                                      Json.Decode.int
-                                                                                                                             )
+            { codReg = codReg
+            , codStazione = codStazione
+            , codiceStazione = codiceStazione
+            , esterno = esterno
+            , lat = lat
+            , localita = localita
+            , lon = lon
+            , nomeCitta = nomeCitta
+            , tipoStazione = tipoStazione
+            }
+        )
+        |> OpenApi.Common.jsonDecodeAndMap
+            (Json.Decode.field "codReg" Json.Decode.int)
+        |> OpenApi.Common.jsonDecodeAndMap
+            (Json.Decode.field
+                "codStazione"
+                Json.Decode.string
+            )
+        |> OpenApi.Common.jsonDecodeAndMap
+            (Json.Decode.field
+                "codiceStazione"
+                Json.Decode.string
+            )
+        |> OpenApi.Common.jsonDecodeAndMap
+            (Json.Decode.field
+                "esterno"
+                Json.Decode.bool
+            )
+        |> OpenApi.Common.jsonDecodeAndMap
+            (Json.Decode.field
+                "lat"
+                Json.Decode.float
+            )
+        |> OpenApi.Common.jsonDecodeAndMap
+            (Json.Decode.field
+                "localita"
+                decodeLocalita
+            )
+        |> OpenApi.Common.jsonDecodeAndMap
+            (Json.Decode.field
+                "lon"
+                Json.Decode.float
+            )
+        |> OpenApi.Common.jsonDecodeAndMap
+            (Json.Decode.field
+                "nomeCitta"
+                Json.Decode.string
+            )
+        |> OpenApi.Common.jsonDecodeAndMap
+            (Json.Decode.field
+                "tipoStazione"
+                Json.Decode.int
+            )
 
 
 encodeStationDetails : Viaggiatreno.Types.StationDetails -> Json.Encode.Value
@@ -89,33 +101,36 @@ decodeLocalita : Json.Decode.Decoder Viaggiatreno.Types.Localita
 decodeLocalita =
     Json.Decode.succeed
         (\id label nomeBreve nomeLungo ->
-             { id = id
-             , label = label
-             , nomeBreve = nomeBreve
-             , nomeLungo = nomeLungo
-             }
-        ) |> OpenApi.Common.jsonDecodeAndMap
-                     (Json.Decode.field "id" Json.Decode.string
-                     ) |> OpenApi.Common.jsonDecodeAndMap
-                                  (Json.Decode.field
-                                           "label"
-                                           (Json.Decode.oneOf
-                                                    [ Json.Decode.map
-                                                        OpenApi.Common.Present
-                                                        Json.Decode.string
-                                                    , Json.Decode.null
-                                                        OpenApi.Common.Null
-                                                    ]
-                                           )
-                                  ) |> OpenApi.Common.jsonDecodeAndMap
-                                               (Json.Decode.field
-                                                        "nomeBreve"
-                                                        Json.Decode.string
-                                               ) |> OpenApi.Common.jsonDecodeAndMap
-                                                            (Json.Decode.field
-                                                                     "nomeLungo"
-                                                                     Json.Decode.string
-                                                            )
+            { id = id
+            , label = label
+            , nomeBreve = nomeBreve
+            , nomeLungo = nomeLungo
+            }
+        )
+        |> OpenApi.Common.jsonDecodeAndMap
+            (Json.Decode.field "id" Json.Decode.string)
+        |> OpenApi.Common.jsonDecodeAndMap
+            (Json.Decode.field
+                "label"
+                (Json.Decode.oneOf
+                    [ Json.Decode.map
+                        OpenApi.Common.Present
+                        Json.Decode.string
+                    , Json.Decode.null
+                        OpenApi.Common.Null
+                    ]
+                )
+            )
+        |> OpenApi.Common.jsonDecodeAndMap
+            (Json.Decode.field
+                "nomeBreve"
+                Json.Decode.string
+            )
+        |> OpenApi.Common.jsonDecodeAndMap
+            (Json.Decode.field
+                "nomeLungo"
+                Json.Decode.string
+            )
 
 
 encodeLocalita : Viaggiatreno.Types.Localita -> Json.Encode.Value

@@ -1,31 +1,45 @@
-module IdDict exposing (IdDict, empty, filter, foldl, foldr, fromList, get, getMax, getMaxKey, getMin, getMinKey, insert, isEmpty, keys, map, member, partition, popMax, popMin, remove, singleton, size, toList, update, values)
+module IdDict exposing
+    ( empty, singleton, insert, update, remove
+    , IdDict
+    , keys, values, toList, fromList
+    , getMinKey, getMin, popMin, getMaxKey, getMax, popMax
+    , isEmpty, member, get, size
+    , map, foldl, foldr, filter, partition
+    )
 
-{-| 
+{-|
+
+
 ## Build
 
 @docs empty, singleton, insert, update, remove
+
 
 ## Dictionaries
 
 @docs IdDict
 
+
 ## Lists
 
 @docs keys, values, toList, fromList
+
 
 ## Min / Max
 
 @docs getMinKey, getMin, popMin, getMaxKey, getMax, popMax
 
+
 ## Query
 
 @docs isEmpty, member, get, size
 
+
 ## Transform
 
 @docs map, foldl, foldr, filter, partition
--}
 
+-}
 
 import FastDict
 import Id
@@ -58,13 +72,13 @@ update key f d =
         IdDict dict ->
             IdDict
                 (FastDict.update
-                     (Id.toString key)
-                     (\updateUnpack ->
-                          Maybe.map
-                              (Tuple.pair key)
-                              (f (Maybe.map Tuple.second updateUnpack))
-                     )
-                     dict
+                    (Id.toString key)
+                    (\updateUnpack ->
+                        Maybe.map
+                            (Tuple.pair key)
+                            (f (Maybe.map Tuple.second updateUnpack))
+                    )
+                    dict
                 )
 
 
@@ -128,14 +142,14 @@ fromList : List ( Id.Id kind, v ) -> IdDict kind v
 fromList l =
     IdDict
         (FastDict.fromList
-             (List.map
-                  (\e ->
-                       case e of
-                           ( k, v ) ->
-                               ( Id.toString k, e )
-                  )
-                  l
-             )
+            (List.map
+                (\e ->
+                    case e of
+                        ( k, v ) ->
+                            ( Id.toString k, e )
+                )
+                l
+            )
         )
 
 
@@ -145,13 +159,13 @@ map f d =
         IdDict dict ->
             IdDict
                 (FastDict.map
-                     (\mapUnpack ->
-                          \unpack ->
-                              case unpack of
-                                  ( k, a ) ->
-                                      ( k, f k a )
-                     )
-                     dict
+                    (\mapUnpack ->
+                        \unpack ->
+                            case unpack of
+                                ( k, a ) ->
+                                    ( k, f k a )
+                    )
+                    dict
                 )
 
 
@@ -161,9 +175,9 @@ foldl f b0 d =
         IdDict dict ->
             FastDict.foldl
                 (\_ kv b ->
-                     case kv of
-                         ( k, v ) ->
-                             f k v b
+                    case kv of
+                        ( k, v ) ->
+                            f k v b
                 )
                 b0
                 dict
@@ -175,9 +189,9 @@ foldr f b0 d =
         IdDict dict ->
             FastDict.foldr
                 (\_ kv b ->
-                     case kv of
-                         ( k, v ) ->
-                             f k v b
+                    case kv of
+                        ( k, v ) ->
+                            f k v b
                 )
                 b0
                 dict
@@ -187,15 +201,15 @@ filter : (Id.Id kind -> v -> Bool) -> IdDict kind v -> IdDict kind v
 filter f d =
     IdDict
         (case d of
-             IdDict dict ->
-                 FastDict.filter
-                     (\filterUnpack ->
-                          \unpack ->
-                              case unpack of
-                                  ( k, v ) ->
-                                      f k v
-                     )
-                     dict
+            IdDict dict ->
+                FastDict.filter
+                    (\filterUnpack ->
+                        \unpack ->
+                            case unpack of
+                                ( k, v ) ->
+                                    f k v
+                    )
+                    dict
         )
 
 
@@ -210,13 +224,13 @@ partition f d =
                 IdDict
                 IdDict
                 (FastDict.partition
-                     (\partitionUnpack ->
-                          \unpack ->
-                              case unpack of
-                                  ( k, v ) ->
-                                      f k v
-                     )
-                     dict
+                    (\partitionUnpack ->
+                        \unpack ->
+                            case unpack of
+                                ( k, v ) ->
+                                    f k v
+                    )
+                    dict
                 )
 
 

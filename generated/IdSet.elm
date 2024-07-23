@@ -1,27 +1,39 @@
-module IdSet exposing (IdSet, empty, filter, foldl, foldr, fromList, insert, isEmpty, member, partition, remove, singleton, size, toList)
+module IdSet exposing
+    ( empty, singleton, insert, remove
+    , toList, fromList
+    , isEmpty, member, size
+    , IdSet
+    , foldl, foldr, filter, partition
+    )
 
-{-| 
+{-|
+
+
 ## Build
 
 @docs empty, singleton, insert, remove
+
 
 ## Lists
 
 @docs toList, fromList
 
+
 ## Query
 
 @docs isEmpty, member, size
+
 
 ## Sets
 
 @docs IdSet
 
+
 ## Transform
 
 @docs foldl, foldr, filter, partition
--}
 
+-}
 
 import FastDict
 import Id
@@ -106,8 +118,8 @@ filter : (Id.Id kind -> Bool) -> IdSet kind -> IdSet kind
 filter f d =
     IdSet
         (case d of
-             IdSet dict ->
-                 FastDict.filter (\filterUnpack -> f) dict
+            IdSet dict ->
+                FastDict.filter (\filterUnpack -> f) dict
         )
 
 
