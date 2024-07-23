@@ -1,0 +1,141 @@
+openapi: 3.1.0
+info:
+  title: ViaggiaTreno
+  description: |-
+    Reverse engineered ViaggiaTreno APIs - real time information on Trenitalia's trains.
+
+    Research done by [sabas](https://github.com/sabas/trenitalia).
+  version: 0.1.0
+externalDocs:
+  description: ViaggiaTreno
+  url: http://www.viaggiatreno.it/infomobilita/index.jsp
+servers:
+  - url: http://www.viaggiatreno.it/infomobilita/resteasy/viaggiatreno
+tags:
+  - name: stations
+    description: Stations' data
+paths:
+  /autocompletaStazione/{input}:
+    get:
+      tags:
+        - stations
+      summary: Get possible autocompletions
+      description: Get possible autocompletions for a possible query
+      parameters:
+        - name: input
+          in: path
+          description: Query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: successful operation
+          content:
+            text/plain:
+              schema:
+                type: string
+  /autocompletaStazioneNTS/{input}:
+    get:
+      tags:
+        - stations
+      summary: Get possible autocompletions
+      description: Get possible autocompletions for a possible query
+      parameters:
+        - name: input
+          in: path
+          description: Query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: successful operation
+          content:
+            text/plain:
+              schema:
+                type: string
+  /cercaStazione/{input}:
+    get:
+      tags:
+        - stations
+      summary: Get possible autocompletions
+      description: Get possible autocompletions for a possible query
+      parameters:
+        - name: input
+          in: path
+          description: Query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                item:
+                  type: object
+                  properties:
+                    nomeLungo:
+                      type: string
+                    nomeBreve:
+                      type: string
+                    label:
+                      type: string
+                      nullable: true
+                    id:
+                      type: string
+                  required:
+                    - nomeLungo
+                    - nomeBreve
+                    - label
+                    - id
+  /elencoStazioni/{idRegione}:
+    get:
+      tags:
+        - stations
+      summary: Get possible autocompletions
+      description: Get possible autocompletions for a possible query
+      parameters:
+        - name: idRegione
+          in: path
+          description: Query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                item:
+                  type: object
+                  properties:
+                    nomeLungo:
+                      type: string
+                    nomeBreve:
+                      type: string
+                    label:
+                      type: string
+                      nullable: true
+                    id:
+                      type: string
+                  required:
+                    - nomeLungo
+                    - nomeBreve
+                    - label
+                    - id
+components:
+  schemas:
+    UserArray:
+      description: List of user object
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              type: string
