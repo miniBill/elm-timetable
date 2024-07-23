@@ -20,7 +20,7 @@ paths:
       tags:
         - stations
       summary: Get possible autocompletions
-      description: Get possible autocompletions for a possible query
+      description: Get possible autocompletions for a given query
       parameters:
         - name: input
           in: path
@@ -40,7 +40,7 @@ paths:
       tags:
         - stations
       summary: Get possible autocompletions
-      description: Get possible autocompletions for a possible query
+      description: Get possible autocompletions for a given query
       parameters:
         - name: input
           in: path
@@ -59,8 +59,8 @@ paths:
     get:
       tags:
         - stations
-      summary: Get possible autocompletions
-      description: Get possible autocompletions for a possible query
+      summary: Get possible stations
+      description: Get possible stations for a given query
       parameters:
         - name: input
           in: path
@@ -81,12 +81,10 @@ paths:
     get:
       tags:
         - stations
-      summary: Get possible autocompletions
-      description: Get possible autocompletions for a possible query
+      summary: Get all stations in a region
       parameters:
         - name: idRegione
           in: path
-          description: Query
           required: true
           schema:
             type: integer
@@ -99,6 +97,47 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/StationDetails'
+  /regione/{idStazione}:
+    get:
+      tags:
+        - stations
+      summary: Get the idRegione for an idStazione
+      parameters:
+        - name: idStazione
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: integer
+  /dettaglioStazione/{idStazione}/{idRegione}:
+    get:
+      tags:
+        - stations
+      summary: Get station details
+      parameters:
+        - name: idStazione
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: idRegione
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StationDetails'
 components:
   schemas:
     Localita:
@@ -138,6 +177,8 @@ components:
           type: number
         esterno:
           type: boolean
+        nomeCitta:
+          type: string
       required:
         - codReg
         - tipoStazione
@@ -147,3 +188,4 @@ components:
         - lat
         - lon
         - esterno
+        - nomeCitta
