@@ -18,31 +18,50 @@ run =
 task : BackendTask FatalError ()
 task =
     Do.allowFatal stationIdsFromAutocomplete <| \fromAutocomplete ->
-    Do.allowFatal stationIdsFromRegions <| \fromRegions ->
+    Do.allowFatal (stationIdsFromRegions fromAutocomplete) <| \fromRegions ->
     Script.log ("Got " ++ String.fromInt (Dict.size fromAutocomplete) ++ " train stations from autocomplete, " ++ String.fromInt (Set.size fromRegions) ++ " from regions")
 
 
-stationIdsFromRegions : BackendTask { fatal : FatalError, recoverable : Http.Error } (Set String)
-stationIdsFromRegions =
-    List.range 0 22
+stationIdsFromRegions : Dict String v -> BackendTask { fatal : FatalError, recoverable : Http.Error } (Set String)
+stationIdsFromRegions dict =
+    let
+        ids =
+            Dict.keys dict
+    in
+    ids
         |> List.map
-            (\idRegione ->
-                Viaggiatreno.Api.elencoStazioniIdRegione
+            (\idStazione ->
+                Viaggiatreno.Api.regioneIdStazione
                     { params =
-                        { idRegione = idRegione }
+                        { idStazione = idStazione }
                     }
-                    |> BackendTask.quiet
             )
         |> BackendTask.combine
-        |> BackendTask.map
-            (\res ->
-                res
-                    |> List.concat
-                    |> List.map
-                        (\station ->
-                            station.codiceStazione
-                        )
+        |> BackendTask.andThen
+            (\regionIds ->
+                regionIds
                     |> Set.fromList
+                    |> Set.toList
+                    |> Debug.log "regionIds"
+                    |> List.map
+                        (\idRegione ->
+                            Viaggiatreno.Api.elencoStazioniIdRegione
+                                { params =
+                                    { idRegione = idRegione }
+                                }
+                                |> BackendTask.quiet
+                        )
+                    |> BackendTask.combine
+                    |> BackendTask.map
+                        (\res ->
+                            res
+                                |> List.concat
+                                |> List.map
+                                    (\station ->
+                                        station.codiceStazione
+                                    )
+                                |> Set.fromList
+                        )
             )
 
 
