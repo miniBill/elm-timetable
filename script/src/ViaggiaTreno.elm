@@ -9,6 +9,7 @@ import List.Extra
 import Pages.Script as Script exposing (Script)
 import Set exposing (Set)
 import Viaggiatreno.Api
+import Viaggiatreno.Types exposing (StationDetails)
 
 
 run : Script
@@ -22,10 +23,10 @@ script =
     Do.allowFatal stationIdsFromAutocomplete <| \fromAutocomplete ->
     Do.log "Getting stations from regions" <| \_ ->
     Do.allowFatal (stationIdsFromRegions fromAutocomplete) <| \fromRegions ->
-    Script.log ("Got " ++ String.fromInt (Dict.size fromAutocomplete) ++ " train stations from autocomplete, " ++ String.fromInt (Set.size fromRegions) ++ " from regions")
+    Script.log ("Got " ++ String.fromInt (Dict.size fromAutocomplete) ++ " train stations from autocomplete, " ++ String.fromInt (Dict.size fromRegions) ++ " from regions")
 
 
-stationIdsFromRegions : Dict String v -> BackendTask { fatal : FatalError, recoverable : Http.Error } (Set String)
+stationIdsFromRegions : Dict String v -> BackendTask { fatal : FatalError, recoverable : Http.Error } (Dict String StationDetails)
 stationIdsFromRegions dict =
     let
         ids : List String
@@ -73,9 +74,9 @@ stationIdsFromRegions dict =
                                 |> List.concat
                                 |> List.map
                                     (\station ->
-                                        station.codiceStazione
+                                        ( station.codiceStazione, station )
                                     )
-                                |> Set.fromList
+                                |> Dict.fromList
                         )
             )
 
