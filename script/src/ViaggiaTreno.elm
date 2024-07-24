@@ -7,9 +7,8 @@ import Dict exposing (Dict)
 import FatalError exposing (FatalError)
 import List.Extra
 import Pages.Script as Script exposing (Script)
-import Set
 import Viaggiatreno.Api
-import Viaggiatreno.Types exposing (Localita, StationDetails)
+import Viaggiatreno.Types exposing (StationDetails)
 
 
 run : Script
@@ -21,71 +20,53 @@ script : BackendTask FatalError ()
 script =
     Do.log "Getting stations from autocomplete" <| \_ ->
     Do.allowFatal stationIdsFromAutocomplete <| \fromAutocomplete ->
-    Do.log "Getting stations from autocomplete #2" <| \_ ->
-    Do.allowFatal stationIdsFromAutocomplete2 <| \fromAutocomplete2 ->
-    Do.log "Getting stations from regions" <| \_ ->
-    Do.allowFatal (stationIdsFromRegions fromAutocomplete) <| \fromRegions ->
-    Do.log ("Got " ++ String.fromInt (Dict.size fromAutocomplete) ++ " train stations from autocomplete, " ++ String.fromInt (Dict.size fromAutocomplete2) ++ " train stations from autocomplete #2, " ++ String.fromInt (Dict.size fromRegions) ++ " from regions") <| \_ ->
+    Do.log ("Got " ++ String.fromInt (Dict.size fromAutocomplete) ++ " train stations from autocomplete") <| \_ ->
+    Do.allowFatal (getAllStationsDetails (Dict.keys fromAutocomplete)) <| \details ->
     Script.log
         ("Missing from regions:"
             ++ Debug.toString
-                (Dict.diff fromAutocomplete2 fromRegions)
+                (List.take 3 details)
         )
 
 
-stationIdsFromRegions : Dict String v -> BackendTask { fatal : FatalError, recoverable : Http.Error } (Dict String StationDetails)
-stationIdsFromRegions dict =
-    let
-        ids : List String
-        ids =
-            Dict.keys dict
-    in
-    ids
+getAllStationsDetails :
+    List String
+    -> BackendTask { fatal : FatalError, recoverable : Http.Error } (List StationDetails)
+getAllStationsDetails stationIds =
+    stationIds
         |> List.map
-            (\idStazione ->
-                wrapCache
-                    (Viaggiatreno.Api.regioneIdStazione
-                        { params =
-                            { idStazione = idStazione }
-                        }
-                        |> BackendTask.quiet
+            (\stationId ->
+                Do.do
+                    (wrapCache
+                        (Viaggiatreno.Api.regioneStationId
+                            { params = { stationId = stationId } }
+                            |> BackendTask.quiet
+                        )
                     )
-                    |> BackendTask.map Just
-                    |> BackendTask.onError (\_ -> BackendTask.succeed Nothing)
+                <| \regionId ->
+                wrapCache
+                    (Viaggiatreno.Api.dettaglioStazioneStationIdRegionId
+                        { params =
+                            { stationId = stationId
+                            , regionId = regionId
+                            }
+                        }
+                    )
+                    |> BackendTask.quiet
             )
-        |> List.Extra.greedyGroupsOf 10
+        |> combineInGroupsOf 10
+
+
+combineInGroupsOf :
+    Int
+    -> List (BackendTask e v)
+    -> BackendTask e (List v)
+combineInGroupsOf size list =
+    list
+        |> List.Extra.greedyGroupsOf size
         |> List.map BackendTask.combine
         |> BackendTask.sequence
-        |> BackendTask.andThen
-            (\regionIds ->
-                regionIds
-                    |> List.concat
-                    |> List.filterMap identity
-                    |> Set.fromList
-                    |> Set.toList
-                    |> Debug.log "regionIds"
-                    |> List.map
-                        (\idRegione ->
-                            wrapCache
-                                (Viaggiatreno.Api.elencoStazioniIdRegione
-                                    { params =
-                                        { idRegione = idRegione }
-                                    }
-                                    |> BackendTask.quiet
-                                )
-                        )
-                    |> BackendTask.combine
-                    |> BackendTask.map
-                        (\res ->
-                            res
-                                |> List.concat
-                                |> List.map
-                                    (\station ->
-                                        ( station.codiceStazione, station )
-                                    )
-                                |> Dict.fromList
-                        )
-            )
+        |> BackendTask.map List.concat
 
 
 wrapCache :
@@ -178,34 +159,6 @@ stationIdsFromAutocomplete =
 
                                 _ ->
                                     Debug.todo <| "Invalid row: \"" ++ line ++ "\""
-                        )
-                    |> Dict.fromList
-            )
-
-
-stationIdsFromAutocomplete2 : BackendTask { fatal : FatalError, recoverable : Http.Error } (Dict String Localita)
-stationIdsFromAutocomplete2 =
-    List.range (Char.toCode 'A') (Char.toCode 'Z')
-        |> List.map
-            (\code ->
-                wrapCache
-                    (Viaggiatreno.Api.cercaStazioneInput
-                        { params =
-                            { input =
-                                String.fromChar (Char.fromCode code)
-                            }
-                        }
-                        |> BackendTask.quiet
-                    )
-            )
-        |> BackendTask.combine
-        |> BackendTask.map
-            (\res ->
-                res
-                    |> List.concat
-                    |> List.map
-                        (\line ->
-                            ( line.id, line )
                         )
                     |> Dict.fromList
             )
