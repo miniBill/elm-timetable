@@ -40,7 +40,7 @@ getAllStationsDetails stationIds =
                     (wrapCache
                         (Viaggiatreno.Api.regioneStationId
                             { params = { stationId = stationId } }
-                            |> BackendTask.quiet
+                         -- |> BackendTask.quiet
                         )
                     )
                 <| \regionId ->
@@ -52,9 +52,9 @@ getAllStationsDetails stationIds =
                             }
                         }
                     )
-                    |> BackendTask.quiet
+             -- |> BackendTask.quiet
             )
-        |> combineInGroupsOf 10
+        |> combineInGroupsOf 1
 
 
 combineInGroupsOf :
