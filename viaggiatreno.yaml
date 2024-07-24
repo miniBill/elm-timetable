@@ -3,7 +3,7 @@ info:
   title: ViaggiaTreno
   description: |-
     Reverse engineered ViaggiaTreno APIs - real time information on Trenitalia's trains.
-    Research done by [sabas](https://github.com/sabas/trenitalia).
+    Research done by [sabas and macrobra](https://github.com/sabas/trenitalia).
   version: 0.1.0
 externalDocs:
   description: ViaggiaTreno
@@ -76,13 +76,14 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Localita"
-  /elencoStazioni/{idRegione}:
+  /elencoStazioni/{regionId}:
     get:
       tags:
         - stations
-      summary: Get all stations in a region
+      summary: |-
+        Get all stations in a region [WARNING: incomplete listing]
       parameters:
-        - name: idRegione
+        - name: regionId
           in: path
           required: true
           schema:
@@ -96,13 +97,13 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/StationDetails"
-  /regione/{idStazione}:
+  /regione/{stationId}:
     get:
       tags:
         - stations
-      summary: Get the idRegione for an idStazione
+      summary: Get the regionId for an stationId
       parameters:
-        - name: idStazione
+        - name: stationId
           in: path
           required: true
           schema:
@@ -114,18 +115,18 @@ paths:
             application/json:
               schema:
                 type: integer
-  /dettaglioStazione/{idStazione}/{idRegione}:
+  /dettaglioStazione/{stationId}/{regionId}:
     get:
       tags:
         - stations
       summary: Get station details
       parameters:
-        - name: idStazione
+        - name: stationId
           in: path
           required: true
           schema:
             type: string
-        - name: idRegione
+        - name: regionId
           in: path
           required: true
           schema:
@@ -137,6 +138,31 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/StationDetails"
+  /news/{regionId}/{language}:
+    get:
+      tags:
+        - news
+      summary: Get news for a specific region and language (use 0 for national news)
+      parameters:
+        - name: regionId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: language
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/News"
 components:
   schemas:
     Localita:
@@ -156,6 +182,22 @@ components:
         - nomeBreve
         - label
         - id
+    News:
+      type: object
+      properties:
+        titolo:
+          type: string
+        data:
+          type: integer
+        primoPiano:
+          type: string
+        testo:
+          type: string
+      required:
+        - titolo
+        - data
+        - primoPiano
+        - testo
     StationDetails:
       description: Details of a station when listing
       type: object

@@ -1,15 +1,21 @@
 module Viaggiatreno.Api exposing
-    ( autocompletaStazioneInput, autocompletaStazioneNTSInput, cercaStazioneInput
-    , dettaglioStazioneIdStazioneIdRegione, elencoStazioniIdRegione, regioneIdStazione
+    ( newsRegionIdLanguage
+    , autocompletaStazioneInput, autocompletaStazioneNTSInput, cercaStazioneInput
+    , dettaglioStazioneStationIdRegionId, elencoStazioniRegionId, regioneStationId
     )
 
 {-|
 
 
+## news
+
+@docs newsRegionIdLanguage
+
+
 ## stations
 
 @docs autocompletaStazioneInput, autocompletaStazioneNTSInput, cercaStazioneInput
-@docs dettaglioStazioneIdStazioneIdRegione, elencoStazioniIdRegione, regioneIdStazione
+@docs dettaglioStazioneStationIdRegionId, elencoStazioniRegionId, regioneStationId
 
 -}
 
@@ -113,22 +119,22 @@ cercaStazioneInput config =
 
 {-| Get station details
 -}
-dettaglioStazioneIdStazioneIdRegione :
-    { params : { idStazione : String, idRegione : Int } }
+dettaglioStazioneStationIdRegionId :
+    { params : { stationId : String, regionId : Int } }
     ->
         BackendTask.BackendTask
             { fatal : FatalError.FatalError
             , recoverable : BackendTask.Http.Error
             }
             Viaggiatreno.Types.StationDetails
-dettaglioStazioneIdStazioneIdRegione config =
+dettaglioStazioneStationIdRegionId config =
     BackendTask.Http.request
         { url =
             Url.Builder.crossOrigin
                 "http://localhost:9000/cache"
                 [ "dettaglioStazione"
-                , config.params.idStazione
-                , String.fromInt config.params.idRegione
+                , config.params.stationId
+                , String.fromInt config.params.regionId
                 ]
                 []
         , method = "GET"
@@ -140,22 +146,22 @@ dettaglioStazioneIdStazioneIdRegione config =
         (BackendTask.Http.expectJson Viaggiatreno.Json.decodeStationDetails)
 
 
-{-| Get all stations in a region
+{-| |- Get all stations in a region [WARNING: incomplete listing]
 -}
-elencoStazioniIdRegione :
-    { params : { idRegione : Int } }
+elencoStazioniRegionId :
+    { params : { regionId : Int } }
     ->
         BackendTask.BackendTask
             { fatal : FatalError.FatalError
             , recoverable : BackendTask.Http.Error
             }
             (List Viaggiatreno.Types.StationDetails)
-elencoStazioniIdRegione config =
+elencoStazioniRegionId config =
     BackendTask.Http.request
         { url =
             Url.Builder.crossOrigin
                 "http://localhost:9000/cache"
-                [ "elencoStazioni", String.fromInt config.params.idRegione ]
+                [ "elencoStazioni", String.fromInt config.params.regionId ]
                 []
         , method = "GET"
         , headers = []
@@ -168,22 +174,53 @@ elencoStazioniIdRegione config =
         )
 
 
-{-| Get the idRegione for an idStazione
+{-| Get news for a specific region and language (use 0 for national news)
 -}
-regioneIdStazione :
-    { params : { idStazione : String } }
+newsRegionIdLanguage :
+    { params : { regionId : Int, language : String } }
+    ->
+        BackendTask.BackendTask
+            { fatal : FatalError.FatalError
+            , recoverable : BackendTask.Http.Error
+            }
+            (List Viaggiatreno.Types.News)
+newsRegionIdLanguage config =
+    BackendTask.Http.request
+        { url =
+            Url.Builder.crossOrigin
+                "http://localhost:9000/cache"
+                [ "news"
+                , String.fromInt config.params.regionId
+                , config.params.language
+                ]
+                []
+        , method = "GET"
+        , headers = []
+        , body = BackendTask.Http.emptyBody
+        , retries = Nothing
+        , timeoutInMs = Nothing
+        }
+        (BackendTask.Http.expectJson
+            (Json.Decode.list Viaggiatreno.Json.decodeNews)
+        )
+
+
+{-| Get the regionId for an stationId
+-}
+regioneStationId :
+    { params : { stationId : String } }
     ->
         BackendTask.BackendTask
             { fatal : FatalError.FatalError
             , recoverable : BackendTask.Http.Error
             }
             Int
-regioneIdStazione config =
+regioneStationId config =
     BackendTask.Http.request
         { url =
             Url.Builder.crossOrigin
                 "http://localhost:9000/cache"
-                [ "regione", config.params.idStazione ]
+                [ "regione", config.params.stationId ]
                 []
         , method = "GET"
         , headers = []

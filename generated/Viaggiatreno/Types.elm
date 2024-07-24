@@ -1,7 +1,8 @@
 module Viaggiatreno.Types exposing
-    ( Localita, StationDetails
+    ( Localita, News, StationDetails
     , AutocompletaStazioneInput_Error, AutocompletaStazioneNTSInput_Error, CercaStazioneInput_Error
-    , DettaglioStazioneIdStazioneIdRegione_Error, ElencoStazioniIdRegione_Error, RegioneIdStazione_Error
+    , DettaglioStazioneStationIdRegionId_Error, ElencoStazioniRegionId_Error, NewsRegionIdLanguage_Error
+    , RegioneStationId_Error
     )
 
 {-|
@@ -9,13 +10,14 @@ module Viaggiatreno.Types exposing
 
 ## Aliases
 
-@docs Localita, StationDetails
+@docs Localita, News, StationDetails
 
 
 ## Errors
 
 @docs AutocompletaStazioneInput_Error, AutocompletaStazioneNTSInput_Error, CercaStazioneInput_Error
-@docs DettaglioStazioneIdStazioneIdRegione_Error, ElencoStazioniIdRegione_Error, RegioneIdStazione_Error
+@docs DettaglioStazioneStationIdRegionId_Error, ElencoStazioniRegionId_Error, NewsRegionIdLanguage_Error
+@docs RegioneStationId_Error
 
 -}
 
@@ -34,15 +36,19 @@ type alias CercaStazioneInput_Error =
     Never
 
 
-type alias DettaglioStazioneIdStazioneIdRegione_Error =
+type alias DettaglioStazioneStationIdRegionId_Error =
     Never
 
 
-type alias ElencoStazioniIdRegione_Error =
+type alias ElencoStazioniRegionId_Error =
     Never
 
 
-type alias RegioneIdStazione_Error =
+type alias NewsRegionIdLanguage_Error =
+    Never
+
+
+type alias RegioneStationId_Error =
     Never
 
 
@@ -57,6 +63,10 @@ type alias StationDetails =
     , nomeCitta : String
     , tipoStazione : Int
     }
+
+
+type alias News =
+    { data : Int, primoPiano : String, testo : String, titolo : String }
 
 
 type alias Localita =

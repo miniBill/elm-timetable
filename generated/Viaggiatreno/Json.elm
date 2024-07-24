@@ -1,6 +1,6 @@
 module Viaggiatreno.Json exposing
-    ( encodeLocalita, encodeStationDetails
-    , decodeLocalita, decodeStationDetails
+    ( encodeLocalita, encodeNews, encodeStationDetails
+    , decodeLocalita, decodeNews, decodeStationDetails
     )
 
 {-|
@@ -8,12 +8,12 @@ module Viaggiatreno.Json exposing
 
 ## Encoders
 
-@docs encodeLocalita, encodeStationDetails
+@docs encodeLocalita, encodeNews, encodeStationDetails
 
 
 ## Decoders
 
-@docs decodeLocalita, decodeStationDetails
+@docs decodeLocalita, decodeNews, decodeStationDetails
 
 -}
 
@@ -94,6 +94,45 @@ encodeStationDetails rec =
         , ( "lon", Json.Encode.float rec.lon )
         , ( "nomeCitta", Json.Encode.string rec.nomeCitta )
         , ( "tipoStazione", Json.Encode.int rec.tipoStazione )
+        ]
+
+
+decodeNews : Json.Decode.Decoder Viaggiatreno.Types.News
+decodeNews =
+    Json.Decode.succeed
+        (\data primoPiano testo titolo ->
+            { data = data
+            , primoPiano = primoPiano
+            , testo = testo
+            , titolo = titolo
+            }
+        )
+        |> OpenApi.Common.jsonDecodeAndMap
+            (Json.Decode.field "data" Json.Decode.int)
+        |> OpenApi.Common.jsonDecodeAndMap
+            (Json.Decode.field
+                "primoPiano"
+                Json.Decode.string
+            )
+        |> OpenApi.Common.jsonDecodeAndMap
+            (Json.Decode.field
+                "testo"
+                Json.Decode.string
+            )
+        |> OpenApi.Common.jsonDecodeAndMap
+            (Json.Decode.field
+                "titolo"
+                Json.Decode.string
+            )
+
+
+encodeNews : Viaggiatreno.Types.News -> Json.Encode.Value
+encodeNews rec =
+    Json.Encode.object
+        [ ( "data", Json.Encode.int rec.data )
+        , ( "primoPiano", Json.Encode.string rec.primoPiano )
+        , ( "testo", Json.Encode.string rec.testo )
+        , ( "titolo", Json.Encode.string rec.titolo )
         ]
 
 

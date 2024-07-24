@@ -7,9 +7,9 @@ import Dict exposing (Dict)
 import FatalError exposing (FatalError)
 import List.Extra
 import Pages.Script as Script exposing (Script)
-import Set exposing (Set)
+import Set
 import Viaggiatreno.Api
-import Viaggiatreno.Types exposing (StationDetails)
+import Viaggiatreno.Types exposing (Localita, StationDetails)
 
 
 run : Script
@@ -21,9 +21,16 @@ script : BackendTask FatalError ()
 script =
     Do.log "Getting stations from autocomplete" <| \_ ->
     Do.allowFatal stationIdsFromAutocomplete <| \fromAutocomplete ->
+    Do.log "Getting stations from autocomplete #2" <| \_ ->
+    Do.allowFatal stationIdsFromAutocomplete2 <| \fromAutocomplete2 ->
     Do.log "Getting stations from regions" <| \_ ->
     Do.allowFatal (stationIdsFromRegions fromAutocomplete) <| \fromRegions ->
-    Script.log ("Got " ++ String.fromInt (Dict.size fromAutocomplete) ++ " train stations from autocomplete, " ++ String.fromInt (Dict.size fromRegions) ++ " from regions")
+    Do.log ("Got " ++ String.fromInt (Dict.size fromAutocomplete) ++ " train stations from autocomplete, " ++ String.fromInt (Dict.size fromAutocomplete2) ++ " train stations from autocomplete #2, " ++ String.fromInt (Dict.size fromRegions) ++ " from regions") <| \_ ->
+    Script.log
+        ("Missing from regions:"
+            ++ Debug.toString
+                (Dict.diff fromAutocomplete2 fromRegions)
+        )
 
 
 stationIdsFromRegions : Dict String v -> BackendTask { fatal : FatalError, recoverable : Http.Error } (Dict String StationDetails)
@@ -171,6 +178,34 @@ stationIdsFromAutocomplete =
 
                                 _ ->
                                     Debug.todo <| "Invalid row: \"" ++ line ++ "\""
+                        )
+                    |> Dict.fromList
+            )
+
+
+stationIdsFromAutocomplete2 : BackendTask { fatal : FatalError, recoverable : Http.Error } (Dict String Localita)
+stationIdsFromAutocomplete2 =
+    List.range (Char.toCode 'A') (Char.toCode 'Z')
+        |> List.map
+            (\code ->
+                wrapCache
+                    (Viaggiatreno.Api.cercaStazioneInput
+                        { params =
+                            { input =
+                                String.fromChar (Char.fromCode code)
+                            }
+                        }
+                        |> BackendTask.quiet
+                    )
+            )
+        |> BackendTask.combine
+        |> BackendTask.map
+            (\res ->
+                res
+                    |> List.concat
+                    |> List.map
+                        (\line ->
+                            ( line.id, line )
                         )
                     |> Dict.fromList
             )
