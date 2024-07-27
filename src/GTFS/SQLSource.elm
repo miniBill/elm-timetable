@@ -8,6 +8,7 @@ import GTFS exposing (Accessibility(..), Calendar, CalendarDate, ExceptionType(.
 import Id exposing (Id)
 import Json.Encode
 import Length exposing (Length)
+import SQLite.SQL as SQL
 import Url exposing (Url)
 
 
@@ -17,8 +18,81 @@ import Url exposing (Url)
 -------------------
 
 
+toCreate :
+    { ifNotExists : Bool
+    }
+    -> Table a
+    -> SQL.Statement
+toCreate config table =
+    SQL.CreateTable
+        { name = table.name
+        , ifNotExists = config.ifNotExists
+        , temporary = False
+        , schemaName = Nothing
+        , definition = toTableDefinition table
+        }
+
+
+toTableDefinition : Table a -> SQL.TableDefinition
+toTableDefinition table =
+    SQL.TableDefinitionColumns
+        { options =
+            { strict = True
+            , withoutRowid = False
+            }
+        , columns = List.map toSqlColumn table.columns
+        , constraints =
+            [ SQL.UnnamedTableConstraint
+                (SQL.TablePrimaryKey
+                    (List.map
+                        (\name ->
+                            { order = Nothing
+                            , nameOrExpr = SQL.IsName name
+                            , collate = Nothing
+                            }
+                        )
+                        table.primaryKey
+                    )
+                    Nothing
+                )
+            ]
+        }
+
+
+toSqlColumn : Column -> SQL.ColumnDefinition
+toSqlColumn column =
+    { name = column.name
+    , tipe = Just (typeToSqlType column.tipe)
+    , constraints =
+        case column.tipe of
+            Nullable _ ->
+                []
+
+            _ ->
+                [ SQL.UnnamedColumnConstraint (SQL.ColumnNotNull Nothing) ]
+    }
+
+
+typeToSqlType : ColumnType -> SQL.Type
+typeToSqlType tipe =
+    case tipe of
+        Nullable x ->
+            typeToSqlType x
+
+        Integer ->
+            SQL.Integer
+
+        Real ->
+            SQL.Real
+
+        Text ->
+            SQL.Text
+
+
 type alias Table a =
-    { columns : List Column
+    { name : String
+    , primaryKey : List String
+    , columns : List Column
     , encode : a -> Json.Encode.Value
     }
 
@@ -44,20 +118,23 @@ type ColumnType
     | Nullable ColumnType
 
 
-object : List ( Column, Encoder a ) -> Table a
-object children =
-    { columns = List.map Tuple.first children
+object : String -> List String -> List ( Column, Encoder a ) -> Table a
+object name primaryKey children =
+    { name = name
+    , primaryKey = primaryKey
+    , columns = List.map Tuple.first children
     , encode =
         \value ->
             children
-                |> List.map (\( { name }, prop ) -> ( name, prop value ))
+                |> List.map (\( col, prop ) -> ( col.name, prop value ))
                 |> Json.Encode.object
     }
 
 
 stopTimeEncoder : Table StopTime
 stopTimeEncoder =
-    object
+    object "stop_times"
+        [ "trip_id", "stop_sequence" ]
         [ required "trip_id" .trip_id id
         , optional "arrival_time" .arrival_time timeEncoder
         , optional "departure_time" .departure_time timeEncoder
@@ -81,7 +158,8 @@ stopTimeEncoder =
 
 tripEncoder : Table Trip
 tripEncoder =
-    object
+    object "trips"
+        [ "trip_id" ]
         [ required "route_id" .route_id id
         , required "service_id" .service_id id
         , required "trip_id" .id id
@@ -97,7 +175,8 @@ tripEncoder =
 
 calendarEncoder : Table Calendar
 calendarEncoder =
-    object
+    object "calendar"
+        [ "service_id" ]
         [ required "service_id" .id id
         , required "monday" .monday boolEncoder
         , required "tuesday" .tuesday boolEncoder
@@ -113,7 +192,8 @@ calendarEncoder =
 
 calendarDateEncoder : Table CalendarDate
 calendarDateEncoder =
-    object
+    object "calendar_dates"
+        [ "service_id", "date" ]
         [ required "service_id" .service_id id
         , required "date" .date dateEncoder
         , required "exception_type" .exception_type exceptionTypeEncoder
@@ -178,7 +258,8 @@ pickupDropOffTypeToInt input =
 
 stopEncoder : Table Stop
 stopEncoder =
-    object
+    object "stops"
+        [ "stop_id" ]
         [ required "stop_id" .id id
         , optional "stop_code" .code string
         , optional "stop_name" .name string
@@ -199,7 +280,8 @@ stopEncoder =
 
 pathwayEncoder : Table Pathway
 pathwayEncoder =
-    object
+    object "pathways"
+        [ "pathway_id" ]
         [ required "pathway_id" .id id
         , required "from_stop_id" .from_stop_id id
         , required "to_stop_id" .to_stop_id id
