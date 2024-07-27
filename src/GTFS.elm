@@ -1,25 +1,21 @@
-module GTFS exposing (Accessibility(..), ExceptionType(..), Latitude, LocationType(..), Longitude, PathwayMode(..), PickupDropOffType(..), Timezone, dateToInt, locationTypeToString)
+module GTFS exposing
+    ( Accessibility(..), ExceptionType(..), LocationType(..), PathwayMode(..), PickupDropOffType(..), Timezone
+    , locationTypeToString
+    , RouteType(..)
+    )
 
-import Angle exposing (Angle)
-import Date exposing (Date)
+{-|
+
+@docs Accessibility, ExceptionType, LocationType, PathwayMode, PickupDropOffType, Timezone
+@docs locationTypeToString
+
+-}
+
+-- Types --
 
 
 type alias Timezone =
     String
-
-
-type alias Latitude =
-    Angle
-
-
-type alias Longitude =
-    Angle
-
-
-
--------------------
--- Feed decoders --
--------------------
 
 
 type PathwayMode
@@ -35,11 +31,6 @@ type PathwayMode
 type ExceptionType
     = ServiceAdded
     | ServiceRemoved
-
-
-dateToInt : Date -> Int
-dateToInt date =
-    Date.year date * 10000 + Date.monthNumber date * 100 + Date.day date
 
 
 type PickupDropOffType
@@ -63,10 +54,21 @@ type Accessibility
     | NotAccessible
 
 
+type RouteType
+    = TramStreetcarLightRail
+    | SubwayMetro
+    | Rail
+    | Bus
+    | Ferry
+    | CableTram
+    | AerialLift
+    | Funicular
+    | Trolleybus
+    | Monorail
 
---------------------
--- Basic decoders --
---------------------
+
+
+-- Tables --
 
 
 locationTypeToString : LocationType -> String

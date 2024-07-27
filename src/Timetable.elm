@@ -8,7 +8,7 @@ import Dict exposing (Dict)
 import Dict.Extra
 import Duration exposing (Seconds)
 import Feed exposing (Feed)
-import GTFS.SQLSource exposing (Stop, StopTime, Trip)
+import GTFS.Tables exposing (Stop, StopTime, Trip)
 import Graph
 import Html exposing (Html)
 import Html.Attributes

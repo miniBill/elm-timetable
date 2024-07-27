@@ -1,4 +1,4 @@
-module SQLite.TableBuilder exposing (Codec, Color, Column, ColumnType(..), ForeignKey, Table, TableBuilder, andThen, angle, bool, clock, color, column, date, float, id, int, kilometers, meters, nullColumn, seconds, string, table, url, withForeignKey, withPrimaryKey)
+module SQLite.TableBuilder exposing (Codec, Color, Column, ColumnType(..), ForeignKey, Table, TableBuilder, andThen, angle, bool, clock, color, column, date, dateToInt, float, id, int, kilometers, meters, nullColumn, seconds, string, table, url, withForeignKey, withPrimaryKey)
 
 import Angle exposing (Angle)
 import Clock exposing (Clock)

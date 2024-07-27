@@ -1,27 +1,26 @@
-module GTFS.SQLSource exposing
-    ( Agency, agencyTable
-    , Stop, stopsTable
-    , Route, routesTable
-    , Trip, tripsTable
-    , StopTime, stopTimesTable
-    , Calendar, calendarsTable
-    , CalendarDate, calendarDatesTable
-    , ShapePoint, shapePointsTable
-    , Pathway, pathwaysTable
-    , RouteType, toCreate
+module GTFS.Tables exposing
+    ( Agency, agency
+    , Stop, stops
+    , Route, routes
+    , Trip, trips
+    , StopTime, stopTimes
+    , Calendar, calendars
+    , CalendarDate, calendarDates
+    , ShapePoint, shapePoints
+    , Pathway, pathways
     )
 
 {-|
 
-@docs Agency, agencyTable
-@docs Stop, stopsTable
-@docs Route, routesTable
-@docs Trip, tripsTable
-@docs StopTime, stopTimesTable
-@docs Calendar, calendarsTable
-@docs CalendarDate, calendarDatesTable
-@docs ShapePoint, shapePointsTable
-@docs Pathway, pathwaysTable
+@docs Agency, agency
+@docs Stop, stops
+@docs Route, routes
+@docs Trip, trips
+@docs StopTime, stopTimes
+@docs Calendar, calendars
+@docs CalendarDate, calendarDates
+@docs ShapePoint, shapePoints
+@docs Pathway, pathways
 
 -}
 
@@ -29,100 +28,15 @@ import Angle exposing (Angle)
 import Clock exposing (Clock)
 import Date exposing (Date)
 import Duration exposing (Duration)
-import GTFS exposing (Accessibility(..), ExceptionType(..), Latitude, LocationType(..), Longitude, PathwayMode(..), PickupDropOffType(..), Timezone)
+import GTFS exposing (Accessibility(..), ExceptionType(..), LocationType(..), PathwayMode(..), PickupDropOffType(..), RouteType(..), Timezone)
 import Id exposing (AgencyId, BlockId, Id, LevelId, LocationGroupId, LocationId, NetworkId, PathwayId, RouteId, ServiceId, ShapeId, StopId, TripId, ZoneId)
 import Length exposing (Length)
-import SQLite.Statement as Statement
-import SQLite.Statement.CreateTable as CreateTable
-import SQLite.TableBuilder exposing (Codec, Color, Column, ColumnType(..), Table, andThen, angle, bool, clock, color, column, date, float, id, int, kilometers, meters, nullColumn, seconds, string, table, url, withForeignKey, withPrimaryKey)
-import SQLite.Types as Types
+import SQLite.TableBuilder exposing (Codec, Color, Table, andThen, angle, bool, clock, color, column, date, float, id, int, kilometers, meters, nullColumn, seconds, string, table, url, withForeignKey, withPrimaryKey)
 import Url exposing (Url)
 
 
 
--------------------
--- Feed Encoders --
--------------------
-
-
-toCreate :
-    { ifNotExists : Bool
-    }
-    -> Table a
-    -> Statement.Statement
-toCreate config t =
-    Statement.CreateTable
-        { name = t.name
-        , ifNotExists = config.ifNotExists
-        , temporary = False
-        , schemaName = Nothing
-        , definition = toTableDefinition t
-        }
-
-
-toTableDefinition : Table a -> CreateTable.TableDefinition
-toTableDefinition { columns, primaryKey } =
-    CreateTable.TableDefinitionColumns
-        { options =
-            { strict = True
-            , withoutRowid = False
-            }
-        , columns = feedColumn :: List.map toSqlColumn columns
-        , constraints =
-            [ CreateTable.UnnamedTableConstraint
-                (CreateTable.TablePrimaryKey
-                    (List.map
-                        (\name ->
-                            { nameOrExpr = CreateTable.IsName name
-                            , collate = Nothing
-                            , ascDesc = Nothing
-                            }
-                        )
-                        (feedColumn.name :: primaryKey)
-                    )
-                    Nothing
-                )
-            ]
-        }
-
-
-feedColumn : CreateTable.ColumnDefinition
-feedColumn =
-    { name = "feed"
-    , tipe = Just Types.Text
-    , constraints =
-        [ CreateTable.UnnamedColumnConstraint (CreateTable.ColumnNotNull Nothing) ]
-    }
-
-
-toSqlColumn : Column -> CreateTable.ColumnDefinition
-toSqlColumn { name, tipe } =
-    { name = name
-    , tipe = Just (typeToSqlType tipe)
-    , constraints =
-        case tipe of
-            Nullable _ ->
-                []
-
-            _ ->
-                [ CreateTable.UnnamedColumnConstraint (CreateTable.ColumnNotNull Nothing) ]
-    }
-
-
-typeToSqlType : ColumnType -> Types.Type
-typeToSqlType tipe =
-    case tipe of
-        Nullable x ->
-            typeToSqlType x
-
-        Integer ->
-            Types.Integer
-
-        Real ->
-            Types.Real
-
-        Text ->
-            Types.Text
+-- Tables --
 
 
 type alias StopTime =
@@ -149,8 +63,8 @@ type alias StopTime =
     }
 
 
-stopTimesTable : Table StopTime
-stopTimesTable =
+stopTimes : Table StopTime
+stopTimes =
     table "stop_times.txt" "stop_times" StopTime
         |> column "trip_id" .trip_id id
         |> nullColumn "arrival_time" .arrival_time clock
@@ -193,8 +107,8 @@ type alias Trip =
     }
 
 
-tripsTable : Table Trip
-tripsTable =
+trips : Table Trip
+trips =
     table "trips.txt" "trips" Trip
         |> column "route_id" .route_id id
         |> column "service_id" .service_id id
@@ -204,11 +118,11 @@ tripsTable =
         |> nullColumn "direction_id" .direction_id bool
         |> nullColumn "block_id" .block_id id
         |> nullColumn "shape_id" .shape_id id
-        |> nullColumn "wheelchair_accessible" .wheelchair_accessible accessibilityEncoder
-        |> nullColumn "bikes_allowed" .bikes_allowed accessibilityEncoder
+        |> nullColumn "wheelchair_accessible" .wheelchair_accessible accessibility
+        |> nullColumn "bikes_allowed" .bikes_allowed accessibility
         |> withPrimaryKey [ "trip_id" ]
-        |> withForeignKey { columnName = "route_id", tableName = routesTable.name, mapsTo = Nothing }
-        |> withForeignKey { columnName = "shape_id", tableName = shapePointsTable.name, mapsTo = Nothing }
+        |> withForeignKey { columnName = "route_id", tableName = routes.name, mapsTo = Nothing }
+        |> withForeignKey { columnName = "shape_id", tableName = shapePoints.name, mapsTo = Nothing }
 
 
 type alias Route =
@@ -228,8 +142,8 @@ type alias Route =
     }
 
 
-routesTable : Table Route
-routesTable =
+routes : Table Route
+routes =
     table "routes.txt" "routes" Route
         |> column "route_id" .id id
         |> nullColumn "agency_id" .agency_id id
@@ -245,7 +159,7 @@ routesTable =
         |> nullColumn "continuous_drop_off" .continuous_drop_off pickupDropOffType
         |> nullColumn "network_id" .network_id id
         |> withPrimaryKey [ "route_id" ]
-        |> withForeignKey { columnName = "agency_id", tableName = agencyTable.name, mapsTo = Nothing }
+        |> withForeignKey { columnName = "agency_id", tableName = agency.name, mapsTo = Nothing }
 
 
 type alias ShapePoint =
@@ -257,8 +171,8 @@ type alias ShapePoint =
     }
 
 
-shapePointsTable : Table ShapePoint
-shapePointsTable =
+shapePoints : Table ShapePoint
+shapePoints =
     table "shapes.txt" "shape_points" ShapePoint
         |> column "shape_id" .shape_id id
         |> column "shape_pt_lat" .latitude angle
@@ -280,8 +194,8 @@ type alias Agency =
     }
 
 
-agencyTable : Table Agency
-agencyTable =
+agency : Table Agency
+agency =
     table "agency.txt" "agencies" Agency
         |> column "agency_id" .id id
         |> column "agency_name" .name string
@@ -308,8 +222,8 @@ type alias Calendar =
     }
 
 
-calendarsTable : Table Calendar
-calendarsTable =
+calendars : Table Calendar
+calendars =
     table "calendar.txt" "calendars" Calendar
         |> column "service_id" .id id
         |> column "monday" .monday bool
@@ -331,12 +245,12 @@ type alias CalendarDate =
     }
 
 
-calendarDatesTable : Table CalendarDate
-calendarDatesTable =
+calendarDates : Table CalendarDate
+calendarDates =
     table "calendar_dates.txt" "calendar_dates" CalendarDate
         |> column "service_id" .service_id id
         |> column "date" .date date
-        |> column "exception_type" .exception_type exceptionTypeEncoder
+        |> column "exception_type" .exception_type exceptionType
         |> withPrimaryKey [ "service_id", "date" ]
 
 
@@ -346,8 +260,8 @@ type alias Stop =
     , name : Maybe String
     , tts_name : Maybe String
     , description : Maybe String
-    , lat : Maybe Latitude
-    , lon : Maybe Longitude
+    , lat : Maybe Angle
+    , lon : Maybe Angle
     , zone_id : Maybe (Id ZoneId)
     , url : Maybe Url
     , location_type : LocationType
@@ -359,8 +273,8 @@ type alias Stop =
     }
 
 
-stopsTable : Table Stop
-stopsTable =
+stops : Table Stop
+stops =
     table "stops.txt" "stops" Stop
         |> column "stop_id" .id id
         |> nullColumn "stop_code" .code string
@@ -371,10 +285,10 @@ stopsTable =
         |> nullColumn "stop_lon" .lon angle
         |> nullColumn "zone_id" .zone_id id
         |> nullColumn "stop_url" .url url
-        |> column "location_type" .location_type locationTypeEncoder
+        |> column "location_type" .location_type locationType
         |> nullColumn "parent_station" .parent_station id
         |> nullColumn "stop_timezone" .timezone string
-        |> nullColumn "wheelchair_boarding" .wheelchair_boarding accessibilityEncoder
+        |> nullColumn "wheelchair_boarding" .wheelchair_boarding accessibility
         |> nullColumn "level_id" .level_id id
         |> nullColumn "platform_code" .platform_code string
         |> withPrimaryKey [ "stop_id" ]
@@ -398,8 +312,8 @@ type alias Pathway =
     }
 
 
-pathwaysTable : Table Pathway
-pathwaysTable =
+pathways : Table Pathway
+pathways =
     table "pathways.txt" "pathways" Pathway
         |> column "pathway_id" .id id
         |> column "from_stop_id" .from_stop_id id
@@ -414,12 +328,16 @@ pathwaysTable =
         |> nullColumn "signposted_as" .signposted_as string
         |> nullColumn "reversed_signposted_as" .reversed_signposted_as string
         |> withPrimaryKey [ "pathway_id" ]
-        |> withForeignKey { columnName = "from_stop_id", tableName = stopsTable.name, mapsTo = Just "stop_id" }
-        |> withForeignKey { columnName = "to_stop_id", tableName = stopsTable.name, mapsTo = Just "stop_id" }
+        |> withForeignKey { columnName = "from_stop_id", tableName = stops.name, mapsTo = Just "stop_id" }
+        |> withForeignKey { columnName = "to_stop_id", tableName = stops.name, mapsTo = Just "stop_id" }
 
 
-exceptionTypeEncoder : Codec ExceptionType
-exceptionTypeEncoder =
+
+-- Fields --
+
+
+exceptionType : Codec ExceptionType
+exceptionType =
     andThen parseExceptionType exceptionTypeToInt int
 
 
@@ -486,8 +404,8 @@ parsePickupDropOffType input =
             Err (String.fromInt input ++ " is not a valid pickup/drop off type")
 
 
-locationTypeEncoder : Codec LocationType
-locationTypeEncoder =
+locationType : Codec LocationType
+locationType =
     andThen parseLocationType locationTypeToInt int
 
 
@@ -532,8 +450,8 @@ parseLocationType input =
             Err (String.fromInt input ++ " is not a valid location type")
 
 
-accessibilityEncoder : Codec Accessibility
-accessibilityEncoder =
+accessibility : Codec Accessibility
+accessibility =
     andThen parseAccessibility accessibilityToInt int
 
 
@@ -622,19 +540,6 @@ parsePathwayMode input =
 
         _ ->
             Err (String.fromInt input ++ " is not a valid pathway mode")
-
-
-type RouteType
-    = TramStreetcarLightRail
-    | SubwayMetro
-    | Rail
-    | Bus
-    | Ferry
-    | CableTram
-    | AerialLift
-    | Funicular
-    | Trolleybus
-    | Monorail
 
 
 routeType : Codec RouteType

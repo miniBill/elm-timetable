@@ -4,12 +4,13 @@ import Angle
 import Date exposing (Date)
 import Dict exposing (Dict)
 import GTFS
-import GTFS.SQLSource exposing (Calendar, CalendarDate, Pathway, Stop, StopTime, Trip)
+import GTFS.Tables exposing (Calendar, CalendarDate, Pathway, Stop, StopTime, Trip)
 import Id exposing (Id, PathwayId, ServiceId, StopId, TripId)
 import IdDict exposing (IdDict)
 import IdDict.Extra
 import IdSet exposing (IdSet)
 import List.Extra
+import SQLite.TableBuilder
 import Time exposing (Weekday(..))
 
 
@@ -92,7 +93,7 @@ filterTrips today calendarDates calendars trips =
                 case
                     calendarDates
                         |> IdDict.get trip.service_id
-                        |> Maybe.andThen (Dict.get (GTFS.dateToInt today))
+                        |> Maybe.andThen (Dict.get (SQLite.TableBuilder.dateToInt today))
                 of
                     Just { exception_type } ->
                         exception_type == GTFS.ServiceAdded

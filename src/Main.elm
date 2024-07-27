@@ -6,7 +6,7 @@ import Date exposing (Date)
 import Dict
 import Feed exposing (Feed)
 import GTFS
-import GTFS.SQLSource exposing (Pathway, Stop, StopTime, Trip)
+import GTFS.Tables as Tables exposing (Pathway, Stop, StopTime, Trip)
 import Html.Lazy
 import Http
 import Id exposing (FeedId, Id, StopId, TripId)
@@ -95,7 +95,7 @@ init _ =
                                         IdDict.insert calendarDate.service_id
                                             (IdDict.get calendarDate.service_id acc
                                                 |> Maybe.withDefault Dict.empty
-                                                |> Dict.insert (GTFS.dateToInt calendarDate.date)
+                                                |> Dict.insert (SQLite.TableBuilder.dateToInt calendarDate.date)
                                                     calendarDate
                                             )
                                             acc
@@ -104,14 +104,14 @@ init _ =
                         }
                     )
                     (Task.map3 (\l m r -> ( l, m, r ))
-                        (getCSVId feed GTFS.SQLSource.stopsTable)
-                        (getCSVId feed GTFS.SQLSource.pathwaysTable)
-                        (getCSV feed GTFS.SQLSource.stopTimesTable)
+                        (getCSVId feed Tables.stops)
+                        (getCSVId feed Tables.pathways)
+                        (getCSV feed Tables.stopTimes)
                     )
                     (Task.map3 (\l m r -> ( l, m, r ))
-                        (getCSVId feed GTFS.SQLSource.tripsTable)
-                        (getCSVId feed GTFS.SQLSource.calendarsTable)
-                        (getCSV feed GTFS.SQLSource.calendarDatesTable)
+                        (getCSVId feed Tables.trips)
+                        (getCSVId feed Tables.calendars)
+                        (getCSV feed Tables.calendarDates)
                     )
                     |> Task.attempt (GotFeed feed)
             )
