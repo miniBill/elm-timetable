@@ -2,9 +2,6 @@ module GTFS exposing (Accessibility(..), ExceptionType(..), Latitude, LocationTy
 
 import Angle exposing (Angle)
 import Date exposing (Date)
-import Duration exposing (Duration)
-import Id exposing (Id, PathwayId, ServiceId, StopId)
-import Length exposing (Length)
 
 
 type alias Timezone =
