@@ -149,6 +149,14 @@ type alias Table a =
     , primaryKey : List String
     , columns : List Column
     , encode : a -> Json.Encode.Value
+    , foreignKeys : List ForeignKey
+    }
+
+
+type alias ForeignKey =
+    { columnName : String
+    , tableName : String
+    , mapsTo : Maybe String
     }
 
 
@@ -173,23 +181,33 @@ type ColumnType
     | Nullable ColumnType
 
 
-object : String -> List String -> List ( Column, Encoder a ) -> Table a
-object name primaryKey children =
+object : String -> List ( Column, Encoder a ) -> Table a
+object name children =
     { name = name
-    , primaryKey = primaryKey
     , columns = List.map Tuple.first children
     , encode =
         \value ->
             children
                 |> List.map (\( col, prop ) -> ( col.name, prop value ))
                 |> Json.Encode.object
+    , foreignKeys = []
+    , primaryKey = []
     }
+
+
+withPrimaryKey : List String -> Table a -> Table a
+withPrimaryKey columns table =
+    { table | primaryKey = columns }
+
+
+withForeignKey : ForeignKey -> Table a -> Table a
+withForeignKey fk table =
+    { table | foreignKeys = fk :: table.foreignKeys }
 
 
 stopTimeEncoder : Table StopTime
 stopTimeEncoder =
     object "stop_times"
-        [ "trip_id", "stop_sequence" ]
         [ required "trip_id" .trip_id id
         , optional "arrival_time" .arrival_time timeEncoder
         , optional "departure_time" .departure_time timeEncoder
@@ -209,12 +227,18 @@ stopTimeEncoder =
         , optional "pickup_booking_rule_id" .pickup_booking_rule_id id
         , optional "drop_off_booking_rule_id" .drop_off_booking_rule_id id
         ]
+        |> withPrimaryKey [ "trip_id", "stop_sequence" ]
+        |> withForeignKey { columnName = "trip_id", tableName = "trips", mapsTo = Nothing }
+        |> withForeignKey { columnName = "stop_id", tableName = "stops", mapsTo = Nothing }
+        |> withForeignKey { columnName = "location_group_id", tableName = "location_groups", mapsTo = Nothing }
+        |> withForeignKey { columnName = "location_id", tableName = "locations", mapsTo = Nothing }
+        |> withForeignKey { columnName = "pickup_booking_rule_id", tableName = "booking_rules", mapsTo = Nothing }
+        |> withForeignKey { columnName = "drop_off_booking_rule_id", tableName = "booking_rules", mapsTo = Nothing }
 
 
 tripEncoder : Table Trip
 tripEncoder =
     object "trips"
-        [ "trip_id" ]
         [ required "route_id" .route_id id
         , required "service_id" .service_id id
         , required "trip_id" .id id
@@ -226,12 +250,14 @@ tripEncoder =
         , optional "wheelchair_accessible" .wheelchair_accessible accessibilityEncoder
         , optional "bikes_allowed" .bikes_allowed accessibilityEncoder
         ]
+        |> withPrimaryKey [ "trip_id" ]
+        |> withForeignKey { columnName = "route_id", tableName = "routes", mapsTo = Nothing }
+        |> withForeignKey { columnName = "shape_id", tableName = "shapes", mapsTo = Nothing }
 
 
 calendarEncoder : Table Calendar
 calendarEncoder =
     object "calendar"
-        [ "service_id" ]
         [ required "service_id" .id id
         , required "monday" .monday boolEncoder
         , required "tuesday" .tuesday boolEncoder
@@ -243,16 +269,17 @@ calendarEncoder =
         , required "start_date" .start_date dateEncoder
         , required "end_date" .end_date dateEncoder
         ]
+        |> withPrimaryKey [ "service_id" ]
 
 
 calendarDateEncoder : Table CalendarDate
 calendarDateEncoder =
     object "calendar_dates"
-        [ "service_id", "date" ]
         [ required "service_id" .service_id id
         , required "date" .date dateEncoder
         , required "exception_type" .exception_type exceptionTypeEncoder
         ]
+        |> withPrimaryKey [ "service_id", "date" ]
 
 
 exceptionTypeEncoder : TypedEncoder ExceptionType
@@ -314,7 +341,6 @@ pickupDropOffTypeToInt input =
 stopEncoder : Table Stop
 stopEncoder =
     object "stops"
-        [ "stop_id" ]
         [ required "stop_id" .id id
         , optional "stop_code" .code string
         , optional "stop_name" .name string
@@ -331,12 +357,14 @@ stopEncoder =
         , optional "level_id" .level_id id
         , optional "platform_code" .platform_code string
         ]
+        |> withPrimaryKey [ "stop_id" ]
+        |> withForeignKey { columnName = "parent_station", tableName = "stops", mapsTo = Just "stop_id" }
+        |> withForeignKey { columnName = "level_id", tableName = "levels", mapsTo = Nothing }
 
 
 pathwayEncoder : Table Pathway
 pathwayEncoder =
     object "pathways"
-        [ "pathway_id" ]
         [ required "pathway_id" .id id
         , required "from_stop_id" .from_stop_id id
         , required "to_stop_id" .to_stop_id id
@@ -350,6 +378,9 @@ pathwayEncoder =
         , optional "signposted_as" .signposted_as string
         , optional "reversed_signposted_as" .reversed_signposted_as string
         ]
+        |> withPrimaryKey [ "pathway_id" ]
+        |> withForeignKey { columnName = "from_stop_id", tableName = "stops", mapsTo = Just "stop_id" }
+        |> withForeignKey { columnName = "to_stop_id", tableName = "stops", mapsTo = Just "stop_id" }
 
 
 locationTypeEncoder : TypedEncoder LocationType
