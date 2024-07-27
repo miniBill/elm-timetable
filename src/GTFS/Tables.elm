@@ -257,7 +257,7 @@ type alias Stop =
     , lon : Maybe Angle
     , zone_id : Maybe (Id ZoneId)
     , url : Maybe Url
-    , location_type : LocationType
+    , location_type : Maybe LocationType
     , parent_station : Maybe (Id StopId)
     , timezone : Maybe Timezone
     , wheelchair_boarding : Maybe Accessibility
@@ -283,7 +283,7 @@ stops =
         |> with (nullableColumn "stop_lon" .lon angle)
         |> with (nullableColumn "zone_id" .zone_id id)
         |> with (nullableColumn "stop_url" .url url)
-        |> with (column "location_type" .location_type locationType)
+        |> with (nullableColumn "location_type" .location_type locationType)
         |> with (nullableColumn "parent_station" .parent_station id |> withForeignKeyTo name "stop_id")
         |> with (nullableColumn "stop_timezone" .timezone string)
         |> with (nullableColumn "wheelchair_boarding" .wheelchair_boarding accessibility)

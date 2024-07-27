@@ -1,5 +1,6 @@
 module GTFS.ToSQL exposing (toCreate)
 
+import List.Extra
 import SQLite.Statement as Statement
 import SQLite.Statement.CreateTable as CreateTable
 import SQLite.TableBuilder exposing (Table)
@@ -32,8 +33,9 @@ toTableDefinition { columns, primaryKey, foreignKeys } =
     let
         primaryKeyConstraint : CreateTable.TableConstraint
         primaryKeyConstraint =
-            CreateTable.UnnamedTableConstraint
-                (CreateTable.TablePrimaryKey
+            { name = Nothing
+            , constraint =
+                CreateTable.TablePrimaryKey
                     (List.map
                         (\name ->
                             { nameOrExpr = CreateTable.IsName name
@@ -44,38 +46,84 @@ toTableDefinition { columns, primaryKey, foreignKeys } =
                         (feedColumn.name :: primaryKey)
                     )
                     Nothing
-                )
+            }
+
+        ( columnForeignKeys, columnsWithoutForeignKeys ) =
+            columns
+                |> List.map
+                    (\column ->
+                        case
+                            List.Extra.findMap
+                                (\{ constraint } ->
+                                    case constraint of
+                                        CreateTable.ColumnForeignKey fk ->
+                                            Just fk
+
+                                        _ ->
+                                            Nothing
+                                )
+                                column.constraints
+                        of
+                            Just fk ->
+                                ( Just ( column.name, fk )
+                                , { column
+                                    | constraints =
+                                        List.Extra.removeWhen
+                                            (\{ constraint } -> constraint == CreateTable.ColumnForeignKey fk)
+                                            column.constraints
+                                  }
+                                )
+
+                            Nothing ->
+                                ( Nothing, column )
+                    )
+                |> List.unzip
     in
     CreateTable.TableDefinitionColumns
         { options =
             { strict = True
             , withoutRowid = False
             }
-        , columns = feedColumn :: columns
+        , columns = feedColumn :: columnsWithoutForeignKeys
         , constraints =
-            primaryKeyConstraint :: List.map foreignKeyToConstraint foreignKeys
+            primaryKeyConstraint
+                :: List.filterMap
+                    (Maybe.map
+                        (\( name, foreignKeyClause ) ->
+                            { name = Nothing
+                            , constraint =
+                                CreateTable.TableForeignKey
+                                    [ "feed", name ]
+                                    { foreignKeyClause
+                                        | columnNames =
+                                            if List.isEmpty foreignKeyClause.columnNames then
+                                                [ "feed", name ]
+
+                                            else
+                                                "feed" :: foreignKeyClause.columnNames
+                                    }
+                            }
+                        )
+                    )
+                    columnForeignKeys
+                ++ List.map foreignKeyToConstraint foreignKeys
         }
 
 
 foreignKeyToConstraint : SQLite.TableBuilder.ForeignKey -> CreateTable.TableConstraint
 foreignKeyToConstraint { columnName, tableName, mapsTo } =
-    CreateTable.UnnamedTableConstraint
-        (CreateTable.TableForeignKey
-            [ columnName ]
+    { name = Nothing
+    , constraint =
+        CreateTable.TableForeignKey
+            [ "feed", columnName ]
             { foreignTable = tableName
-            , columnNames =
-                case mapsTo of
-                    Nothing ->
-                        []
-
-                    Just mt ->
-                        [ mt ]
+            , columnNames = [ "feed", Maybe.withDefault columnName mapsTo ]
             , onDelete = Nothing
             , onUpdate = Nothing
             , match = Nothing
             , defer = Nothing
             }
-        )
+    }
 
 
 feedColumn : CreateTable.ColumnDefinition
@@ -83,5 +131,5 @@ feedColumn =
     { name = "feed"
     , tipe = Just Types.Text
     , constraints =
-        [ CreateTable.UnnamedColumnConstraint (CreateTable.ColumnNotNull Nothing) ]
+        [ { name = Nothing, constraint = CreateTable.ColumnNotNull Nothing } ]
     }

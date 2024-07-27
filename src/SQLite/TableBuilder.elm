@@ -87,7 +87,7 @@ column name getter ( tipe, encode, decoder ) =
     { definition =
         { name = name
         , tipe = Just tipe
-        , constraints = [ CreateTable.UnnamedColumnConstraint (CreateTable.ColumnNotNull Nothing) ]
+        , constraints = [ { name = Nothing, constraint = CreateTable.ColumnNotNull Nothing } ]
         }
     , encode = \v -> encode (getter v)
     , decoder = Csv.Decode.field name decoder
@@ -127,8 +127,9 @@ withForeignKeyTo tableName columnName ({ definition } as c) =
         | definition =
             { definition
                 | constraints =
-                    CreateTable.UnnamedColumnConstraint
-                        (CreateTable.ColumnForeignKey
+                    { name = Nothing
+                    , constraint =
+                        CreateTable.ColumnForeignKey
                             { foreignTable = tableName
                             , columnNames = [ columnName ]
                             , onDelete = Nothing
@@ -136,7 +137,7 @@ withForeignKeyTo tableName columnName ({ definition } as c) =
                             , match = Nothing
                             , defer = Nothing
                             }
-                        )
+                    }
                         :: definition.constraints
             }
     }
@@ -148,8 +149,9 @@ withForeignKey tableName ({ definition } as c) =
         | definition =
             { definition
                 | constraints =
-                    CreateTable.UnnamedColumnConstraint
-                        (CreateTable.ColumnForeignKey
+                    { name = Nothing
+                    , constraint =
+                        CreateTable.ColumnForeignKey
                             { foreignTable = tableName
                             , columnNames = []
                             , onDelete = Nothing
@@ -157,7 +159,7 @@ withForeignKey tableName ({ definition } as c) =
                             , match = Nothing
                             , defer = Nothing
                             }
-                        )
+                    }
                         :: definition.constraints
             }
     }

@@ -365,7 +365,7 @@ viewStops search { stops } =
             , maybeColumn "lon" .lon Table.angle
             , maybeColumn "zone_id" .zone_id Table.id
             , maybeColumn "url" .url Table.url
-            , Theme.tableColumn "location_type" .location_type (Table.string << GTFS.locationTypeToString)
+            , maybeColumn "location_type" .location_type (Table.string << GTFS.locationTypeToString)
             , maybeColumn "parent_station" .parent_station (Table.string << stopName stops)
             , maybeColumn "timezone" .timezone Table.string
             , maybeColumn "wheelchair_boarding" .wheelchair_boarding Table.accessibility
