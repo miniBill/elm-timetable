@@ -1,6 +1,7 @@
-module Clock exposing (Clock, fromHoursMinutesSeconds, toHumanString, toString)
+module Clock exposing (Clock, fromHoursMinutesSeconds, parser, toHumanString, toString)
 
 import Duration exposing (Seconds)
+import Parser exposing ((|.), (|=), Parser)
 import Quantity exposing (Quantity(..))
 
 
@@ -72,3 +73,30 @@ toHumanString (Quantity fromStartOfDay) =
 fromHoursMinutesSeconds : Int -> Int -> Int -> Clock
 fromHoursMinutesSeconds h m s =
     Quantity (h * 3600 + m * 60 + s)
+
+
+parser : Parser Clock
+parser =
+    Parser.succeed fromHoursMinutesSeconds
+        |= intParser
+        |. Parser.symbol ":"
+        |= intParser
+        |. Parser.symbol ":"
+        |= intParser
+
+
+intParser : Parser Int
+intParser =
+    (Parser.chompIf Char.isDigit
+        |. Parser.chompWhile Char.isDigit
+    )
+        |> Parser.getChompedString
+        |> Parser.andThen
+            (\r ->
+                case String.toInt r of
+                    Just i ->
+                        Parser.succeed i
+
+                    Nothing ->
+                        Parser.problem (r ++ " is not a valid number")
+            )

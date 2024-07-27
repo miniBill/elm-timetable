@@ -1,29 +1,11 @@
 module GTFS.SQLSource exposing
-    ( Codec
-    , Column
-    , ColumnType(..)
-    , ForeignKey
-    , Table
-    , accessibilityToInt
-    , angle
-    , bool
-    , boolToInt
+    ( accessibilityToInt
     , calendarDatesTable
     , calendarTable
-    , clock
-    , column
-    , dateEncoder
-    , dateToInt
     , exceptionTypeEncoder
     , exceptionTypeToInt
-    , float
-    , id
-    , int
     , locationTypeEncoder
     , locationTypeToInt
-    , map
-    , meters
-    , nullColumn
     , pathwayMode
     , pathwayModeToInt
     , pathwaysTable
@@ -31,29 +13,20 @@ module GTFS.SQLSource exposing
     , pickupDropOffTypeToInt
     , stopTimesTable
     , stopsTable
-    , string
-    , table
     , toCreate
     , toSqlColumn
     , toTableDefinition
     , tripsTable
     , typeToSqlType
-    , url
     )
 
 import Angle exposing (Angle)
-import Clock exposing (Clock)
-import Csv.Decode
-import Date exposing (Date)
-import Duration exposing (Duration)
 import GTFS exposing (Accessibility(..), Calendar, CalendarDate, ExceptionType(..), LocationType(..), Pathway, PathwayMode(..), PickupDropOffType(..), Stop, StopTime, Timezone, Trip)
 import Id exposing (AgencyId, Id, NetworkId, RouteId, ShapeId)
-import Json.Encode
 import Length exposing (Length)
-import Maybe.Extra
-import Parser exposing ((|.), (|=), Parser)
 import SQLite.Statement as Statement
 import SQLite.Statement.CreateTable as CreateTable
+import SQLite.TableBuilder exposing (Codec, Color, Column, ColumnType(..), Table, andThen, angle, bool, clock, color, column, date, float, id, int, kilometers, meters, nullColumn, seconds, string, table, url, withForeignKey, withPrimaryKey)
 import SQLite.Types as Types
 import Url exposing (Url)
 
@@ -142,80 +115,6 @@ typeToSqlType tipe =
 
         Text ->
             Types.Text
-
-
-type alias TableBuilder a ctor =
-    { name : String
-    , columns : List Column
-    , encode : a -> List ( String, Json.Encode.Value )
-    , decoder : Csv.Decode.Decoder ctor
-    }
-
-
-type alias Table a =
-    { name : String
-    , primaryKey : List String
-    , columns : List Column
-    , encode : a -> Json.Encode.Value
-    , decoder : Csv.Decode.Decoder a
-    , foreignKeys : List ForeignKey
-    }
-
-
-type alias ForeignKey =
-    { columnName : String
-    , tableName : String
-    , mapsTo : Maybe String
-    }
-
-
-type alias Column =
-    { name : String
-    , tipe : ColumnType
-    }
-
-
-type alias Codec a =
-    ( ColumnType
-    , a -> Json.Encode.Value
-    , Csv.Decode.Decoder a
-    )
-
-
-type ColumnType
-    = Integer
-    | Real
-    | Text
-    | Nullable ColumnType
-
-
-table : String -> String -> ctor -> TableBuilder a ctor
-table filename name ctor =
-    { name = name
-    , columns = []
-    , encode = \_ -> []
-    , decoder = Csv.Decode.succeed ctor
-    }
-
-
-withPrimaryKey : List String -> TableBuilder a a -> Table a
-withPrimaryKey columns t =
-    { name = t.name
-    , columns = List.reverse t.columns
-    , encode =
-        \value ->
-            value
-                |> t.encode
-                |> Json.Encode.object
-    , decoder = t.decoder
-    , primaryKey = columns
-    , foreignKeys = []
-    }
-
-
-withForeignKey : ForeignKey -> Table a -> Table a
-withForeignKey fk t =
-    { t | foreignKeys = fk :: t.foreignKeys }
 
 
 stopTimesTable : Table StopTime
@@ -360,8 +259,8 @@ calendarTable =
         |> column "friday" .friday bool
         |> column "saturday" .saturday bool
         |> column "sunday" .sunday bool
-        |> column "start_date" .start_date dateEncoder
-        |> column "end_date" .end_date dateEncoder
+        |> column "start_date" .start_date date
+        |> column "end_date" .end_date date
         |> withPrimaryKey [ "service_id" ]
 
 
@@ -369,7 +268,7 @@ calendarDatesTable : Table CalendarDate
 calendarDatesTable =
     table "calendar_dates.txt" "calendar_dates" CalendarDate
         |> column "service_id" .service_id id
-        |> column "date" .date dateEncoder
+        |> column "date" .date date
         |> column "exception_type" .exception_type exceptionTypeEncoder
         |> withPrimaryKey [ "service_id", "date" ]
 
@@ -400,34 +299,6 @@ parseExceptionType input =
 
         _ ->
             Err (String.fromInt input ++ " is not a valid exception type")
-
-
-dateEncoder : Codec Date
-dateEncoder =
-    map dateFromInt dateToInt int
-
-
-dateFromInt : Int -> Date
-dateFromInt input =
-    let
-        year : Int
-        year =
-            input // 10000
-
-        month : Date.Month
-        month =
-            Date.numberToMonth (modBy 100 (input // 100))
-
-        day : Int
-        day =
-            modBy 100 input
-    in
-    Date.fromCalendarDate year month day
-
-
-dateToInt : Date -> Int
-dateToInt date =
-    Date.year date * 10000 + Date.monthNumber date * 100 + Date.day date
 
 
 pickupDropOffType : Codec PickupDropOffType
@@ -657,86 +528,6 @@ parsePathwayMode input =
 --------------------
 
 
-column :
-    String
-    -> (a -> p)
-    -> Codec p
-    -> TableBuilder a (p -> b)
-    -> TableBuilder a b
-column name getter ( tipe, encode, decoder ) builder =
-    { name = builder.name
-    , columns =
-        { name = name
-        , tipe = tipe
-        }
-            :: builder.columns
-    , encode = \v -> ( name, encode (getter v) ) :: builder.encode v
-    , decoder =
-        builder.decoder
-            |> Csv.Decode.pipeline decoder
-    }
-
-
-nullColumn :
-    String
-    -> (a -> Maybe p)
-    -> Codec p
-    -> TableBuilder a (Maybe p -> b)
-    -> TableBuilder a b
-nullColumn name getter ( tipe, encode, decoder ) builder =
-    { name = builder.name
-    , columns =
-        { name = name
-        , tipe = Nullable tipe
-        }
-            :: builder.columns
-    , encode =
-        \v ->
-            ( name
-            , case getter v of
-                Nothing ->
-                    Json.Encode.null
-
-                Just w ->
-                    encode w
-            )
-                :: builder.encode v
-    , decoder =
-        builder.decoder
-            |> Csv.Decode.pipeline
-                (decoder
-                    |> Csv.Decode.blank
-                    |> Csv.Decode.optionalField name
-                    |> Csv.Decode.map Maybe.Extra.join
-                )
-    }
-
-
-map : (a -> b) -> (b -> a) -> Codec a -> Codec b
-map back go ( tipe, encode, decoder ) =
-    ( tipe
-    , \value -> encode (go value)
-    , Csv.Decode.map back decoder
-    )
-
-
-andThen : (a -> Result String b) -> (b -> a) -> Codec a -> Codec b
-andThen go back ( tipe, encode, decoder ) =
-    ( tipe
-    , \value -> encode (back value)
-    , decoder
-        |> Csv.Decode.andThen
-            (\raw ->
-                case go raw of
-                    Ok v ->
-                        Csv.Decode.succeed v
-
-                    Err e ->
-                        Csv.Decode.fail e
-            )
-    )
-
-
 type RouteType
     = TramStreetcarLightRail
     | SubwayMetro
@@ -824,136 +615,3 @@ parseRouteType input =
 
         _ ->
             Err (String.fromInt input ++ " is not a valid route type")
-
-
-type alias Color =
-    String
-
-
-color : Codec Color
-color =
-    string
-
-
-id : Codec (Id kind)
-id =
-    map Id.fromString Id.toString string
-
-
-clock : Codec Clock
-clock =
-    andThen (parsed "time" timeParser) Clock.toString string
-
-
-parsed : String -> Parser a -> String -> Result String a
-parsed label parser input =
-    case Parser.run parser input of
-        Err _ ->
-            Err (input ++ " is not a valid " ++ label)
-
-        Ok v ->
-            Ok v
-
-
-timeParser : Parser Clock
-timeParser =
-    Parser.succeed Clock.fromHoursMinutesSeconds
-        |= intParser
-        |. Parser.symbol ":"
-        |= intParser
-        |. Parser.symbol ":"
-        |= intParser
-
-
-intParser : Parser Int
-intParser =
-    (Parser.chompIf Char.isDigit
-        |. Parser.chompWhile Char.isDigit
-    )
-        |> Parser.getChompedString
-        |> Parser.andThen
-            (\r ->
-                case String.toInt r of
-                    Just i ->
-                        Parser.succeed i
-
-                    Nothing ->
-                        Parser.problem (r ++ " is not a valid number")
-            )
-
-
-bool : Codec Bool
-bool =
-    andThen parseBool boolToInt int
-
-
-parseBool : Int -> Result String Bool
-parseBool input =
-    case input of
-        0 ->
-            Ok False
-
-        1 ->
-            Ok True
-
-        _ ->
-            Err (String.fromInt input ++ " is not a valid bool")
-
-
-boolToInt : Bool -> Int
-boolToInt input =
-    if input then
-        1
-
-    else
-        0
-
-
-seconds : Codec Duration
-seconds =
-    map Duration.seconds Duration.inSeconds float
-
-
-meters : Codec Length
-meters =
-    map Length.meters Length.inMeters float
-
-
-kilometers : Codec Length
-kilometers =
-    map Length.kilometers Length.inKilometers float
-
-
-angle : Codec Angle
-angle =
-    map Angle.degrees Angle.inDegrees float
-
-
-url : Codec Url
-url =
-    andThen
-        (\v ->
-            case Url.fromString v of
-                Nothing ->
-                    Err (v ++ " is not a valid URL")
-
-                Just res ->
-                    Ok res
-        )
-        Url.toString
-        string
-
-
-string : Codec String
-string =
-    ( Text, Json.Encode.string, Csv.Decode.string )
-
-
-float : Codec Float
-float =
-    ( Real, Json.Encode.float, Csv.Decode.float )
-
-
-int : Codec Int
-int =
-    ( Integer, Json.Encode.int, Csv.Decode.int )
