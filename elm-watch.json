@@ -1,9 +1,7 @@
 {
     "targets": {
         "Main": {
-            "inputs": [
-                "src/Main.elm"
-            ],
+            "inputs": ["src/Main.elm", "src/SQL.elm"],
             "output": "build/main.js"
         }
     },
