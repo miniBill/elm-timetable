@@ -1,57 +1,57 @@
 module GTFS.SQLSource exposing
-    ( Column
+    ( Codec
+    , Column
     , ColumnType(..)
-    , Encoder
+    , ForeignKey
     , Table
-    , TypedEncoder
-    , accessibilityEncoder
     , accessibilityToInt
-    , angleEncoder
-    , boolEncoder
+    , angle
+    , bool
     , boolToInt
-    , calendarDateEncoder
-    , calendarEncoder
+    , calendarDatesTable
+    , calendarTable
+    , clock
+    , column
     , dateEncoder
     , dateToInt
-    , dateToString
     , exceptionTypeEncoder
     , exceptionTypeToInt
     , float
     , id
     , int
-    , length
     , locationTypeEncoder
     , locationTypeToInt
     , map
-    , maybe
-    , object
-    , optional
-    , pathwayEncoder
-    , pathwayModeEncoder
+    , meters
+    , nullColumn
+    , pathwayMode
     , pathwayModeToInt
-    , pickupDropOffTypeEncoder
+    , pathwaysTable
+    , pickupDropOffType
     , pickupDropOffTypeToInt
-    , required
-    , stopEncoder
-    , stopTimeEncoder
+    , stopTimesTable
+    , stopsTable
     , string
-    , timeEncoder
+    , table
     , toCreate
     , toSqlColumn
     , toTableDefinition
-    , tripEncoder
+    , tripsTable
     , typeToSqlType
-    , urlEncoder
+    , url
     )
 
 import Angle exposing (Angle)
 import Clock exposing (Clock)
+import Csv.Decode
 import Date exposing (Date)
-import Duration
-import GTFS exposing (Accessibility(..), Calendar, CalendarDate, ExceptionType(..), LocationType(..), Pathway, PathwayMode(..), PickupDropOffType(..), Stop, StopTime, Trip)
-import Id exposing (Id)
+import Duration exposing (Duration)
+import GTFS exposing (Accessibility(..), Calendar, CalendarDate, ExceptionType(..), LocationType(..), Pathway, PathwayMode(..), PickupDropOffType(..), Stop, StopTime, Timezone, Trip)
+import Id exposing (AgencyId, Id, NetworkId, RouteId, ShapeId)
 import Json.Encode
 import Length exposing (Length)
+import Maybe.Extra
+import Parser exposing ((|.), (|=), Parser)
 import SQLite.Statement as Statement
 import SQLite.Statement.CreateTable as CreateTable
 import SQLite.Types as Types
@@ -69,24 +69,24 @@ toCreate :
     }
     -> Table a
     -> Statement.Statement
-toCreate config table =
+toCreate config t =
     Statement.CreateTable
-        { name = table.name
+        { name = t.name
         , ifNotExists = config.ifNotExists
         , temporary = False
         , schemaName = Nothing
-        , definition = toTableDefinition table
+        , definition = toTableDefinition t
         }
 
 
 toTableDefinition : Table a -> CreateTable.TableDefinition
-toTableDefinition table =
+toTableDefinition { columns, primaryKey } =
     CreateTable.TableDefinitionColumns
         { options =
             { strict = True
             , withoutRowid = False
             }
-        , columns = feedColumn :: List.map toSqlColumn table.columns
+        , columns = feedColumn :: List.map toSqlColumn columns
         , constraints =
             [ CreateTable.UnnamedTableConstraint
                 (CreateTable.TablePrimaryKey
@@ -97,7 +97,7 @@ toTableDefinition table =
                             , ascDesc = Nothing
                             }
                         )
-                        (feedColumn.name :: table.primaryKey)
+                        (feedColumn.name :: primaryKey)
                     )
                     Nothing
                 )
@@ -115,11 +115,11 @@ feedColumn =
 
 
 toSqlColumn : Column -> CreateTable.ColumnDefinition
-toSqlColumn column =
-    { name = column.name
-    , tipe = Just (typeToSqlType column.tipe)
+toSqlColumn { name, tipe } =
+    { name = name
+    , tipe = Just (typeToSqlType tipe)
     , constraints =
-        case column.tipe of
+        case tipe of
             Nullable _ ->
                 []
 
@@ -144,11 +144,20 @@ typeToSqlType tipe =
             Types.Text
 
 
+type alias TableBuilder a ctor =
+    { name : String
+    , columns : List Column
+    , encode : a -> List ( String, Json.Encode.Value )
+    , decoder : Csv.Decode.Decoder ctor
+    }
+
+
 type alias Table a =
     { name : String
     , primaryKey : List String
     , columns : List Column
     , encode : a -> Json.Encode.Value
+    , decoder : Csv.Decode.Decoder a
     , foreignKeys : List ForeignKey
     }
 
@@ -166,12 +175,11 @@ type alias Column =
     }
 
 
-type alias TypedEncoder a =
-    ( ColumnType, Encoder a )
-
-
-type alias Encoder a =
-    a -> Json.Encode.Value
+type alias Codec a =
+    ( ColumnType
+    , a -> Json.Encode.Value
+    , Csv.Decode.Decoder a
+    )
 
 
 type ColumnType
@@ -181,52 +189,56 @@ type ColumnType
     | Nullable ColumnType
 
 
-object : String -> List ( Column, Encoder a ) -> Table a
-object name children =
+table : String -> String -> ctor -> TableBuilder a ctor
+table filename name ctor =
     { name = name
-    , columns = List.map Tuple.first children
-    , encode =
-        \value ->
-            children
-                |> List.map (\( col, prop ) -> ( col.name, prop value ))
-                |> Json.Encode.object
-    , foreignKeys = []
-    , primaryKey = []
+    , columns = []
+    , encode = \_ -> []
+    , decoder = Csv.Decode.succeed ctor
     }
 
 
-withPrimaryKey : List String -> Table a -> Table a
-withPrimaryKey columns table =
-    { table | primaryKey = columns }
+withPrimaryKey : List String -> TableBuilder a a -> Table a
+withPrimaryKey columns t =
+    { name = t.name
+    , columns = List.reverse t.columns
+    , encode =
+        \value ->
+            value
+                |> t.encode
+                |> Json.Encode.object
+    , decoder = t.decoder
+    , primaryKey = columns
+    , foreignKeys = []
+    }
 
 
 withForeignKey : ForeignKey -> Table a -> Table a
-withForeignKey fk table =
-    { table | foreignKeys = fk :: table.foreignKeys }
+withForeignKey fk t =
+    { t | foreignKeys = fk :: t.foreignKeys }
 
 
-stopTimeEncoder : Table StopTime
-stopTimeEncoder =
-    object "stop_times"
-        [ required "trip_id" .trip_id id
-        , optional "arrival_time" .arrival_time timeEncoder
-        , optional "departure_time" .departure_time timeEncoder
-        , optional "stop_id" .stop_id id
-        , optional "location_group_id" .location_group_id id
-        , optional "location_id" .location_id id
-        , required "stop_sequence" .stop_sequence int
-        , optional "stop_headsign" .stop_headsign string
-        , optional "start_pickup_drop_off_window" .start_pickup_drop_off_window timeEncoder
-        , optional "end_pickup_drop_off_window" .end_pickup_drop_off_window timeEncoder
-        , optional "pickup_type" .pickup_type pickupDropOffTypeEncoder
-        , optional "drop_off_type" .drop_off_type pickupDropOffTypeEncoder
-        , optional "continuous_pickup" .continuous_pickup pickupDropOffTypeEncoder
-        , optional "continuous_drop_off" .continuous_drop_off pickupDropOffTypeEncoder
-        , optional "shape_dist_traveled" .shape_dist_traveled float
-        , optional "timepoint" .timepoint boolEncoder
-        , optional "pickup_booking_rule_id" .pickup_booking_rule_id id
-        , optional "drop_off_booking_rule_id" .drop_off_booking_rule_id id
-        ]
+stopTimesTable : Table StopTime
+stopTimesTable =
+    table "stop_times.txt" "stop_times" StopTime
+        |> column "trip_id" .trip_id id
+        |> nullColumn "arrival_time" .arrival_time clock
+        |> nullColumn "departure_time" .departure_time clock
+        |> nullColumn "stop_id" .stop_id id
+        |> nullColumn "location_group_id" .location_group_id id
+        |> nullColumn "location_id" .location_id id
+        |> column "stop_sequence" .stop_sequence int
+        |> nullColumn "stop_headsign" .stop_headsign string
+        |> nullColumn "start_pickup_drop_off_window" .start_pickup_drop_off_window clock
+        |> nullColumn "end_pickup_drop_off_window" .end_pickup_drop_off_window clock
+        |> nullColumn "pickup_type" .pickup_type pickupDropOffType
+        |> nullColumn "drop_off_type" .drop_off_type pickupDropOffType
+        |> nullColumn "continuous_pickup" .continuous_pickup pickupDropOffType
+        |> nullColumn "continuous_drop_off" .continuous_drop_off pickupDropOffType
+        |> nullColumn "shape_dist_traveled" .shape_dist_traveled float
+        |> nullColumn "timepoint" .timepoint bool
+        |> nullColumn "pickup_booking_rule_id" .pickup_booking_rule_id id
+        |> nullColumn "drop_off_booking_rule_id" .drop_off_booking_rule_id id
         |> withPrimaryKey [ "trip_id", "stop_sequence" ]
         |> withForeignKey { columnName = "trip_id", tableName = "trips", mapsTo = Nothing }
         |> withForeignKey { columnName = "stop_id", tableName = "stops", mapsTo = Nothing }
@@ -236,55 +248,135 @@ stopTimeEncoder =
         |> withForeignKey { columnName = "drop_off_booking_rule_id", tableName = "booking_rules", mapsTo = Nothing }
 
 
-tripEncoder : Table Trip
-tripEncoder =
-    object "trips"
-        [ required "route_id" .route_id id
-        , required "service_id" .service_id id
-        , required "trip_id" .id id
-        , optional "trip_headsign" .headsign string
-        , optional "trip_short_name" .short_name string
-        , optional "direction_id" .direction_id boolEncoder
-        , optional "block_id" .block_id id
-        , optional "shape_id" .shape_id id
-        , optional "wheelchair_accessible" .wheelchair_accessible accessibilityEncoder
-        , optional "bikes_allowed" .bikes_allowed accessibilityEncoder
-        ]
+tripsTable : Table Trip
+tripsTable =
+    table "trips.txt" "trips" Trip
+        |> column "route_id" .route_id id
+        |> column "service_id" .service_id id
+        |> column "trip_id" .id id
+        |> nullColumn "trip_headsign" .headsign string
+        |> nullColumn "trip_short_name" .short_name string
+        |> nullColumn "direction_id" .direction_id bool
+        |> nullColumn "block_id" .block_id id
+        |> nullColumn "shape_id" .shape_id id
+        |> nullColumn "wheelchair_accessible" .wheelchair_accessible accessibilityEncoder
+        |> nullColumn "bikes_allowed" .bikes_allowed accessibilityEncoder
         |> withPrimaryKey [ "trip_id" ]
-        |> withForeignKey { columnName = "route_id", tableName = "routes", mapsTo = Nothing }
-        |> withForeignKey { columnName = "shape_id", tableName = "shapes", mapsTo = Nothing }
+        |> withForeignKey { columnName = "route_id", tableName = routesTable.name, mapsTo = Nothing }
+        |> withForeignKey { columnName = "shape_id", tableName = shapePointsTable.name, mapsTo = Nothing }
 
 
-calendarEncoder : Table Calendar
-calendarEncoder =
-    object "calendar"
-        [ required "service_id" .id id
-        , required "monday" .monday boolEncoder
-        , required "tuesday" .tuesday boolEncoder
-        , required "wednesday" .wednesday boolEncoder
-        , required "thursday" .thursday boolEncoder
-        , required "friday" .friday boolEncoder
-        , required "saturday" .saturday boolEncoder
-        , required "sunday" .sunday boolEncoder
-        , required "start_date" .start_date dateEncoder
-        , required "end_date" .end_date dateEncoder
-        ]
+type alias Route =
+    { id : Id RouteId
+    , agency_id : Maybe (Id AgencyId)
+    , short_name : Maybe String
+    , long_name : Maybe String
+    , description : Maybe String
+    , tipe : RouteType
+    , url : Maybe String
+    , color : Maybe Color
+    , text_color : Maybe Color
+    , sort_order : Maybe Int
+    , continuous_pickup : Maybe PickupDropOffType
+    , continuous_drop_off : Maybe PickupDropOffType
+    , network_id : Maybe (Id NetworkId)
+    }
+
+
+routesTable : Table Route
+routesTable =
+    table "routes.txt" "routes" Route
+        |> column "route_id" .id id
+        |> nullColumn "agency_id" .agency_id id
+        |> nullColumn "route_short_name" .short_name string
+        |> nullColumn "route_long_name" .long_name string
+        |> nullColumn "route_desc" .description string
+        |> column "route_type" .tipe routeType
+        |> nullColumn "route_url" .url string
+        |> nullColumn "route_color" .color color
+        |> nullColumn "route_text_color" .text_color color
+        |> nullColumn "route_sort_order" .sort_order int
+        |> nullColumn "continuous_pickup" .continuous_pickup pickupDropOffType
+        |> nullColumn "continuous_drop_off" .continuous_drop_off pickupDropOffType
+        |> nullColumn "network_id" .network_id id
+        |> withPrimaryKey [ "route_id" ]
+        |> withForeignKey { columnName = "agency_id", tableName = agencyTable.name, mapsTo = Nothing }
+
+
+type alias ShapePoint =
+    { shape_id : Id ShapeId
+    , latitude : Angle
+    , longitude : Angle
+    , sequence : Int
+    , distance_traveled : Maybe Length
+    }
+
+
+shapePointsTable : Table ShapePoint
+shapePointsTable =
+    table "shapes.txt" "shape_points" ShapePoint
+        |> column "shape_id" .shape_id id
+        |> column "shape_pt_lat" .latitude angle
+        |> column "shape_pt_lon" .longitude angle
+        |> column "shape_pt_sequence" .sequence int
+        |> nullColumn "shape_dist_traveled" .distance_traveled kilometers
+        |> withPrimaryKey [ "shape_id", "shape_pt_sequence" ]
+
+
+type alias Agency =
+    { id : Id AgencyId
+    , name : String
+    , url : Url
+    , timezone : Timezone
+    , lang : Maybe String
+    , phone : Maybe String
+    , fare_url : Maybe String
+    , email : Maybe String
+    }
+
+
+agencyTable : Table Agency
+agencyTable =
+    table "agency.txt" "agencies" Agency
+        |> column "agency_id" .id id
+        |> column "agency_name" .name string
+        |> column "agency_url" .url url
+        |> column "agency_timezone" .timezone string
+        |> nullColumn "agency_lang" .lang string
+        |> nullColumn "agency_phone" .phone string
+        |> nullColumn "agency_fare_url" .fare_url string
+        |> nullColumn "agency_email" .email string
+        |> withPrimaryKey [ "agency_id" ]
+
+
+calendarTable : Table Calendar
+calendarTable =
+    table "calendar.txt" "calendars" Calendar
+        |> column "service_id" .id id
+        |> column "monday" .monday bool
+        |> column "tuesday" .tuesday bool
+        |> column "wednesday" .wednesday bool
+        |> column "thursday" .thursday bool
+        |> column "friday" .friday bool
+        |> column "saturday" .saturday bool
+        |> column "sunday" .sunday bool
+        |> column "start_date" .start_date dateEncoder
+        |> column "end_date" .end_date dateEncoder
         |> withPrimaryKey [ "service_id" ]
 
 
-calendarDateEncoder : Table CalendarDate
-calendarDateEncoder =
-    object "calendar_dates"
-        [ required "service_id" .service_id id
-        , required "date" .date dateEncoder
-        , required "exception_type" .exception_type exceptionTypeEncoder
-        ]
+calendarDatesTable : Table CalendarDate
+calendarDatesTable =
+    table "calendar_dates.txt" "calendar_dates" CalendarDate
+        |> column "service_id" .service_id id
+        |> column "date" .date dateEncoder
+        |> column "exception_type" .exception_type exceptionTypeEncoder
         |> withPrimaryKey [ "service_id", "date" ]
 
 
-exceptionTypeEncoder : TypedEncoder ExceptionType
+exceptionTypeEncoder : Codec ExceptionType
 exceptionTypeEncoder =
-    map exceptionTypeToInt int
+    andThen parseExceptionType exceptionTypeToInt int
 
 
 exceptionTypeToInt : ExceptionType -> Int
@@ -297,19 +389,40 @@ exceptionTypeToInt input =
             2
 
 
-dateEncoder : TypedEncoder Date
+parseExceptionType : Int -> Result String ExceptionType
+parseExceptionType input =
+    case input of
+        1 ->
+            Ok ServiceAdded
+
+        2 ->
+            Ok ServiceRemoved
+
+        _ ->
+            Err (String.fromInt input ++ " is not a valid exception type")
+
+
+dateEncoder : Codec Date
 dateEncoder =
-    map dateToString string
+    map dateFromInt dateToInt int
 
 
-dateToString : Date -> String
-dateToString date =
+dateFromInt : Int -> Date
+dateFromInt input =
     let
-        pad : (Date -> Int) -> String
-        pad prop =
-            String.padLeft 2 '0' (String.fromInt (prop date))
+        year : Int
+        year =
+            input // 10000
+
+        month : Date.Month
+        month =
+            Date.numberToMonth (modBy 100 (input // 100))
+
+        day : Int
+        day =
+            modBy 100 input
     in
-    pad Date.year ++ pad Date.monthNumber ++ pad Date.day
+    Date.fromCalendarDate year month day
 
 
 dateToInt : Date -> Int
@@ -317,9 +430,9 @@ dateToInt date =
     Date.year date * 10000 + Date.monthNumber date * 100 + Date.day date
 
 
-pickupDropOffTypeEncoder : TypedEncoder PickupDropOffType
-pickupDropOffTypeEncoder =
-    map pickupDropOffTypeToInt int
+pickupDropOffType : Codec PickupDropOffType
+pickupDropOffType =
+    andThen parsePickupDropOffType pickupDropOffTypeToInt int
 
 
 pickupDropOffTypeToInt : PickupDropOffType -> Int
@@ -338,54 +451,71 @@ pickupDropOffTypeToInt input =
             3
 
 
-stopEncoder : Table Stop
-stopEncoder =
-    object "stops"
-        [ required "stop_id" .id id
-        , optional "stop_code" .code string
-        , optional "stop_name" .name string
-        , optional "tts_stop_name" .tts_name string
-        , optional "stop_desc" .description string
-        , optional "stop_lat" .lat angleEncoder
-        , optional "stop_lon" .lon angleEncoder
-        , optional "zone_id" .zone_id id
-        , optional "stop_url" .url urlEncoder
-        , required "location_type" .location_type locationTypeEncoder
-        , optional "parent_station" .parent_station id
-        , optional "stop_timezone" .timezone string
-        , optional "wheelchair_boarding" .wheelchair_boarding accessibilityEncoder
-        , optional "level_id" .level_id id
-        , optional "platform_code" .platform_code string
-        ]
+parsePickupDropOffType : Int -> Result String PickupDropOffType
+parsePickupDropOffType input =
+    case input of
+        0 ->
+            Ok RegularlyScheduled
+
+        1 ->
+            Ok NoPickupDropOff
+
+        2 ->
+            Ok PhoneAgency
+
+        3 ->
+            Ok CoordinateWithDriver
+
+        _ ->
+            Err (String.fromInt input ++ " is not a valid pickup/drop off type")
+
+
+stopsTable : Table Stop
+stopsTable =
+    table "stops.txt" "stops" Stop
+        |> column "stop_id" .id id
+        |> nullColumn "stop_code" .code string
+        |> nullColumn "stop_name" .name string
+        |> nullColumn "tts_stop_name" .tts_name string
+        |> nullColumn "stop_desc" .description string
+        |> nullColumn "stop_lat" .lat angle
+        |> nullColumn "stop_lon" .lon angle
+        |> nullColumn "zone_id" .zone_id id
+        |> nullColumn "stop_url" .url url
+        |> column "location_type" .location_type locationTypeEncoder
+        |> nullColumn "parent_station" .parent_station id
+        |> nullColumn "stop_timezone" .timezone string
+        |> nullColumn "wheelchair_boarding" .wheelchair_boarding accessibilityEncoder
+        |> nullColumn "level_id" .level_id id
+        |> nullColumn "platform_code" .platform_code string
         |> withPrimaryKey [ "stop_id" ]
         |> withForeignKey { columnName = "parent_station", tableName = "stops", mapsTo = Just "stop_id" }
         |> withForeignKey { columnName = "level_id", tableName = "levels", mapsTo = Nothing }
 
 
-pathwayEncoder : Table Pathway
-pathwayEncoder =
-    object "pathways"
-        [ required "pathway_id" .id id
-        , required "from_stop_id" .from_stop_id id
-        , required "to_stop_id" .to_stop_id id
-        , required "pathway_mode" .mode pathwayModeEncoder
-        , required "is_bidirectional" .is_bidirectional boolEncoder
-        , optional "length" .length length
-        , optional "traversal_time" .traversal_time (map Duration.inSeconds float)
-        , optional "stair_count" .stair_count int
-        , optional "max_slope" .max_slope float
-        , optional "min_width" .min_width length
-        , optional "signposted_as" .signposted_as string
-        , optional "reversed_signposted_as" .reversed_signposted_as string
-        ]
+pathwaysTable : Table Pathway
+pathwaysTable =
+    table "pathways.txt" "pathways" Pathway
+        |> column "pathway_id" .id id
+        |> column "from_stop_id" .from_stop_id id
+        |> column "to_stop_id" .to_stop_id id
+        |> column "pathway_mode" .mode pathwayMode
+        |> column "is_bidirectional" .is_bidirectional bool
+        |> nullColumn "length" .length meters
+        |> nullColumn "traversal_time" .traversal_time seconds
+        |> nullColumn "stair_count" .stair_count int
+        |> nullColumn "max_slope" .max_slope float
+        |> nullColumn "min_width" .min_width meters
+        |> nullColumn "signposted_as" .signposted_as string
+        |> nullColumn "reversed_signposted_as" .reversed_signposted_as string
         |> withPrimaryKey [ "pathway_id" ]
-        |> withForeignKey { columnName = "from_stop_id", tableName = "stops", mapsTo = Just "stop_id" }
-        |> withForeignKey { columnName = "to_stop_id", tableName = "stops", mapsTo = Just "stop_id" }
+        |> withForeignKey { columnName = "from_stop_id", tableName = stopsTable.name, mapsTo = Just "stop_id" }
+        |> withForeignKey { columnName = "to_stop_id", tableName = stopsTable.name, mapsTo = Just "stop_id" }
 
 
-locationTypeEncoder : TypedEncoder LocationType
+locationTypeEncoder : Codec LocationType
 locationTypeEncoder =
-    map locationTypeToInt int
+    andThen parseLocationType locationTypeToInt int
 
 
 locationTypeToInt : LocationType -> Int
@@ -407,9 +537,31 @@ locationTypeToInt input =
             4
 
 
-accessibilityEncoder : TypedEncoder Accessibility
+parseLocationType : Int -> Result String LocationType
+parseLocationType input =
+    case input of
+        0 ->
+            Ok StopPlatform
+
+        1 ->
+            Ok Station
+
+        2 ->
+            Ok EntranceExit
+
+        3 ->
+            Ok GenericNode
+
+        4 ->
+            Ok BoardingArea
+
+        _ ->
+            Err (String.fromInt input ++ " is not a valid location type")
+
+
+accessibilityEncoder : Codec Accessibility
 accessibilityEncoder =
-    map accessibilityToInt int
+    andThen parseAccessibility accessibilityToInt int
 
 
 accessibilityToInt : Accessibility -> Int
@@ -425,9 +577,25 @@ accessibilityToInt input =
             2
 
 
-pathwayModeEncoder : TypedEncoder PathwayMode
-pathwayModeEncoder =
-    map pathwayModeToInt int
+parseAccessibility : Int -> Result String Accessibility
+parseAccessibility input =
+    case input of
+        0 ->
+            Ok NoAccessibilityInformation
+
+        1 ->
+            Ok Accessibly
+
+        2 ->
+            Ok NotAccessible
+
+        _ ->
+            Err (String.fromInt input ++ " is not a valid accessibility")
+
+
+pathwayMode : Codec PathwayMode
+pathwayMode =
+    andThen parsePathwayMode pathwayModeToInt int
 
 
 pathwayModeToInt : PathwayMode -> Int
@@ -455,25 +623,281 @@ pathwayModeToInt input =
             7
 
 
+parsePathwayMode : Int -> Result String PathwayMode
+parsePathwayMode input =
+    case input of
+        1 ->
+            Ok Walkway
+
+        2 ->
+            Ok Stairs
+
+        3 ->
+            Ok MovingSidewalk
+
+        4 ->
+            Ok Escalator
+
+        5 ->
+            Ok Elevator
+
+        6 ->
+            Ok FareGate
+
+        7 ->
+            Ok ExitGate
+
+        _ ->
+            Err (String.fromInt input ++ " is not a valid pathway mode")
+
+
 
 --------------------
 -- Basic Encoders --
 --------------------
 
 
-id : TypedEncoder (Id kind)
+column :
+    String
+    -> (a -> p)
+    -> Codec p
+    -> TableBuilder a (p -> b)
+    -> TableBuilder a b
+column name getter ( tipe, encode, decoder ) builder =
+    { name = builder.name
+    , columns =
+        { name = name
+        , tipe = tipe
+        }
+            :: builder.columns
+    , encode = \v -> ( name, encode (getter v) ) :: builder.encode v
+    , decoder =
+        builder.decoder
+            |> Csv.Decode.pipeline decoder
+    }
+
+
+nullColumn :
+    String
+    -> (a -> Maybe p)
+    -> Codec p
+    -> TableBuilder a (Maybe p -> b)
+    -> TableBuilder a b
+nullColumn name getter ( tipe, encode, decoder ) builder =
+    { name = builder.name
+    , columns =
+        { name = name
+        , tipe = Nullable tipe
+        }
+            :: builder.columns
+    , encode =
+        \v ->
+            ( name
+            , case getter v of
+                Nothing ->
+                    Json.Encode.null
+
+                Just w ->
+                    encode w
+            )
+                :: builder.encode v
+    , decoder =
+        builder.decoder
+            |> Csv.Decode.pipeline
+                (decoder
+                    |> Csv.Decode.blank
+                    |> Csv.Decode.optionalField name
+                    |> Csv.Decode.map Maybe.Extra.join
+                )
+    }
+
+
+map : (a -> b) -> (b -> a) -> Codec a -> Codec b
+map back go ( tipe, encode, decoder ) =
+    ( tipe
+    , \value -> encode (go value)
+    , Csv.Decode.map back decoder
+    )
+
+
+andThen : (a -> Result String b) -> (b -> a) -> Codec a -> Codec b
+andThen go back ( tipe, encode, decoder ) =
+    ( tipe
+    , \value -> encode (back value)
+    , decoder
+        |> Csv.Decode.andThen
+            (\raw ->
+                case go raw of
+                    Ok v ->
+                        Csv.Decode.succeed v
+
+                    Err e ->
+                        Csv.Decode.fail e
+            )
+    )
+
+
+type RouteType
+    = TramStreetcarLightRail
+    | SubwayMetro
+    | Rail
+    | Bus
+    | Ferry
+    | CableTram
+    | AerialLift
+    | Funicular
+    | Trolleybus
+    | Monorail
+
+
+routeType : Codec RouteType
+routeType =
+    andThen parseRouteType routeTypeToInt int
+
+
+routeTypeToInt : RouteType -> Int
+routeTypeToInt tipe =
+    case tipe of
+        TramStreetcarLightRail ->
+            0
+
+        SubwayMetro ->
+            1
+
+        Rail ->
+            2
+
+        Bus ->
+            3
+
+        Ferry ->
+            4
+
+        CableTram ->
+            5
+
+        AerialLift ->
+            6
+
+        Funicular ->
+            7
+
+        Trolleybus ->
+            11
+
+        Monorail ->
+            12
+
+
+parseRouteType : Int -> Result String RouteType
+parseRouteType input =
+    case input of
+        0 ->
+            Ok TramStreetcarLightRail
+
+        1 ->
+            Ok SubwayMetro
+
+        2 ->
+            Ok Rail
+
+        3 ->
+            Ok Bus
+
+        4 ->
+            Ok Ferry
+
+        5 ->
+            Ok CableTram
+
+        6 ->
+            Ok AerialLift
+
+        7 ->
+            Ok Funicular
+
+        11 ->
+            Ok Trolleybus
+
+        12 ->
+            Ok Monorail
+
+        _ ->
+            Err (String.fromInt input ++ " is not a valid route type")
+
+
+type alias Color =
+    String
+
+
+color : Codec Color
+color =
+    string
+
+
+id : Codec (Id kind)
 id =
-    map Id.toString string
+    map Id.fromString Id.toString string
 
 
-timeEncoder : TypedEncoder Clock
-timeEncoder =
-    map Clock.toString string
+clock : Codec Clock
+clock =
+    andThen (parsed "time" timeParser) Clock.toString string
 
 
-boolEncoder : TypedEncoder Bool
-boolEncoder =
-    map boolToInt int
+parsed : String -> Parser a -> String -> Result String a
+parsed label parser input =
+    case Parser.run parser input of
+        Err _ ->
+            Err (input ++ " is not a valid " ++ label)
+
+        Ok v ->
+            Ok v
+
+
+timeParser : Parser Clock
+timeParser =
+    Parser.succeed Clock.fromHoursMinutesSeconds
+        |= intParser
+        |. Parser.symbol ":"
+        |= intParser
+        |. Parser.symbol ":"
+        |= intParser
+
+
+intParser : Parser Int
+intParser =
+    (Parser.chompIf Char.isDigit
+        |. Parser.chompWhile Char.isDigit
+    )
+        |> Parser.getChompedString
+        |> Parser.andThen
+            (\r ->
+                case String.toInt r of
+                    Just i ->
+                        Parser.succeed i
+
+                    Nothing ->
+                        Parser.problem (r ++ " is not a valid number")
+            )
+
+
+bool : Codec Bool
+bool =
+    andThen parseBool boolToInt int
+
+
+parseBool : Int -> Result String Bool
+parseBool input =
+    case input of
+        0 ->
+            Ok False
+
+        1 ->
+            Ok True
+
+        _ ->
+            Err (String.fromInt input ++ " is not a valid bool")
 
 
 boolToInt : Bool -> Int
@@ -485,71 +909,51 @@ boolToInt input =
         0
 
 
-required :
-    String
-    -> (a -> p)
-    -> TypedEncoder p
-    -> ( Column, Encoder a )
-required name getter ( tipe, encoder ) =
-    ( { name = name
-      , tipe = tipe
-      }
-    , \v -> encoder (getter v)
-    )
+seconds : Codec Duration
+seconds =
+    map Duration.seconds Duration.inSeconds float
 
 
-optional :
-    String
-    -> (a -> Maybe p)
-    -> TypedEncoder p
-    -> ( Column, Encoder a )
-optional name getter encoder =
-    required name getter (maybe encoder)
+meters : Codec Length
+meters =
+    map Length.meters Length.inMeters float
 
 
-length : TypedEncoder Length
-length =
-    map Length.inMeters float
+kilometers : Codec Length
+kilometers =
+    map Length.kilometers Length.inKilometers float
 
 
-angleEncoder : TypedEncoder Angle
-angleEncoder =
-    map Angle.inDegrees float
+angle : Codec Angle
+angle =
+    map Angle.degrees Angle.inDegrees float
 
 
-urlEncoder : TypedEncoder Url
-urlEncoder =
-    map Url.toString string
+url : Codec Url
+url =
+    andThen
+        (\v ->
+            case Url.fromString v of
+                Nothing ->
+                    Err (v ++ " is not a valid URL")
+
+                Just res ->
+                    Ok res
+        )
+        Url.toString
+        string
 
 
-map : (b -> a) -> TypedEncoder a -> TypedEncoder b
-map f ( tipe, encoder ) =
-    ( tipe, \value -> encoder (f value) )
-
-
-string : TypedEncoder String
+string : Codec String
 string =
-    ( Text, Json.Encode.string )
+    ( Text, Json.Encode.string, Csv.Decode.string )
 
 
-float : TypedEncoder Float
+float : Codec Float
 float =
-    ( Real, Json.Encode.float )
+    ( Real, Json.Encode.float, Csv.Decode.float )
 
 
-int : TypedEncoder Int
+int : Codec Int
 int =
-    ( Integer, Json.Encode.int )
-
-
-maybe : TypedEncoder p -> TypedEncoder (Maybe p)
-maybe ( tipe, encoder ) =
-    ( Nullable tipe
-    , \v ->
-        case v of
-            Nothing ->
-                Json.Encode.null
-
-            Just w ->
-                encoder w
-    )
+    ( Integer, Json.Encode.int, Csv.Decode.int )

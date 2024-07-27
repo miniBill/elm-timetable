@@ -8,7 +8,7 @@ import SQLite.Statement as Statement
 
 main : Html msg
 main =
-    SQLSource.toCreate { ifNotExists = False } SQLSource.stopEncoder
+    SQLSource.toCreate { ifNotExists = False } SQLSource.stopsTable
         |> Statement.toString
         |> Html.text
         |> List.singleton

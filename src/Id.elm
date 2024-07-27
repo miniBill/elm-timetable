@@ -1,10 +1,12 @@
 module Id exposing
-    ( BlockId
+    ( AgencyId
+    , BlockId
     , FeedId
     , Id
     , LevelId
     , LocationGroupId
     , LocationId
+    , NetworkId
     , PathwayId
     , RouteId
     , ServiceId
@@ -56,6 +58,14 @@ type ShapeId
 
 type RouteId
     = RouteId
+
+
+type AgencyId
+    = AgencyId
+
+
+type NetworkId
+    = NetworkId
 
 
 type ServiceId
