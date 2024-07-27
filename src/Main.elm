@@ -5,8 +5,8 @@ import Csv.Decode
 import Date exposing (Date)
 import Dict
 import Feed exposing (Feed)
-import GTFS exposing (Pathway, Stop, StopTime, Trip)
-import GTFS.SQLSource
+import GTFS
+import GTFS.SQLSource exposing (Pathway, Stop, StopTime, Trip)
 import Html.Lazy
 import Http
 import Id exposing (FeedId, Id, StopId, TripId)
@@ -110,7 +110,7 @@ init _ =
                     )
                     (Task.map3 (\l m r -> ( l, m, r ))
                         (getCSVId feed GTFS.SQLSource.tripsTable)
-                        (getCSVId feed GTFS.SQLSource.calendarTable)
+                        (getCSVId feed GTFS.SQLSource.calendarsTable)
                         (getCSV feed GTFS.SQLSource.calendarDatesTable)
                     )
                     |> Task.attempt (GotFeed feed)

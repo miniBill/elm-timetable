@@ -1,16 +1,36 @@
 module GTFS.SQLSource exposing
-    ( calendarDatesTable
-    , calendarTable
-    , pathwaysTable
-    , stopTimesTable
-    , stopsTable
+    ( Agency, agencyTable
+    , Stop, stopsTable
+    , Route, routesTable
+    , Trip, tripsTable
+    , StopTime, stopTimesTable
+    , Calendar, calendarsTable
+    , CalendarDate, calendarDatesTable
+    , ShapePoint, shapePointsTable
+    , Pathway, pathwaysTable
     , toCreate
-    , tripsTable
     )
 
+{-|
+
+@docs Agency, agencyTable
+@docs Stop, stopsTable
+@docs Route, routesTable
+@docs Trip, tripsTable
+@docs StopTime, stopTimesTable
+@docs Calendar, calendarsTable
+@docs CalendarDate, calendarDatesTable
+@docs ShapePoint, shapePointsTable
+@docs Pathway, pathwaysTable
+
+-}
+
 import Angle exposing (Angle)
-import GTFS exposing (Accessibility(..), Calendar, CalendarDate, ExceptionType(..), LocationType(..), Pathway, PathwayMode(..), PickupDropOffType(..), Stop, StopTime, Timezone, Trip)
-import Id exposing (AgencyId, Id, NetworkId, RouteId, ShapeId)
+import Clock exposing (Clock)
+import Date exposing (Date)
+import Duration exposing (Duration)
+import GTFS exposing (Accessibility(..), ExceptionType(..), Latitude, LocationType(..), Longitude, PathwayMode(..), PickupDropOffType(..), Timezone)
+import Id exposing (AgencyId, BlockId, Id, LevelId, LocationGroupId, LocationId, NetworkId, PathwayId, RouteId, ServiceId, ShapeId, StopId, TripId, ZoneId)
 import Length exposing (Length)
 import SQLite.Statement as Statement
 import SQLite.Statement.CreateTable as CreateTable
@@ -105,6 +125,30 @@ typeToSqlType tipe =
             Types.Text
 
 
+type alias StopTime =
+    { trip_id : Id TripId
+    , arrival_time : Maybe Clock
+    , departure_time : Maybe Clock
+    , stop_id : Maybe (Id StopId)
+    , location_group_id : Maybe (Id LocationGroupId)
+    , location_id : Maybe (Id LocationId)
+    , stop_sequence : Int
+    , stop_headsign : Maybe String
+    , start_pickup_drop_off_window : Maybe Clock
+    , end_pickup_drop_off_window : Maybe Clock
+    , pickup_type : Maybe PickupDropOffType
+    , drop_off_type : Maybe PickupDropOffType
+    , continuous_pickup : Maybe PickupDropOffType
+    , continuous_drop_off : Maybe PickupDropOffType
+    , shape_dist_traveled : Maybe Float
+
+    -- False for approximate, True or Nothing for exact
+    , timepoint : Maybe Bool
+    , pickup_booking_rule_id : Maybe (Id Never)
+    , drop_off_booking_rule_id : Maybe (Id Never)
+    }
+
+
 stopTimesTable : Table StopTime
 stopTimesTable =
     table "stop_times.txt" "stop_times" StopTime
@@ -133,6 +177,20 @@ stopTimesTable =
         |> withForeignKey { columnName = "location_id", tableName = "locations", mapsTo = Nothing }
         |> withForeignKey { columnName = "pickup_booking_rule_id", tableName = "booking_rules", mapsTo = Nothing }
         |> withForeignKey { columnName = "drop_off_booking_rule_id", tableName = "booking_rules", mapsTo = Nothing }
+
+
+type alias Trip =
+    { route_id : Id RouteId
+    , service_id : Id ServiceId
+    , id : Id TripId
+    , headsign : Maybe String
+    , short_name : Maybe String
+    , direction_id : Maybe Bool
+    , block_id : Maybe (Id BlockId)
+    , shape_id : Maybe (Id ShapeId)
+    , wheelchair_accessible : Maybe Accessibility
+    , bikes_allowed : Maybe Accessibility
+    }
 
 
 tripsTable : Table Trip
@@ -236,8 +294,22 @@ agencyTable =
         |> withPrimaryKey [ "agency_id" ]
 
 
-calendarTable : Table Calendar
-calendarTable =
+type alias Calendar =
+    { id : Id ServiceId
+    , monday : Bool
+    , tuesday : Bool
+    , wednesday : Bool
+    , thursday : Bool
+    , friday : Bool
+    , saturday : Bool
+    , sunday : Bool
+    , start_date : Date
+    , end_date : Date
+    }
+
+
+calendarsTable : Table Calendar
+calendarsTable =
     table "calendar.txt" "calendars" Calendar
         |> column "service_id" .id id
         |> column "monday" .monday bool
@@ -252,6 +324,13 @@ calendarTable =
         |> withPrimaryKey [ "service_id" ]
 
 
+type alias CalendarDate =
+    { service_id : Id ServiceId
+    , date : Date
+    , exception_type : ExceptionType
+    }
+
+
 calendarDatesTable : Table CalendarDate
 calendarDatesTable =
     table "calendar_dates.txt" "calendar_dates" CalendarDate
@@ -259,6 +338,25 @@ calendarDatesTable =
         |> column "date" .date date
         |> column "exception_type" .exception_type exceptionTypeEncoder
         |> withPrimaryKey [ "service_id", "date" ]
+
+
+type alias Stop =
+    { id : Id StopId
+    , code : Maybe String
+    , name : Maybe String
+    , tts_name : Maybe String
+    , description : Maybe String
+    , lat : Maybe Latitude
+    , lon : Maybe Longitude
+    , zone_id : Maybe (Id ZoneId)
+    , url : Maybe Url
+    , location_type : LocationType
+    , parent_station : Maybe (Id StopId)
+    , timezone : Maybe Timezone
+    , wheelchair_boarding : Maybe Accessibility
+    , level_id : Maybe (Id LevelId)
+    , platform_code : Maybe String
+    }
 
 
 stopsTable : Table Stop
@@ -282,6 +380,22 @@ stopsTable =
         |> withPrimaryKey [ "stop_id" ]
         |> withForeignKey { columnName = "parent_station", tableName = "stops", mapsTo = Just "stop_id" }
         |> withForeignKey { columnName = "level_id", tableName = "levels", mapsTo = Nothing }
+
+
+type alias Pathway =
+    { id : Id PathwayId
+    , from_stop_id : Id StopId
+    , to_stop_id : Id StopId
+    , mode : PathwayMode
+    , is_bidirectional : Bool
+    , length : Maybe Length
+    , traversal_time : Maybe Duration
+    , stair_count : Maybe Int
+    , max_slope : Maybe Float
+    , min_width : Maybe Length
+    , signposted_as : Maybe String
+    , reversed_signposted_as : Maybe String
+    }
 
 
 pathwaysTable : Table Pathway

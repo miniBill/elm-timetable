@@ -3,7 +3,8 @@ module Pathfinding exposing (filterStopTimes, filterStops, filterTrips, pathfind
 import Angle
 import Date exposing (Date)
 import Dict exposing (Dict)
-import GTFS exposing (Calendar, CalendarDate, Pathway, Stop, StopTime, Trip)
+import GTFS
+import GTFS.SQLSource exposing (Calendar, CalendarDate, Pathway, Stop, StopTime, Trip)
 import Id exposing (Id, PathwayId, ServiceId, StopId, TripId)
 import IdDict exposing (IdDict)
 import IdDict.Extra

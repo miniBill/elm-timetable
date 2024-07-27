@@ -1,7 +1,7 @@
 module Feed exposing (Feed, empty, merge)
 
 import Dict exposing (Dict)
-import GTFS exposing (Calendar, CalendarDate, Pathway, Stop, StopTime, Trip)
+import GTFS.SQLSource exposing (Calendar, CalendarDate, Pathway, Stop, StopTime, Trip)
 import Id exposing (PathwayId, ServiceId, StopId, TripId)
 import IdDict exposing (IdDict)
 import IdDict.Extra
