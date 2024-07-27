@@ -58,8 +58,8 @@ init _ =
         feeds : List (Id FeedId)
         feeds =
             [ -- Id.fromString "de" ,
-              Id.fromString "oebb-2024"
-            , Id.fromString "micotra-2024"
+              --   Id.fromString "oebb-2024" ,
+              Id.fromString "micotra-2024"
             ]
 
         model : Model

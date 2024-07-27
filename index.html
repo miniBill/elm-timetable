@@ -7,11 +7,16 @@
     </head>
 
     <body>
+        <aside></aside>
         <main></main>
         <script src="./build/main.js"></script>
         <script>
             Elm.Main.init({
                 node: document.querySelector("main"),
+                flags: {},
+            });
+            Elm.SQL.init({
+                node: document.querySelector("aside"),
                 flags: {},
             });
         </script>
