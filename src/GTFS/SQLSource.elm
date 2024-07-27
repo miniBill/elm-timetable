@@ -8,7 +8,7 @@ module GTFS.SQLSource exposing
     , CalendarDate, calendarDatesTable
     , ShapePoint, shapePointsTable
     , Pathway, pathwaysTable
-    , toCreate
+    , RouteType, toCreate
     )
 
 {-|
