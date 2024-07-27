@@ -1,4 +1,48 @@
-module GTFS.SQLSource exposing (..)
+module GTFS.SQLSource exposing
+    ( Column
+    , ColumnType(..)
+    , Encoder
+    , Table
+    , TypedEncoder
+    , accessibilityEncoder
+    , accessibilityToInt
+    , angleEncoder
+    , boolEncoder
+    , boolToInt
+    , calendarDateEncoder
+    , calendarEncoder
+    , dateEncoder
+    , dateToInt
+    , dateToString
+    , exceptionTypeEncoder
+    , exceptionTypeToInt
+    , float
+    , id
+    , int
+    , length
+    , locationTypeEncoder
+    , locationTypeToInt
+    , map
+    , maybe
+    , object
+    , optional
+    , pathwayEncoder
+    , pathwayModeEncoder
+    , pathwayModeToInt
+    , pickupDropOffTypeEncoder
+    , pickupDropOffTypeToInt
+    , required
+    , stopEncoder
+    , stopTimeEncoder
+    , string
+    , timeEncoder
+    , toCreate
+    , toSqlColumn
+    , toTableDefinition
+    , tripEncoder
+    , typeToSqlType
+    , urlEncoder
+    )
 
 import Angle exposing (Angle)
 import Clock exposing (Clock)
@@ -8,7 +52,9 @@ import GTFS exposing (Accessibility(..), Calendar, CalendarDate, ExceptionType(.
 import Id exposing (Id)
 import Json.Encode
 import Length exposing (Length)
-import SQLite.SQL as SQL
+import SQLite.Statement as Statement
+import SQLite.Statement.CreateTable as CreateTable
+import SQLite.Types as Types
 import Url exposing (Url)
 
 
@@ -22,9 +68,9 @@ toCreate :
     { ifNotExists : Bool
     }
     -> Table a
-    -> SQL.Statement
+    -> Statement.Statement
 toCreate config table =
-    SQL.CreateTable
+    Statement.CreateTable
         { name = table.name
         , ifNotExists = config.ifNotExists
         , temporary = False
@@ -33,22 +79,22 @@ toCreate config table =
         }
 
 
-toTableDefinition : Table a -> SQL.TableDefinition
+toTableDefinition : Table a -> CreateTable.TableDefinition
 toTableDefinition table =
-    SQL.TableDefinitionColumns
+    CreateTable.TableDefinitionColumns
         { options =
             { strict = True
             , withoutRowid = False
             }
         , columns = List.map toSqlColumn table.columns
         , constraints =
-            [ SQL.UnnamedTableConstraint
-                (SQL.TablePrimaryKey
+            [ CreateTable.UnnamedTableConstraint
+                (CreateTable.TablePrimaryKey
                     (List.map
                         (\name ->
-                            { order = Nothing
-                            , nameOrExpr = SQL.IsName name
+                            { nameOrExpr = CreateTable.IsName name
                             , collate = Nothing
+                            , ascDesc = Nothing
                             }
                         )
                         table.primaryKey
@@ -59,7 +105,7 @@ toTableDefinition table =
         }
 
 
-toSqlColumn : Column -> SQL.ColumnDefinition
+toSqlColumn : Column -> CreateTable.ColumnDefinition
 toSqlColumn column =
     { name = column.name
     , tipe = Just (typeToSqlType column.tipe)
@@ -69,24 +115,24 @@ toSqlColumn column =
                 []
 
             _ ->
-                [ SQL.UnnamedColumnConstraint (SQL.ColumnNotNull Nothing) ]
+                [ CreateTable.UnnamedColumnConstraint (CreateTable.ColumnNotNull Nothing) ]
     }
 
 
-typeToSqlType : ColumnType -> SQL.Type
+typeToSqlType : ColumnType -> Types.Type
 typeToSqlType tipe =
     case tipe of
         Nullable x ->
             typeToSqlType x
 
         Integer ->
-            SQL.Integer
+            Types.Integer
 
         Real ->
-            SQL.Real
+            Types.Real
 
         Text ->
-            SQL.Text
+            Types.Text
 
 
 type alias Table a =
