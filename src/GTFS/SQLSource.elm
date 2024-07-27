@@ -273,6 +273,49 @@ calendarDatesTable =
         |> withPrimaryKey [ "service_id", "date" ]
 
 
+stopsTable : Table Stop
+stopsTable =
+    table "stops.txt" "stops" Stop
+        |> column "stop_id" .id id
+        |> nullColumn "stop_code" .code string
+        |> nullColumn "stop_name" .name string
+        |> nullColumn "tts_stop_name" .tts_name string
+        |> nullColumn "stop_desc" .description string
+        |> nullColumn "stop_lat" .lat angle
+        |> nullColumn "stop_lon" .lon angle
+        |> nullColumn "zone_id" .zone_id id
+        |> nullColumn "stop_url" .url url
+        |> column "location_type" .location_type locationTypeEncoder
+        |> nullColumn "parent_station" .parent_station id
+        |> nullColumn "stop_timezone" .timezone string
+        |> nullColumn "wheelchair_boarding" .wheelchair_boarding accessibilityEncoder
+        |> nullColumn "level_id" .level_id id
+        |> nullColumn "platform_code" .platform_code string
+        |> withPrimaryKey [ "stop_id" ]
+        |> withForeignKey { columnName = "parent_station", tableName = "stops", mapsTo = Just "stop_id" }
+        |> withForeignKey { columnName = "level_id", tableName = "levels", mapsTo = Nothing }
+
+
+pathwaysTable : Table Pathway
+pathwaysTable =
+    table "pathways.txt" "pathways" Pathway
+        |> column "pathway_id" .id id
+        |> column "from_stop_id" .from_stop_id id
+        |> column "to_stop_id" .to_stop_id id
+        |> column "pathway_mode" .mode pathwayMode
+        |> column "is_bidirectional" .is_bidirectional bool
+        |> nullColumn "length" .length meters
+        |> nullColumn "traversal_time" .traversal_time seconds
+        |> nullColumn "stair_count" .stair_count int
+        |> nullColumn "max_slope" .max_slope float
+        |> nullColumn "min_width" .min_width meters
+        |> nullColumn "signposted_as" .signposted_as string
+        |> nullColumn "reversed_signposted_as" .reversed_signposted_as string
+        |> withPrimaryKey [ "pathway_id" ]
+        |> withForeignKey { columnName = "from_stop_id", tableName = stopsTable.name, mapsTo = Just "stop_id" }
+        |> withForeignKey { columnName = "to_stop_id", tableName = stopsTable.name, mapsTo = Just "stop_id" }
+
+
 exceptionTypeEncoder : Codec ExceptionType
 exceptionTypeEncoder =
     andThen parseExceptionType exceptionTypeToInt int
@@ -339,49 +382,6 @@ parsePickupDropOffType input =
 
         _ ->
             Err (String.fromInt input ++ " is not a valid pickup/drop off type")
-
-
-stopsTable : Table Stop
-stopsTable =
-    table "stops.txt" "stops" Stop
-        |> column "stop_id" .id id
-        |> nullColumn "stop_code" .code string
-        |> nullColumn "stop_name" .name string
-        |> nullColumn "tts_stop_name" .tts_name string
-        |> nullColumn "stop_desc" .description string
-        |> nullColumn "stop_lat" .lat angle
-        |> nullColumn "stop_lon" .lon angle
-        |> nullColumn "zone_id" .zone_id id
-        |> nullColumn "stop_url" .url url
-        |> column "location_type" .location_type locationTypeEncoder
-        |> nullColumn "parent_station" .parent_station id
-        |> nullColumn "stop_timezone" .timezone string
-        |> nullColumn "wheelchair_boarding" .wheelchair_boarding accessibilityEncoder
-        |> nullColumn "level_id" .level_id id
-        |> nullColumn "platform_code" .platform_code string
-        |> withPrimaryKey [ "stop_id" ]
-        |> withForeignKey { columnName = "parent_station", tableName = "stops", mapsTo = Just "stop_id" }
-        |> withForeignKey { columnName = "level_id", tableName = "levels", mapsTo = Nothing }
-
-
-pathwaysTable : Table Pathway
-pathwaysTable =
-    table "pathways.txt" "pathways" Pathway
-        |> column "pathway_id" .id id
-        |> column "from_stop_id" .from_stop_id id
-        |> column "to_stop_id" .to_stop_id id
-        |> column "pathway_mode" .mode pathwayMode
-        |> column "is_bidirectional" .is_bidirectional bool
-        |> nullColumn "length" .length meters
-        |> nullColumn "traversal_time" .traversal_time seconds
-        |> nullColumn "stair_count" .stair_count int
-        |> nullColumn "max_slope" .max_slope float
-        |> nullColumn "min_width" .min_width meters
-        |> nullColumn "signposted_as" .signposted_as string
-        |> nullColumn "reversed_signposted_as" .reversed_signposted_as string
-        |> withPrimaryKey [ "pathway_id" ]
-        |> withForeignKey { columnName = "from_stop_id", tableName = stopsTable.name, mapsTo = Just "stop_id" }
-        |> withForeignKey { columnName = "to_stop_id", tableName = stopsTable.name, mapsTo = Just "stop_id" }
 
 
 locationTypeEncoder : Codec LocationType
@@ -520,12 +520,6 @@ parsePathwayMode input =
 
         _ ->
             Err (String.fromInt input ++ " is not a valid pathway mode")
-
-
-
---------------------
--- Basic Encoders --
---------------------
 
 
 type RouteType
