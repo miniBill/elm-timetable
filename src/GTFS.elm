@@ -1,17 +1,14 @@
 module GTFS exposing
-    ( Accessibility(..), ExceptionType(..), LocationType(..), PathwayMode(..), PickupDropOffType(..), Timezone
+    ( Accessibility(..), ExceptionType(..), LocationType(..), PathwayMode(..), PickupDropOffType(..), RouteType(..), Timezone
     , locationTypeToString
-    , RouteType(..)
     )
 
 {-|
 
-@docs Accessibility, ExceptionType, LocationType, PathwayMode, PickupDropOffType, Timezone
+@docs Accessibility, ExceptionType, LocationType, PathwayMode, PickupDropOffType, RouteType, Timezone
 @docs locationTypeToString
 
 -}
-
--- Types --
 
 
 type alias Timezone =
@@ -65,10 +62,6 @@ type RouteType
     | Funicular
     | Trolleybus
     | Monorail
-
-
-
--- Tables --
 
 
 locationTypeToString : LocationType -> String
