@@ -86,7 +86,7 @@ toTableDefinition table =
             { strict = True
             , withoutRowid = False
             }
-        , columns = List.map toSqlColumn table.columns
+        , columns = feedColumn :: List.map toSqlColumn table.columns
         , constraints =
             [ CreateTable.UnnamedTableConstraint
                 (CreateTable.TablePrimaryKey
@@ -97,12 +97,21 @@ toTableDefinition table =
                             , ascDesc = Nothing
                             }
                         )
-                        table.primaryKey
+                        (feedColumn.name :: table.primaryKey)
                     )
                     Nothing
                 )
             ]
         }
+
+
+feedColumn : CreateTable.ColumnDefinition
+feedColumn =
+    { name = "feed"
+    , tipe = Just Types.Text
+    , constraints =
+        [ CreateTable.UnnamedColumnConstraint (CreateTable.ColumnNotNull Nothing) ]
+    }
 
 
 toSqlColumn : Column -> CreateTable.ColumnDefinition
