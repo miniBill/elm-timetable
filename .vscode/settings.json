@@ -1,19 +1,20 @@
 {
-  "cSpell.words": [
-    "Freilassing",
-    "GTFS",
-    "Hauptbahnhof",
-    "headsign",
-    "Isartor",
-    "micotra",
-    "München",
-    "oebb",
-    "Pasing",
-    "timepoint",
-    "Trenitalia",
-    "ViaggiaTreno",
-    "Villach"
-  ],
-  "cSpell.language": "en-US",
-  "files.associations": { "*.txt": "csv" }
+    "cSpell.words": [
+        "Freilassing",
+        "GTFS",
+        "Hauptbahnhof",
+        "headsign",
+        "Isartor",
+        "micotra",
+        "München",
+        "oebb",
+        "Pasing",
+        "timepoint",
+        "tipe",
+        "Trenitalia",
+        "ViaggiaTreno",
+        "Villach"
+    ],
+    "cSpell.language": "en-US",
+    "files.associations": { "*.txt": "csv" }
 }
