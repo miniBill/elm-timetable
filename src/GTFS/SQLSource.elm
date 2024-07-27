@@ -1,23 +1,11 @@
 module GTFS.SQLSource exposing
-    ( accessibilityToInt
-    , calendarDatesTable
+    ( calendarDatesTable
     , calendarTable
-    , exceptionTypeEncoder
-    , exceptionTypeToInt
-    , locationTypeEncoder
-    , locationTypeToInt
-    , pathwayMode
-    , pathwayModeToInt
     , pathwaysTable
-    , pickupDropOffType
-    , pickupDropOffTypeToInt
     , stopTimesTable
     , stopsTable
     , toCreate
-    , toSqlColumn
-    , toTableDefinition
     , tripsTable
-    , typeToSqlType
     )
 
 import Angle exposing (Angle)

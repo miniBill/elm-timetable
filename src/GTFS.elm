@@ -1,14 +1,11 @@
-module GTFS exposing (Accessibility(..), Calendar, CalendarDate, ExceptionType(..), Latitude, LocationType(..), Longitude, Pathway, PathwayMode(..), PickupDropOffType(..), Stop, StopTime, Timezone, Trip, calendarDateDecoder, calendarDecoder, dateToInt, locationTypeToString, pathwayDecoder, stopDecoder, stopTimeDecoder, tripDecoder)
+module GTFS exposing (Accessibility(..), Calendar, CalendarDate, ExceptionType(..), Latitude, LocationType(..), Longitude, Pathway, PathwayMode(..), PickupDropOffType(..), Stop, StopTime, Timezone, Trip, dateToInt, locationTypeToString)
 
 import Angle exposing (Angle)
 import Clock exposing (Clock)
-import Csv.Decode
 import Date exposing (Date)
 import Duration exposing (Duration)
 import Id exposing (BlockId, Id, LevelId, LocationGroupId, LocationId, PathwayId, RouteId, ServiceId, ShapeId, StopId, TripId, ZoneId)
 import Length exposing (Length)
-import Maybe.Extra
-import Parser exposing ((|.), (|=), Parser)
 import Url exposing (Url)
 
 
@@ -54,29 +51,6 @@ type alias StopTime =
     }
 
 
-stopTimeDecoder : Csv.Decode.Decoder StopTime
-stopTimeDecoder =
-    Csv.Decode.succeed StopTime
-        |> required "trip_id" id
-        |> optional "arrival_time" timeDecoder
-        |> optional "departure_time" timeDecoder
-        |> optional "stop_id" id
-        |> optional "location_group_id" id
-        |> optional "location_id" id
-        |> required "stop_sequence" Csv.Decode.int
-        |> optional "stop_headsign" Csv.Decode.string
-        |> optional "start_pickup_drop_off_window" timeDecoder
-        |> optional "end_pickup_drop_off_window" timeDecoder
-        |> optional "pickup_type" pickupDropOffTypeDecoder
-        |> optional "drop_off_type" pickupDropOffTypeDecoder
-        |> optional "continuous_pickup" pickupDropOffTypeDecoder
-        |> optional "continuous_drop_off" pickupDropOffTypeDecoder
-        |> optional "shape_dist_traveled" Csv.Decode.float
-        |> optional "timepoint" boolDecoder
-        |> optional "pickup_booking_rule_id" id
-        |> optional "drop_off_booking_rule_id" id
-
-
 type alias Trip =
     { route_id : Id RouteId
     , service_id : Id ServiceId
@@ -89,21 +63,6 @@ type alias Trip =
     , wheelchair_accessible : Maybe Accessibility
     , bikes_allowed : Maybe Accessibility
     }
-
-
-tripDecoder : Csv.Decode.Decoder Trip
-tripDecoder =
-    Csv.Decode.succeed Trip
-        |> required "route_id" id
-        |> required "service_id" id
-        |> required "trip_id" id
-        |> optional "trip_headsign" Csv.Decode.string
-        |> optional "trip_short_name" Csv.Decode.string
-        |> optional "direction_id" boolDecoder
-        |> optional "block_id" id
-        |> optional "shape_id" id
-        |> optional "wheelchair_accessible" accessibilityDecoder
-        |> optional "bikes_allowed" accessibilityDecoder
 
 
 type alias Calendar =
@@ -120,21 +79,6 @@ type alias Calendar =
     }
 
 
-calendarDecoder : Csv.Decode.Decoder Calendar
-calendarDecoder =
-    Csv.Decode.succeed Calendar
-        |> required "service_id" id
-        |> required "monday" boolDecoder
-        |> required "tuesday" boolDecoder
-        |> required "wednesday" boolDecoder
-        |> required "thursday" boolDecoder
-        |> required "friday" boolDecoder
-        |> required "saturday" boolDecoder
-        |> required "sunday" boolDecoder
-        |> required "start_date" dateDecoder
-        |> required "end_date" dateDecoder
-
-
 type alias CalendarDate =
     { service_id : Id ServiceId
     , date : Date
@@ -142,63 +86,9 @@ type alias CalendarDate =
     }
 
 
-calendarDateDecoder : Csv.Decode.Decoder CalendarDate
-calendarDateDecoder =
-    Csv.Decode.succeed CalendarDate
-        |> required "service_id" id
-        |> required "date" dateDecoder
-        |> required "exception_type" exceptionTypeDecoder
-
-
 type ExceptionType
     = ServiceAdded
     | ServiceRemoved
-
-
-exceptionTypeDecoder : Csv.Decode.Decoder ExceptionType
-exceptionTypeDecoder =
-    parsed exceptionTypeParser
-
-
-exceptionTypeParser : String -> Maybe ExceptionType
-exceptionTypeParser input =
-    case input of
-        "1" ->
-            Just ServiceAdded
-
-        "2" ->
-            Just ServiceRemoved
-
-        _ ->
-            Nothing
-
-
-dateDecoder : Csv.Decode.Decoder Date
-dateDecoder =
-    parsed dateParser
-
-
-dateParser : String -> Maybe Date
-dateParser string =
-    string
-        |> String.toInt
-        |> Maybe.map
-            (\raw ->
-                let
-                    year : Int
-                    year =
-                        raw // 10000
-
-                    month : Date.Month
-                    month =
-                        Date.numberToMonth (modBy 100 (raw // 100))
-
-                    day : Int
-                    day =
-                        modBy 100 raw
-                in
-                Date.fromCalendarDate year month day
-            )
 
 
 dateToInt : Date -> Int
@@ -211,33 +101,6 @@ type PickupDropOffType
     | NoPickupDropOff
     | PhoneAgency
     | CoordinateWithDriver
-
-
-pickupDropOffTypeDecoder : Csv.Decode.Decoder PickupDropOffType
-pickupDropOffTypeDecoder =
-    parsed pickupDropOffTypeParser
-
-
-pickupDropOffTypeParser : String -> Maybe PickupDropOffType
-pickupDropOffTypeParser input =
-    case input of
-        "" ->
-            Just RegularlyScheduled
-
-        "0" ->
-            Just RegularlyScheduled
-
-        "1" ->
-            Just NoPickupDropOff
-
-        "2" ->
-            Just PhoneAgency
-
-        "3" ->
-            Just CoordinateWithDriver
-
-        _ ->
-            Nothing
 
 
 type alias Stop =
@@ -259,26 +122,6 @@ type alias Stop =
     }
 
 
-stopDecoder : Csv.Decode.Decoder Stop
-stopDecoder =
-    Csv.Decode.succeed Stop
-        |> required "stop_id" id
-        |> optional "stop_code" Csv.Decode.string
-        |> optional "stop_name" Csv.Decode.string
-        |> optional "tts_stop_name" Csv.Decode.string
-        |> optional "stop_desc" Csv.Decode.string
-        |> optional "stop_lat" angleDecoder
-        |> optional "stop_lon" angleDecoder
-        |> optional "zone_id" id
-        |> optional "stop_url" urlDecoder
-        |> required "location_type" locationTypeDecoder
-        |> optional "parent_station" id
-        |> optional "stop_timezone" Csv.Decode.string
-        |> optional "wheelchair_boarding" accessibilityDecoder
-        |> optional "level_id" id
-        |> optional "platform_code" Csv.Decode.string
-
-
 type alias Pathway =
     { id : Id PathwayId
     , from_stop_id : Id StopId
@@ -295,23 +138,6 @@ type alias Pathway =
     }
 
 
-pathwayDecoder : Csv.Decode.Decoder Pathway
-pathwayDecoder =
-    Csv.Decode.succeed Pathway
-        |> required "pathway_id" id
-        |> required "from_stop_id" id
-        |> required "to_stop_id" id
-        |> required "pathway_mode" pathwayModeDecoder
-        |> required "is_bidirectional" boolDecoder
-        |> optional "length" length
-        |> optional "traversal_time" (Csv.Decode.map Duration.seconds Csv.Decode.float)
-        |> optional "stair_count" Csv.Decode.int
-        |> optional "max_slope" Csv.Decode.float
-        |> optional "min_width" length
-        |> optional "signposted_as" Csv.Decode.string
-        |> optional "reversed_signposted_as" Csv.Decode.string
-
-
 type LocationType
     = StopPlatform
     | Station
@@ -320,64 +146,10 @@ type LocationType
     | BoardingArea
 
 
-locationTypeDecoder : Csv.Decode.Decoder LocationType
-locationTypeDecoder =
-    parsed locationTypeParser
-
-
-locationTypeParser : String -> Maybe LocationType
-locationTypeParser input =
-    case input of
-        "" ->
-            Just StopPlatform
-
-        "0" ->
-            Just StopPlatform
-
-        "1" ->
-            Just Station
-
-        "2" ->
-            Just EntranceExit
-
-        "3" ->
-            Just GenericNode
-
-        "4" ->
-            Just BoardingArea
-
-        _ ->
-            Nothing
-
-
 type Accessibility
     = NoAccessibilityInformation
     | Accessibly
     | NotAccessible
-
-
-accessibilityDecoder : Csv.Decode.Decoder Accessibility
-accessibilityDecoder =
-    parsed accessibilityParser
-
-
-accessibilityParser : String -> Maybe Accessibility
-accessibilityParser input =
-    case input of
-        "" ->
-            Just NoAccessibilityInformation
-
-        "0" ->
-            Just NoAccessibilityInformation
-
-        "1" ->
-            Just Accessibly
-
-        "2" ->
-            Just NotAccessible
-
-        _ ->
-            Nothing
 
 
 type PathwayMode
@@ -390,158 +162,10 @@ type PathwayMode
     | ExitGate
 
 
-pathwayModeDecoder : Csv.Decode.Decoder PathwayMode
-pathwayModeDecoder =
-    parsed pathwayModeParser
-
-
-pathwayModeParser : String -> Maybe PathwayMode
-pathwayModeParser input =
-    case input of
-        "1" ->
-            Just Walkway
-
-        "2" ->
-            Just Stairs
-
-        "3" ->
-            Just MovingSidewalk
-
-        "4" ->
-            Just Escalator
-
-        "5" ->
-            Just Elevator
-
-        "6" ->
-            Just FareGate
-
-        "7" ->
-            Just ExitGate
-
-        _ ->
-            Nothing
-
-
 
 --------------------
 -- Basic decoders --
 --------------------
-
-
-id : Csv.Decode.Decoder (Id kind)
-id =
-    Csv.Decode.map Id.fromString Csv.Decode.string
-
-
-timeDecoder : Csv.Decode.Decoder Clock
-timeDecoder =
-    parsed timeParser
-
-
-timeParser : String -> Maybe Clock
-timeParser input =
-    input
-        |> Parser.run timeInnerParser
-        |> Result.toMaybe
-
-
-timeInnerParser : Parser Clock
-timeInnerParser =
-    let
-        int : Parser Int
-        int =
-            (Parser.chompIf Char.isDigit
-                |. Parser.chompWhile Char.isDigit
-            )
-                |> Parser.getChompedString
-                |> Parser.andThen
-                    (\r ->
-                        case String.toInt r of
-                            Just i ->
-                                Parser.succeed i
-
-                            Nothing ->
-                                Parser.problem (r ++ " is not a valid number")
-                    )
-    in
-    Parser.succeed Clock.fromHoursMinutesSeconds
-        |= int
-        |. Parser.symbol ":"
-        |= int
-        |. Parser.symbol ":"
-        |= int
-
-
-boolDecoder : Csv.Decode.Decoder Bool
-boolDecoder =
-    parsed boolParser
-
-
-boolParser : String -> Maybe Bool
-boolParser input =
-    case input of
-        "0" ->
-            Just False
-
-        "1" ->
-            Just True
-
-        _ ->
-            Nothing
-
-
-length : Csv.Decode.Decoder Length
-length =
-    Csv.Decode.map Length.meters Csv.Decode.float
-
-
-angleDecoder : Csv.Decode.Decoder Angle
-angleDecoder =
-    Csv.Decode.map Angle.degrees Csv.Decode.float
-
-
-urlDecoder : Csv.Decode.Decoder Url
-urlDecoder =
-    parsed Url.fromString
-
-
-required :
-    String
-    -> Csv.Decode.Decoder a
-    -> Csv.Decode.Decoder (a -> b)
-    -> Csv.Decode.Decoder b
-required name decoder original =
-    Csv.Decode.pipeline (Csv.Decode.field name decoder) original
-
-
-optional :
-    String
-    -> Csv.Decode.Decoder a
-    -> Csv.Decode.Decoder (Maybe a -> b)
-    -> Csv.Decode.Decoder b
-optional name decoder original =
-    Csv.Decode.pipeline
-        (decoder
-            |> Csv.Decode.blank
-            |> Csv.Decode.optionalField name
-            |> Csv.Decode.map Maybe.Extra.join
-        )
-        original
-
-
-parsed : (String -> Maybe a) -> Csv.Decode.Decoder a
-parsed validation =
-    Csv.Decode.string
-        |> Csv.Decode.andThen
-            (\raw ->
-                case validation raw of
-                    Just url ->
-                        Csv.Decode.succeed url
-
-                    Nothing ->
-                        Csv.Decode.fail "Failed to parse"
-            )
 
 
 locationTypeToString : LocationType -> String

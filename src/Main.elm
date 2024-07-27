@@ -6,6 +6,7 @@ import Date exposing (Date)
 import Dict
 import Feed exposing (Feed)
 import GTFS exposing (Pathway, Stop, StopTime, Trip)
+import GTFS.SQLSource
 import Html.Lazy
 import Http
 import Id exposing (FeedId, Id, StopId, TripId)
@@ -14,6 +15,7 @@ import IdSet exposing (IdSet)
 import Pathfinding
 import Platform exposing (Task)
 import RemoteData
+import SQLite.TableBuilder exposing (Table)
 import Table
 import Task
 import Theme
@@ -102,14 +104,14 @@ init _ =
                         }
                     )
                     (Task.map3 (\l m r -> ( l, m, r ))
-                        (getCSVId feed "stops.txt" GTFS.stopDecoder)
-                        (getCSVId feed "pathways.txt" GTFS.pathwayDecoder)
-                        (getCSV feed "stop_times.txt" GTFS.stopTimeDecoder)
+                        (getCSVId feed GTFS.SQLSource.stopsTable)
+                        (getCSVId feed GTFS.SQLSource.pathwaysTable)
+                        (getCSV feed GTFS.SQLSource.stopTimesTable)
                     )
                     (Task.map3 (\l m r -> ( l, m, r ))
-                        (getCSVId feed "trips.txt" GTFS.tripDecoder)
-                        (getCSVId feed "calendar.txt" GTFS.calendarDecoder)
-                        (getCSV feed "calendar_dates.txt" GTFS.calendarDateDecoder)
+                        (getCSVId feed GTFS.SQLSource.tripsTable)
+                        (getCSVId feed GTFS.SQLSource.calendarTable)
+                        (getCSV feed GTFS.SQLSource.calendarDatesTable)
                     )
                     |> Task.attempt (GotFeed feed)
             )
@@ -119,11 +121,10 @@ init _ =
 
 getCSVId :
     Id FeedId
-    -> String
-    -> Csv.Decode.Decoder { a | id : Id kind }
+    -> Table { a | id : Id kind }
     -> Task Http.Error (IdDict kind { a | id : Id kind })
-getCSVId feed filename decoder =
-    getCSV feed filename decoder
+getCSVId feed table =
+    getCSV feed table
         |> Task.map toDictFromId
 
 
@@ -139,10 +140,9 @@ toDictFromId list =
 
 getCSV :
     Id FeedId
-    -> String
-    -> Csv.Decode.Decoder a
+    -> Table a
     -> Task Http.Error (List a)
-getCSV feed filename decoder =
+getCSV feed { filename, decoder } =
     Http.task
         { method = "GET"
         , headers = []
