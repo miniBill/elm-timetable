@@ -3,6 +3,7 @@
     "source-directories": [
         "src",
         "generated",
+        "../elm-sqlite/src",
         "vendored/BrianHicks/elm-csv/4.0.1/src",
         "vendored/goyalarchit/elm-dagre/4.0.1/src",
         "vendored/mdgriffith/elm-ui/1.1.7/src",
@@ -29,7 +30,8 @@
             "ianmackenzie/elm-units": "2.10.0",
             "justinmimbs/date": "4.1.0",
             "mdgriffith/elm-bezier": "1.0.0",
-            "miniBill/elm-fast-dict": "1.1.0"
+            "miniBill/elm-fast-dict": "1.1.0",
+            "miniBill/elm-rope": "1.0.0"
         },
         "indirect": {
             "avh4/elm-fifo": "1.0.4",
