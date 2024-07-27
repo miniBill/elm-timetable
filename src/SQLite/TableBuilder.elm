@@ -1,4 +1,4 @@
-module SQLite.TableBuilder exposing (Codec, Color, Column, ColumnType(..), ForeignKey, Table, TableBuilder, andThen, angle, bool, clock, color, column, date, dateToInt, float, id, int, kilometers, meters, nullColumn, seconds, string, table, url, withForeignKey, withPrimaryKey)
+module SQLite.TableBuilder exposing (Codec, Color, Column, ForeignKey, Table, TableBuilder, andThen, angle, bool, clock, color, column, date, dateToInt, float, id, int, kilometers, meters, nullableColumn, seconds, string, table, url, with, withForeignKey, withPrimaryKey)
 
 import Angle exposing (Angle)
 import Clock exposing (Clock)
@@ -10,13 +10,15 @@ import Json.Encode
 import Length exposing (Length)
 import Maybe.Extra
 import Parser exposing (Parser)
+import SQLite.Statement.CreateTable as CreateTable exposing (ColumnDefinition)
+import SQLite.Types
 import Url exposing (Url)
 
 
 type alias TableBuilder a ctor =
     { name : String
     , filename : String
-    , columns : List Column
+    , columns : List ColumnDefinition
     , encode : a -> List ( String, Json.Encode.Value )
     , decoder : Csv.Decode.Decoder ctor
     }
@@ -26,10 +28,17 @@ type alias Table a =
     { name : String
     , filename : String
     , primaryKey : List String
-    , columns : List Column
+    , columns : List ColumnDefinition
     , encode : a -> Json.Encode.Value
     , decoder : Csv.Decode.Decoder a
     , foreignKeys : List ForeignKey
+    }
+
+
+type alias Column a p =
+    { definition : ColumnDefinition
+    , encode : a -> Json.Encode.Value
+    , decoder : Csv.Decode.Decoder p
     }
 
 
@@ -40,24 +49,11 @@ type alias ForeignKey =
     }
 
 
-type alias Column =
-    { name : String
-    , tipe : ColumnType
-    }
-
-
 type alias Codec a =
-    ( ColumnType
+    ( SQLite.Types.Type
     , a -> Json.Encode.Value
     , Csv.Decode.Decoder a
     )
-
-
-type ColumnType
-    = Integer
-    | Real
-    | Text
-    | Nullable ColumnType
 
 
 table : String -> String -> ctor -> TableBuilder a ctor
@@ -70,60 +66,58 @@ table filename name ctor =
     }
 
 
+with : Column a p -> TableBuilder a (p -> b) -> TableBuilder a b
+with c builder =
+    { name = builder.name
+    , filename = builder.filename
+    , columns = c.definition :: builder.columns
+    , encode = \v -> ( c.definition.name, c.encode v ) :: builder.encode v
+    , decoder =
+        builder.decoder
+            |> Csv.Decode.pipeline c.decoder
+    }
+
+
 column :
     String
     -> (a -> p)
     -> Codec p
-    -> TableBuilder a (p -> b)
-    -> TableBuilder a b
-column name getter ( tipe, encode, decoder ) builder =
-    { name = builder.name
-    , filename = builder.filename
-    , columns =
+    -> Column a p
+column name getter ( tipe, encode, decoder ) =
+    { definition =
         { name = name
-        , tipe = tipe
+        , tipe = Just tipe
+        , constraints = [ CreateTable.UnnamedColumnConstraint (CreateTable.ColumnNotNull Nothing) ]
         }
-            :: builder.columns
-    , encode = \v -> ( name, encode (getter v) ) :: builder.encode v
-    , decoder =
-        builder.decoder
-            |> Csv.Decode.pipeline decoder
+    , encode = \v -> encode (getter v)
+    , decoder = Csv.Decode.field name decoder
     }
 
 
-nullColumn :
+nullableColumn :
     String
     -> (a -> Maybe p)
     -> Codec p
-    -> TableBuilder a (Maybe p -> b)
-    -> TableBuilder a b
-nullColumn name getter ( tipe, encode, decoder ) builder =
-    { name = builder.name
-    , filename = builder.filename
-    , columns =
+    -> Column a (Maybe p)
+nullableColumn name getter ( tipe, encode, decoder ) =
+    { definition =
         { name = name
-        , tipe = Nullable tipe
+        , tipe = Just tipe
+        , constraints = []
         }
-            :: builder.columns
     , encode =
         \v ->
-            ( name
-            , case getter v of
+            case getter v of
                 Nothing ->
                     Json.Encode.null
 
                 Just w ->
                     encode w
-            )
-                :: builder.encode v
     , decoder =
-        builder.decoder
-            |> Csv.Decode.pipeline
-                (decoder
-                    |> Csv.Decode.blank
-                    |> Csv.Decode.optionalField name
-                    |> Csv.Decode.map Maybe.Extra.join
-                )
+        decoder
+            |> Csv.Decode.blank
+            |> Csv.Decode.optionalField name
+            |> Csv.Decode.map Maybe.Extra.join
     }
 
 
@@ -299,14 +293,14 @@ url =
 
 string : Codec String
 string =
-    ( Text, Json.Encode.string, Csv.Decode.string )
+    ( SQLite.Types.Text, Json.Encode.string, Csv.Decode.string )
 
 
 float : Codec Float
 float =
-    ( Real, Json.Encode.float, Csv.Decode.float )
+    ( SQLite.Types.Real, Json.Encode.float, Csv.Decode.float )
 
 
 int : Codec Int
 int =
-    ( Integer, Json.Encode.int, Csv.Decode.int )
+    ( SQLite.Types.Integer, Json.Encode.int, Csv.Decode.int )

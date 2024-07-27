@@ -2,7 +2,7 @@ module GTFS.ToSQL exposing (toCreate)
 
 import SQLite.Statement as Statement
 import SQLite.Statement.CreateTable as CreateTable
-import SQLite.TableBuilder exposing (Column, ColumnType(..), Table)
+import SQLite.TableBuilder exposing (Table)
 import SQLite.Types as Types
 
 
@@ -28,15 +28,11 @@ toCreate config t =
 
 
 toTableDefinition : Table a -> CreateTable.TableDefinition
-toTableDefinition { columns, primaryKey } =
-    CreateTable.TableDefinitionColumns
-        { options =
-            { strict = True
-            , withoutRowid = False
-            }
-        , columns = feedColumn :: List.map toSqlColumn columns
-        , constraints =
-            [ CreateTable.UnnamedTableConstraint
+toTableDefinition { columns, primaryKey, foreignKeys } =
+    let
+        primaryKeyConstraint : CreateTable.TableConstraint
+        primaryKeyConstraint =
+            CreateTable.UnnamedTableConstraint
                 (CreateTable.TablePrimaryKey
                     (List.map
                         (\name ->
@@ -49,8 +45,37 @@ toTableDefinition { columns, primaryKey } =
                     )
                     Nothing
                 )
-            ]
+    in
+    CreateTable.TableDefinitionColumns
+        { options =
+            { strict = True
+            , withoutRowid = False
+            }
+        , columns = feedColumn :: columns
+        , constraints =
+            primaryKeyConstraint :: List.map foreignKeyToConstraint foreignKeys
         }
+
+
+foreignKeyToConstraint : SQLite.TableBuilder.ForeignKey -> CreateTable.TableConstraint
+foreignKeyToConstraint { columnName, tableName, mapsTo } =
+    CreateTable.UnnamedTableConstraint
+        (CreateTable.TableForeignKey
+            [ columnName ]
+            { foreignTable = tableName
+            , columnNames =
+                case mapsTo of
+                    Nothing ->
+                        []
+
+                    Just mt ->
+                        [ mt ]
+            , onDelete = Nothing
+            , onUpdate = Nothing
+            , match = Nothing
+            , defer = Nothing
+            }
+        )
 
 
 feedColumn : CreateTable.ColumnDefinition
@@ -60,33 +85,3 @@ feedColumn =
     , constraints =
         [ CreateTable.UnnamedColumnConstraint (CreateTable.ColumnNotNull Nothing) ]
     }
-
-
-toSqlColumn : Column -> CreateTable.ColumnDefinition
-toSqlColumn { name, tipe } =
-    { name = name
-    , tipe = Just (typeToSqlType tipe)
-    , constraints =
-        case tipe of
-            Nullable _ ->
-                []
-
-            _ ->
-                [ CreateTable.UnnamedColumnConstraint (CreateTable.ColumnNotNull Nothing) ]
-    }
-
-
-typeToSqlType : ColumnType -> Types.Type
-typeToSqlType tipe =
-    case tipe of
-        Nullable x ->
-            typeToSqlType x
-
-        Integer ->
-            Types.Integer
-
-        Real ->
-            Types.Real
-
-        Text ->
-            Types.Text
