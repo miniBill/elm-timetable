@@ -25,4 +25,4 @@ main =
         |> Html.text
         |> List.singleton
         |> Html.pre
-            [ Html.Attributes.style "font-size" "2rem" ]
+            [ Html.Attributes.style "font-size" "1rem" ]

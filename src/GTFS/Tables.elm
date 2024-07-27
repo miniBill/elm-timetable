@@ -33,7 +33,7 @@ import Duration exposing (Duration)
 import GTFS exposing (Accessibility(..), ExceptionType(..), LocationType(..), PathwayMode(..), PickupDropOffType(..), RouteType(..), Timezone)
 import Id exposing (AgencyId, BlockId, Id, LevelId, LocationGroupId, LocationId, NetworkId, PathwayId, RouteId, ServiceId, ShapeId, StopId, TripId, ZoneId)
 import Length exposing (Length)
-import SQLite.TableBuilder exposing (Codec, Color, Table, andThen, angle, bool, clock, color, column, date, float, id, int, kilometers, meters, nullableColumn, seconds, string, table, url, with, withForeignKey, withPrimaryKey)
+import SQLite.TableBuilder exposing (Codec, Color, Table, andThen, angle, bool, clock, color, column, date, float, id, int, kilometers, meters, nullableColumn, seconds, string, table, url, with, withForeignKey, withForeignKeyTo, withPrimaryKey)
 import Url exposing (Url)
 
 
@@ -68,12 +68,12 @@ type alias StopTime =
 stopTimes : Table StopTime
 stopTimes =
     table "stop_times.txt" "stop_times" StopTime
-        |> with (column "trip_id" .trip_id id)
+        |> with (column "trip_id" .trip_id id |> withForeignKey trips.name)
         |> with (nullableColumn "arrival_time" .arrival_time clock)
         |> with (nullableColumn "departure_time" .departure_time clock)
-        |> with (nullableColumn "stop_id" .stop_id id)
-        |> with (nullableColumn "location_group_id" .location_group_id id)
-        |> with (nullableColumn "location_id" .location_id id)
+        |> with (nullableColumn "stop_id" .stop_id id |> withForeignKey stops.name)
+        |> with (nullableColumn "location_group_id" .location_group_id id {- |> withForeignKey location_groups.name -})
+        |> with (nullableColumn "location_id" .location_id id {- |> withForeignKey locations.name -})
         |> with (column "stop_sequence" .stop_sequence int)
         |> with (nullableColumn "stop_headsign" .stop_headsign string)
         |> with (nullableColumn "start_pickup_drop_off_window" .start_pickup_drop_off_window clock)
@@ -84,18 +84,9 @@ stopTimes =
         |> with (nullableColumn "continuous_drop_off" .continuous_drop_off pickupDropOffType)
         |> with (nullableColumn "shape_dist_traveled" .shape_dist_traveled float)
         |> with (nullableColumn "timepoint" .timepoint bool)
-        |> with (nullableColumn "pickup_booking_rule_id" .pickup_booking_rule_id id)
-        |> with (nullableColumn "drop_off_booking_rule_id" .drop_off_booking_rule_id id)
+        |> with (nullableColumn "pickup_booking_rule_id" .pickup_booking_rule_id id {- |> withForeignKey booking_rules.name -})
+        |> with (nullableColumn "drop_off_booking_rule_id" .drop_off_booking_rule_id id {- |> withForeignKey booking_rules.name -})
         |> withPrimaryKey [ "trip_id", "stop_sequence" ]
-        |> withForeignKey { columnName = "trip_id", tableName = trips.name, mapsTo = Nothing }
-        |> withForeignKey { columnName = "stop_id", tableName = stops.name, mapsTo = Nothing }
-
-
-
--- |> withForeignKey { columnName = "location_group_id", tableName = location_groups.name, mapsTo = Nothing }
--- |> withForeignKey { columnName = "location_id", tableName = locations.name, mapsTo = Nothing }
--- |> withForeignKey { columnName = "pickup_booking_rule_id", tableName = booking_rules.name, mapsTo = Nothing }
--- |> withForeignKey { columnName = "drop_off_booking_rule_id", tableName = booking_rules.name, mapsTo = Nothing }
 
 
 type alias Trip =
@@ -115,19 +106,17 @@ type alias Trip =
 trips : Table Trip
 trips =
     table "trips.txt" "trips" Trip
-        |> with (column "route_id" .route_id id)
+        |> with (column "route_id" .route_id id |> withForeignKey routes.name)
         |> with (column "service_id" .service_id id)
         |> with (column "trip_id" .id id)
         |> with (nullableColumn "trip_headsign" .headsign string)
         |> with (nullableColumn "trip_short_name" .short_name string)
         |> with (nullableColumn "direction_id" .direction_id bool)
         |> with (nullableColumn "block_id" .block_id id)
-        |> with (nullableColumn "shape_id" .shape_id id)
+        |> with (nullableColumn "shape_id" .shape_id id {- |> withForeignKey shapePoints.name -})
         |> with (nullableColumn "wheelchair_accessible" .wheelchair_accessible accessibility)
         |> with (nullableColumn "bikes_allowed" .bikes_allowed accessibility)
         |> withPrimaryKey [ "trip_id" ]
-        |> withForeignKey { columnName = "route_id", tableName = routes.name, mapsTo = Nothing }
-        |> withForeignKey { columnName = "shape_id", tableName = shapePoints.name, mapsTo = Nothing }
 
 
 type alias Route =
@@ -151,7 +140,7 @@ routes : Table Route
 routes =
     table "routes.txt" "routes" Route
         |> with (column "route_id" .id id)
-        |> with (nullableColumn "agency_id" .agency_id id)
+        |> with (nullableColumn "agency_id" .agency_id id |> withForeignKey agency.name)
         |> with (nullableColumn "route_short_name" .short_name string)
         |> with (nullableColumn "route_long_name" .long_name string)
         |> with (nullableColumn "route_desc" .description string)
@@ -164,7 +153,6 @@ routes =
         |> with (nullableColumn "continuous_drop_off" .continuous_drop_off pickupDropOffType)
         |> with (nullableColumn "network_id" .network_id id)
         |> withPrimaryKey [ "route_id" ]
-        |> withForeignKey { columnName = "agency_id", tableName = agency.name, mapsTo = Nothing }
 
 
 type alias ShapePoint =
@@ -296,14 +284,12 @@ stops =
         |> with (nullableColumn "zone_id" .zone_id id)
         |> with (nullableColumn "stop_url" .url url)
         |> with (column "location_type" .location_type locationType)
-        |> with (nullableColumn "parent_station" .parent_station id)
+        |> with (nullableColumn "parent_station" .parent_station id |> withForeignKeyTo name "stop_id")
         |> with (nullableColumn "stop_timezone" .timezone string)
         |> with (nullableColumn "wheelchair_boarding" .wheelchair_boarding accessibility)
-        |> with (nullableColumn "level_id" .level_id id)
+        |> with (nullableColumn "level_id" .level_id id |> withForeignKey levels.name)
         |> with (nullableColumn "platform_code" .platform_code string)
         |> withPrimaryKey [ "stop_id" ]
-        |> withForeignKey { columnName = "parent_station", tableName = name, mapsTo = Just "stop_id" }
-        |> withForeignKey { columnName = "level_id", tableName = levels.name, mapsTo = Nothing }
 
 
 type alias Pathway =
@@ -326,10 +312,8 @@ pathways : Table Pathway
 pathways =
     table "pathways.txt" "pathways" Pathway
         |> with (column "pathway_id" .id id)
-        |> with (column "from_stop_id" .from_stop_id id)
-        --|> withForeignKeyTo stops.name "stop_id")
-        |> with (column "to_stop_id" .to_stop_id id)
-        --|> withForeignKeyTo stops.name "stop_id")
+        |> with (column "from_stop_id" .from_stop_id id |> withForeignKeyTo stops.name "stop_id")
+        |> with (column "to_stop_id" .to_stop_id id |> withForeignKeyTo stops.name "stop_id")
         |> with (column "pathway_mode" .mode pathwayMode)
         |> with (column "is_bidirectional" .is_bidirectional bool)
         |> with (nullableColumn "length" .length meters)
@@ -340,8 +324,6 @@ pathways =
         |> with (nullableColumn "signposted_as" .signposted_as string)
         |> with (nullableColumn "reversed_signposted_as" .reversed_signposted_as string)
         |> withPrimaryKey [ "pathway_id" ]
-        |> withForeignKey { columnName = "from_stop_id", tableName = stops.name, mapsTo = Just "stop_id" }
-        |> withForeignKey { columnName = "to_stop_id", tableName = stops.name, mapsTo = Just "stop_id" }
 
 
 type alias Level =

@@ -1,4 +1,4 @@
-module SQLite.TableBuilder exposing (Codec, Color, Column, ForeignKey, Table, TableBuilder, andThen, angle, bool, clock, color, column, date, dateToInt, float, id, int, kilometers, meters, nullableColumn, seconds, string, table, url, with, withForeignKey, withPrimaryKey)
+module SQLite.TableBuilder exposing (Codec, Color, Column, ForeignKey, Table, TableBuilder, andThen, angle, bool, clock, color, column, date, dateToInt, float, id, int, kilometers, meters, nullableColumn, seconds, string, table, url, with, withForeignKey, withForeignKeyTo, withPrimaryKey)
 
 import Angle exposing (Angle)
 import Clock exposing (Clock)
@@ -121,6 +121,48 @@ nullableColumn name getter ( tipe, encode, decoder ) =
     }
 
 
+withForeignKeyTo : String -> String -> Column a p -> Column a p
+withForeignKeyTo tableName columnName ({ definition } as c) =
+    { c
+        | definition =
+            { definition
+                | constraints =
+                    CreateTable.UnnamedColumnConstraint
+                        (CreateTable.ColumnForeignKey
+                            { foreignTable = tableName
+                            , columnNames = [ columnName ]
+                            , onDelete = Nothing
+                            , onUpdate = Nothing
+                            , match = Nothing
+                            , defer = Nothing
+                            }
+                        )
+                        :: definition.constraints
+            }
+    }
+
+
+withForeignKey : String -> Column a p -> Column a p
+withForeignKey tableName ({ definition } as c) =
+    { c
+        | definition =
+            { definition
+                | constraints =
+                    CreateTable.UnnamedColumnConstraint
+                        (CreateTable.ColumnForeignKey
+                            { foreignTable = tableName
+                            , columnNames = []
+                            , onDelete = Nothing
+                            , onUpdate = Nothing
+                            , match = Nothing
+                            , defer = Nothing
+                            }
+                        )
+                        :: definition.constraints
+            }
+    }
+
+
 withPrimaryKey : List String -> TableBuilder a a -> Table a
 withPrimaryKey primaryKey { name, filename, encode, decoder, columns } =
     { name = name
@@ -135,11 +177,6 @@ withPrimaryKey primaryKey { name, filename, encode, decoder, columns } =
     , primaryKey = primaryKey
     , foreignKeys = []
     }
-
-
-withForeignKey : ForeignKey -> Table a -> Table a
-withForeignKey fk t =
-    { t | foreignKeys = fk :: t.foreignKeys }
 
 
 parsed : String -> Parser a -> (a -> String) -> Codec String -> Codec a
