@@ -3,7 +3,7 @@ module GTFS.ToSQL exposing (toCreate)
 import List.Extra
 import SQLite.Statement as Statement
 import SQLite.Statement.CreateTable as CreateTable
-import SQLite.TableBuilder exposing (Table)
+import SQLite.Table exposing (Table)
 import SQLite.Types as Types
 
 

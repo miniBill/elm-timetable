@@ -1,4 +1,4 @@
-module SQLite.TableBuilder exposing (Codec, Color, Column, ForeignKey, Table, TableBuilder, andThen, angle, bool, clock, color, column, date, dateToInt, float, id, int, kilometers, meters, nullableColumn, seconds, string, table, url, with, withForeignKey, withForeignKeyTo, withPrimaryKey)
+module SQLite.Table exposing (Codec, Color, Column, ForeignKey, Table, TableBuilder, andThen, angle, bool, clock, color, date, dateToInt, float, id, int, kilometers, meters, seconds, string, table, url, with, withForeignKey, withPrimaryKey)
 
 import Angle exposing (Angle)
 import Clock exposing (Clock)
@@ -8,9 +8,8 @@ import Duration exposing (Duration)
 import Id exposing (Id)
 import Json.Encode
 import Length exposing (Length)
-import Maybe.Extra
 import Parser exposing (Parser)
-import SQLite.Statement.CreateTable as CreateTable exposing (ColumnDefinition)
+import SQLite.Statement.CreateTable exposing (ColumnDefinition)
 import SQLite.Types
 import Url exposing (Url)
 
@@ -43,9 +42,9 @@ type alias Column a p =
 
 
 type alias ForeignKey =
-    { columnName : String
+    { columnNames : List String
     , tableName : String
-    , mapsTo : Maybe String
+    , mapsTo : Maybe (List String)
     }
 
 
@@ -67,101 +66,14 @@ table filename name ctor =
 
 
 with : Column a p -> TableBuilder a (p -> b) -> TableBuilder a b
-with c builder =
+with column builder =
     { name = builder.name
     , filename = builder.filename
-    , columns = c.definition :: builder.columns
-    , encode = \v -> ( c.definition.name, c.encode v ) :: builder.encode v
+    , columns = column.definition :: builder.columns
+    , encode = \v -> ( column.definition.name, column.encode v ) :: builder.encode v
     , decoder =
         builder.decoder
-            |> Csv.Decode.pipeline c.decoder
-    }
-
-
-column :
-    String
-    -> (a -> p)
-    -> Codec p
-    -> Column a p
-column name getter ( tipe, encode, decoder ) =
-    { definition =
-        { name = name
-        , tipe = Just tipe
-        , constraints = [ { name = Nothing, constraint = CreateTable.ColumnNotNull Nothing } ]
-        }
-    , encode = \v -> encode (getter v)
-    , decoder = Csv.Decode.field name decoder
-    }
-
-
-nullableColumn :
-    String
-    -> (a -> Maybe p)
-    -> Codec p
-    -> Column a (Maybe p)
-nullableColumn name getter ( tipe, encode, decoder ) =
-    { definition =
-        { name = name
-        , tipe = Just tipe
-        , constraints = []
-        }
-    , encode =
-        \v ->
-            case getter v of
-                Nothing ->
-                    Json.Encode.null
-
-                Just w ->
-                    encode w
-    , decoder =
-        decoder
-            |> Csv.Decode.blank
-            |> Csv.Decode.optionalField name
-            |> Csv.Decode.map Maybe.Extra.join
-    }
-
-
-withForeignKeyTo : String -> String -> Column a p -> Column a p
-withForeignKeyTo tableName columnName ({ definition } as c) =
-    { c
-        | definition =
-            { definition
-                | constraints =
-                    { name = Nothing
-                    , constraint =
-                        CreateTable.ColumnForeignKey
-                            { foreignTable = tableName
-                            , columnNames = [ columnName ]
-                            , onDelete = Nothing
-                            , onUpdate = Nothing
-                            , match = Nothing
-                            , defer = Nothing
-                            }
-                    }
-                        :: definition.constraints
-            }
-    }
-
-
-withForeignKey : String -> Column a p -> Column a p
-withForeignKey tableName ({ definition } as c) =
-    { c
-        | definition =
-            { definition
-                | constraints =
-                    { name = Nothing
-                    , constraint =
-                        CreateTable.ColumnForeignKey
-                            { foreignTable = tableName
-                            , columnNames = []
-                            , onDelete = Nothing
-                            , onUpdate = Nothing
-                            , match = Nothing
-                            , defer = Nothing
-                            }
-                    }
-                        :: definition.constraints
-            }
+            |> Csv.Decode.pipeline column.decoder
     }
 
 
@@ -179,6 +91,11 @@ withPrimaryKey primaryKey { name, filename, encode, decoder, columns } =
     , primaryKey = primaryKey
     , foreignKeys = []
     }
+
+
+withForeignKey : ForeignKey -> Table a -> Table a
+withForeignKey fk t =
+    { t | foreignKeys = fk :: t.foreignKeys }
 
 
 parsed : String -> Parser a -> (a -> String) -> Codec String -> Codec a

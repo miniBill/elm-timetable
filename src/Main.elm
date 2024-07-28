@@ -15,7 +15,7 @@ import IdSet exposing (IdSet)
 import Pathfinding
 import Platform exposing (Task)
 import RemoteData
-import SQLite.TableBuilder exposing (Table)
+import SQLite.Table exposing (Table)
 import Table
 import Task
 import Theme
@@ -95,7 +95,7 @@ init _ =
                                         IdDict.insert calendarDate.service_id
                                             (IdDict.get calendarDate.service_id acc
                                                 |> Maybe.withDefault Dict.empty
-                                                |> Dict.insert (SQLite.TableBuilder.dateToInt calendarDate.date)
+                                                |> Dict.insert (SQLite.Table.dateToInt calendarDate.date)
                                                     calendarDate
                                             )
                                             acc
