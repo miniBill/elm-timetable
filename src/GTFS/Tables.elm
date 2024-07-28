@@ -15,7 +15,7 @@ module GTFS.Tables exposing
     , LocationGroup, locationGroups
     , Network, networks
     , RouteNetwork, routeNetworks
-    , withFeedColumn
+    , allCreates
     )
 
 {-|
@@ -37,7 +37,7 @@ module GTFS.Tables exposing
 @docs Network, networks
 @docs RouteNetwork, routeNetworks
 
-@docs withFeedColumn
+@docs allCreates
 
 -}
 
@@ -46,10 +46,12 @@ import Clock exposing (Clock)
 import Date exposing (Date)
 import Duration exposing (Duration)
 import GTFS exposing (Accessibility(..), ExceptionType(..), LocationType(..), PathwayMode(..), PickupDropOffType(..), RouteType(..), Timezone)
+import GTFS.ToSQL
 import Id exposing (AgencyId, AreaId, BlockId, Id, LevelId, LocationGroupId, LocationId, NetworkId, PathwayId, RouteId, ServiceId, ShapeId, StopAreaId, StopId, TripId, ZoneId)
 import Length exposing (Length)
 import List.Extra
 import SQLite.Column as Column
+import SQLite.Statement as Statement
 import SQLite.Statement.CreateTable as CreateTable
 import SQLite.Table as Table exposing (Codec, Color, Table, andThen, angle, bool, clock, color, date, float, id, int, kilometers, meters, seconds, string, url)
 import SQLite.Types
@@ -806,3 +808,40 @@ feedColumn =
     , constraints =
         [ { name = Nothing, constraint = CreateTable.ColumnNotNull Nothing } ]
     }
+
+
+allCreates : Bool -> List Statement.Statement
+allCreates addFeed =
+    let
+        maybeAddFeed : Table a -> Table a
+        maybeAddFeed table =
+            if addFeed then
+                withFeedColumn table
+
+            else
+                { table | name = table.name ++ "_without_feed" }
+    in
+    [ GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed agency)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed stops)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed routes)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed trips)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed stopTimes)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed calendars)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed calendarDates)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed areas)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed stopAreas)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed networks)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed routeNetworks)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed shapePoints)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed frequencies)
+
+    -- , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed transfers)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed pathways)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed levels)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed locationGroups)
+
+    -- , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed locationGroupStops)
+    -- , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed translations)
+    -- , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed feedInfo)
+    -- , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed attributions)
+    ]
