@@ -19,6 +19,7 @@ main =
     , SQLSource.toCreate { ifNotExists = False } GTFS.Tables.shapePoints
     , SQLSource.toCreate { ifNotExists = False } GTFS.Tables.pathways
     , SQLSource.toCreate { ifNotExists = False } GTFS.Tables.levels
+    , SQLSource.toCreate { ifNotExists = False } GTFS.Tables.locationGroups
     ]
         |> List.map (\statement -> statement |> Statement.toString)
         |> String.join "\n\n"

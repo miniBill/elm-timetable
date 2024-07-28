@@ -9,6 +9,7 @@ module GTFS.Tables exposing
     , ShapePoint, shapePoints
     , Pathway, pathways
     , Level, levels
+    , locationGroups
     )
 
 {-|
@@ -73,7 +74,7 @@ stopTimes =
         |> Table.with (Column.nullable "arrival_time" .arrival_time clock)
         |> Table.with (Column.nullable "departure_time" .departure_time clock)
         |> Table.with (Column.nullable "stop_id" .stop_id id |> Column.withForeignKey stops.name)
-        |> Table.with (Column.nullable "location_group_id" .location_group_id id {- |> Column.withForeignKey location_groups.name -})
+        |> Table.with (Column.nullable "location_group_id" .location_group_id id |> Column.withForeignKey locationGroups.name)
         |> Table.with (Column.nullable "location_id" .location_id id {- |> Column.withForeignKey locations.name -})
         |> Table.with (Column.notNull "stop_sequence" .stop_sequence int)
         |> Table.with (Column.nullable "stop_headsign" .stop_headsign string)
@@ -88,6 +89,20 @@ stopTimes =
         |> Table.with (Column.nullable "pickup_booking_rule_id" .pickup_booking_rule_id id {- |> Column.withForeignKey booking_rules.name -})
         |> Table.with (Column.nullable "drop_off_booking_rule_id" .drop_off_booking_rule_id id {- |> Column.withForeignKey booking_rules.name -})
         |> Table.withPrimaryKey [ "trip_id", "stop_sequence" ]
+
+
+type alias LocationGroup =
+    { id : Id LocationGroupId
+    , group_name : Maybe String
+    }
+
+
+locationGroups : Table LocationGroup
+locationGroups =
+    Table.table "location_groups.txt" "location_groups" LocationGroup
+        |> Table.with (Column.notNull "location_group_id" .id id)
+        |> Table.with (Column.nullable "location_group_name" .group_name string)
+        |> Table.withPrimaryKey [ "location_group_id" ]
 
 
 type alias Trip =

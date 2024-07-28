@@ -3,7 +3,7 @@ module GTFS.ToSQL exposing (toCreate)
 import List.Extra
 import SQLite.Statement as Statement
 import SQLite.Statement.CreateTable as CreateTable
-import SQLite.Table exposing (Table)
+import SQLite.Table as Table exposing (Table)
 import SQLite.Types as Types
 
 
@@ -110,14 +110,14 @@ toTableDefinition { columns, primaryKey, foreignKeys } =
         }
 
 
-foreignKeyToConstraint : SQLite.TableBuilder.ForeignKey -> CreateTable.TableConstraint
-foreignKeyToConstraint { columnName, tableName, mapsTo } =
+foreignKeyToConstraint : Table.ForeignKey -> CreateTable.TableConstraint
+foreignKeyToConstraint { columnNames, tableName, mapsTo } =
     { name = Nothing
     , constraint =
         CreateTable.TableForeignKey
-            [ "feed", columnName ]
+            ("feed" :: columnNames)
             { foreignTable = tableName
-            , columnNames = [ "feed", Maybe.withDefault columnName mapsTo ]
+            , columnNames = "feed" :: Maybe.withDefault columnNames mapsTo
             , onDelete = Nothing
             , onUpdate = Nothing
             , match = Nothing
