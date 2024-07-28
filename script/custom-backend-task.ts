@@ -4,10 +4,10 @@ import { promisify } from "node:util";
 export async function sqlite_open(filename: string): Promise<sqlite3.Database> {
     const db = new sqlite3.Database(filename);
     return await new Promise<sqlite3.Database>((resolve, reject) => {
-        const error = function () {
+        const error = function (err: Error) {
             db.off("open", success);
             db.off("error", error);
-            reject();
+            reject(err);
         };
         const success = function () {
             db.off("open", success);
@@ -20,8 +20,8 @@ export async function sqlite_open(filename: string): Promise<sqlite3.Database> {
 }
 
 export async function sqlite_close(db: sqlite3.Database): Promise<{}> {
-    const close = promisify((callback) =>
-        db.close((err) => callback(err, null))
+    const close = promisify((callback: (err: Error | null) => void) =>
+        db.close((err) => callback(err))
     );
     await close();
     return {};
@@ -35,10 +35,15 @@ export async function sqlite_serialize({
     statements: string[];
 }): Promise<{}> {
     const run = promisify(
-        (statement: string, callback: (err: Error | null) => void) =>
-            db.run(statement, [], callback)
+        (
+            statement: string,
+            callback: (err: Error | null, result: sqlite3.RunResult) => void
+        ) =>
+            db.run(statement, [], function (err: Error | null) {
+                callback(err, this);
+            })
     );
-    const promises: Promise<void>[] = [];
+    const promises: Promise<sqlite3.RunResult>[] = [];
     db.serialize(() => {
         for (const statement of statements) {
             console.info(statement);
