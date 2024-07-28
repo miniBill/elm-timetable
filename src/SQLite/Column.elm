@@ -50,8 +50,8 @@ nullable name getter ( tipe, encode, decoder ) =
     }
 
 
-withForeignKeyTo : String -> String -> Column a p -> Column a p
-withForeignKeyTo tableName columnName ({ definition } as column) =
+withForeignKeyTo : { t | name : String } -> String -> Column a p -> Column a p
+withForeignKeyTo { name } columnName ({ definition } as column) =
     { column
         | definition =
             { definition
@@ -59,7 +59,7 @@ withForeignKeyTo tableName columnName ({ definition } as column) =
                     { name = Nothing
                     , constraint =
                         CreateTable.ColumnForeignKey
-                            { foreignTable = tableName
+                            { foreignTable = name
                             , columnNames = [ columnName ]
                             , onDelete = Nothing
                             , onUpdate = Nothing
@@ -72,8 +72,8 @@ withForeignKeyTo tableName columnName ({ definition } as column) =
     }
 
 
-withForeignKey : String -> Column a p -> Column a p
-withForeignKey tableName ({ definition } as column) =
+withForeignKey : { t | name : String } -> Column a p -> Column a p
+withForeignKey { name } ({ definition } as column) =
     { column
         | definition =
             { definition
@@ -81,7 +81,7 @@ withForeignKey tableName ({ definition } as column) =
                     { name = Nothing
                     , constraint =
                         CreateTable.ColumnForeignKey
-                            { foreignTable = tableName
+                            { foreignTable = name
                             , columnNames = []
                             , onDelete = Nothing
                             , onUpdate = Nothing

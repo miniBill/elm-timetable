@@ -1,5 +1,6 @@
 module Id exposing
     ( AgencyId
+    , AreaId
     , BlockId
     , FeedId
     , Id
@@ -11,6 +12,7 @@ module Id exposing
     , RouteId
     , ServiceId
     , ShapeId
+    , StopAreaId
     , StopId
     , TripId
     , ZoneId
@@ -20,60 +22,68 @@ module Id exposing
     )
 
 
-type ZoneId
-    = ZoneId
+type AgencyId
+    = AgencyId
 
 
-type LevelId
-    = LevelId
-
-
-type PathwayId
-    = PathwayId
-
-
-type LocationId
-    = LocationId
-
-
-type LocationGroupId
-    = LocationGroupId
-
-
-type TripId
-    = TripId
-
-
-type StopId
-    = StopId
+type AreaId
+    = AreaId
 
 
 type BlockId
     = BlockId
 
 
-type ShapeId
-    = ShapeId
+type FeedId
+    = FeedId
 
 
-type RouteId
-    = RouteId
+type LevelId
+    = LevelId
 
 
-type AgencyId
-    = AgencyId
+type LocationGroupId
+    = LocationGroupId
+
+
+type LocationId
+    = LocationId
 
 
 type NetworkId
     = NetworkId
 
 
+type PathwayId
+    = PathwayId
+
+
+type RouteId
+    = RouteId
+
+
 type ServiceId
     = ServiceId
 
 
-type FeedId
-    = FeedId
+type ShapeId
+    = ShapeId
+
+
+type StopId
+    = StopId
+
+
+type StopAreaId
+    = StopAreaId
+
+
+type TripId
+    = TripId
+
+
+type ZoneId
+    = ZoneId
 
 
 type Id kind
