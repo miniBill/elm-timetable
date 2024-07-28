@@ -1,10 +1,8 @@
 module GTFS.ToSQL exposing (toCreate)
 
-import List.Extra
 import SQLite.Statement as Statement
 import SQLite.Statement.CreateTable as CreateTable
-import SQLite.Table as Table exposing (Table)
-import SQLite.Types as Types
+import SQLite.Table exposing (Table)
 
 
 
@@ -30,106 +28,38 @@ toCreate config t =
 
 toTableDefinition : Table a -> CreateTable.TableDefinition
 toTableDefinition { columns, primaryKey, foreignKeys } =
-    let
-        primaryKeyConstraint : CreateTable.TableConstraint
-        primaryKeyConstraint =
-            { name = Nothing
-            , constraint =
-                CreateTable.TablePrimaryKey
-                    (List.map
-                        (\name ->
-                            { nameOrExpr = CreateTable.IsName name
-                            , collate = Nothing
-                            , ascDesc = Nothing
-                            }
-                        )
-                        (feedColumn.name :: primaryKey)
-                    )
-                    Nothing
-            }
-
-        ( columnForeignKeys, columnsWithoutForeignKeys ) =
-            columns
-                |> List.map
-                    (\column ->
-                        case
-                            List.Extra.findMap
-                                (\{ constraint } ->
-                                    case constraint of
-                                        CreateTable.ColumnForeignKey fk ->
-                                            Just fk
-
-                                        _ ->
-                                            Nothing
-                                )
-                                column.constraints
-                        of
-                            Just fk ->
-                                ( Just ( column.name, fk )
-                                , { column
-                                    | constraints =
-                                        List.Extra.removeWhen
-                                            (\{ constraint } -> constraint == CreateTable.ColumnForeignKey fk)
-                                            column.constraints
-                                  }
-                                )
-
-                            Nothing ->
-                                ( Nothing, column )
-                    )
-                |> List.unzip
-    in
     CreateTable.TableDefinitionColumns
         { options =
             { strict = True
             , withoutRowid = False
             }
-        , columns = feedColumn :: columnsWithoutForeignKeys
+        , columns = columns
         , constraints =
-            primaryKeyConstraint
-                :: List.filterMap
-                    (Maybe.map
-                        (\( name, foreignKeyClause ) ->
-                            { name = Nothing
-                            , constraint =
-                                CreateTable.TableForeignKey
-                                    [ "feed", name ]
-                                    { foreignKeyClause
-                                        | columnNames =
-                                            if List.isEmpty foreignKeyClause.columnNames then
-                                                [ "feed", name ]
-
-                                            else
-                                                "feed" :: foreignKeyClause.columnNames
-                                    }
-                            }
-                        )
-                    )
-                    columnForeignKeys
-                ++ List.map foreignKeyToConstraint foreignKeys
+            primaryKeyToConstraint primaryKey
+                :: List.map foreignKeyToConstraint foreignKeys
         }
 
 
-foreignKeyToConstraint : Table.ForeignKey -> CreateTable.TableConstraint
-foreignKeyToConstraint { columnNames, tableName, mapsTo } =
+primaryKeyToConstraint : List String -> CreateTable.TableConstraint
+primaryKeyToConstraint primaryKey =
     { name = Nothing
     , constraint =
-        CreateTable.TableForeignKey
-            ("feed" :: columnNames)
-            { foreignTable = tableName
-            , columnNames = "feed" :: Maybe.withDefault columnNames mapsTo
-            , onDelete = Nothing
-            , onUpdate = Nothing
-            , match = Nothing
-            , defer = Nothing
-            }
+        CreateTable.TablePrimaryKey
+            (List.map
+                (\name ->
+                    { nameOrExpr = CreateTable.IsName name
+                    , collate = Nothing
+                    , ascDesc = Nothing
+                    }
+                )
+                primaryKey
+            )
+            Nothing
     }
 
 
-feedColumn : CreateTable.ColumnDefinition
-feedColumn =
-    { name = "feed"
-    , tipe = Just Types.Text
-    , constraints =
-        [ { name = Nothing, constraint = CreateTable.ColumnNotNull Nothing } ]
+foreignKeyToConstraint : ( List String, CreateTable.ForeignKeyClause ) -> CreateTable.TableConstraint
+foreignKeyToConstraint ( columnNames, clause ) =
+    { name = Nothing
+    , constraint = CreateTable.TableForeignKey columnNames clause
     }

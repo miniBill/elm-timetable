@@ -1,4 +1,4 @@
-module SQLite.Table exposing (Codec, Color, Column, ForeignKey, Table, TableBuilder, andThen, angle, bool, clock, color, date, dateToInt, float, id, int, kilometers, meters, seconds, string, table, url, with, withForeignKey, withPrimaryKey)
+module SQLite.Table exposing (Codec, Color, Column, Table, TableBuilder, andThen, angle, bool, clock, color, date, dateToInt, float, id, int, kilometers, meters, seconds, string, table, url, with, withPrimaryKey)
 
 import Angle exposing (Angle)
 import Clock exposing (Clock)
@@ -9,7 +9,7 @@ import Id exposing (Id)
 import Json.Encode
 import Length exposing (Length)
 import Parser exposing (Parser)
-import SQLite.Statement.CreateTable exposing (ColumnDefinition)
+import SQLite.Statement.CreateTable exposing (ColumnDefinition, ForeignKeyClause)
 import SQLite.Types
 import Url exposing (Url)
 
@@ -30,7 +30,7 @@ type alias Table a =
     , columns : List ColumnDefinition
     , encode : a -> Json.Encode.Value
     , decoder : Csv.Decode.Decoder a
-    , foreignKeys : List ForeignKey
+    , foreignKeys : List ( List String, ForeignKeyClause )
     }
 
 
@@ -41,11 +41,12 @@ type alias Column a p =
     }
 
 
-type alias ForeignKey =
-    { columnNames : List String
-    , tableName : String
-    , mapsTo : Maybe (List String)
-    }
+
+-- type alias ForeignKey =
+--     { columnNames : List String
+--     , tableName : String
+--     , mapsTo : Maybe (List String)
+--     }
 
 
 type alias Codec a =
@@ -93,9 +94,22 @@ withPrimaryKey primaryKey { name, filename, encode, decoder, columns } =
     }
 
 
-withForeignKey : ForeignKey -> Table a -> Table a
-withForeignKey fk t =
-    { t | foreignKeys = fk :: t.foreignKeys }
+
+-- withForeignKey : ForeignKey -> Table a -> Table a
+-- withForeignKey { tableName, columnNames, mapsTo } t =
+--     { t
+--         | foreignKeys =
+--             ( columnNames
+--             , { foreignTable = tableName
+--               , columnNames = Maybe.withDefault [] mapsTo
+--               , onDelete = Nothing
+--               , onUpdate = Nothing
+--               , match = Nothing
+--               , defer = Nothing
+--               }
+--             )
+--                 :: t.foreignKeys
+--     }
 
 
 parsed : String -> Parser a -> (a -> String) -> Codec String -> Codec a

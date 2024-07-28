@@ -14,6 +14,7 @@ module GTFS.Tables exposing
     , LocationGroup, locationGroups
     , Network, networks
     , RouteNetwork, routeNetworks
+    , withFeedColumn
     )
 
 {-|
@@ -34,6 +35,8 @@ module GTFS.Tables exposing
 @docs Network, networks
 @docs RouteNetwork, routeNetworks
 
+@docs withFeedColumn
+
 -}
 
 import Angle exposing (Angle)
@@ -43,8 +46,11 @@ import Duration exposing (Duration)
 import GTFS exposing (Accessibility(..), ExceptionType(..), LocationType(..), PathwayMode(..), PickupDropOffType(..), RouteType(..), Timezone)
 import Id exposing (AgencyId, AreaId, BlockId, Id, LevelId, LocationGroupId, LocationId, NetworkId, PathwayId, RouteId, ServiceId, ShapeId, StopAreaId, StopId, TripId, ZoneId)
 import Length exposing (Length)
+import List.Extra
 import SQLite.Column as Column
+import SQLite.Statement.CreateTable as CreateTable
 import SQLite.Table as Table exposing (Codec, Color, Table, andThen, angle, bool, clock, color, date, float, id, int, kilometers, meters, seconds, string, url)
+import SQLite.Types
 import Url exposing (Url)
 
 
@@ -707,3 +713,74 @@ parseRouteType input =
 
         _ ->
             Err (String.fromInt input ++ " is not a valid route type")
+
+
+withFeedColumn : Table a -> Table a
+withFeedColumn t =
+    let
+        ( columnForeignKeys, columnsWithoutForeignKeys ) =
+            t.columns
+                |> List.map
+                    (\column ->
+                        case
+                            List.Extra.findMap
+                                (\{ constraint } ->
+                                    case constraint of
+                                        CreateTable.ColumnForeignKey fk ->
+                                            Just fk
+
+                                        _ ->
+                                            Nothing
+                                )
+                                column.constraints
+                        of
+                            Just fk ->
+                                ( Just ( column.name, fk )
+                                , { column
+                                    | constraints =
+                                        List.Extra.removeWhen
+                                            (\{ constraint } -> constraint == CreateTable.ColumnForeignKey fk)
+                                            column.constraints
+                                  }
+                                )
+
+                            Nothing ->
+                                ( Nothing, column )
+                    )
+                |> List.unzip
+                |> Tuple.mapFirst (List.filterMap identity)
+    in
+    { t
+        | primaryKey = feedColumn.name :: t.primaryKey
+        , columns = feedColumn :: columnsWithoutForeignKeys
+        , foreignKeys =
+            (t.foreignKeys
+                ++ List.map
+                    (\( colName, fk ) ->
+                        ( [ colName ], fk )
+                    )
+                    columnForeignKeys
+            )
+                |> List.map
+                    (\( colNames, fk ) ->
+                        ( feedColumn.name :: colNames
+                        , { fk
+                            | columnNames =
+                                if List.isEmpty fk.columnNames then
+                                    []
+
+                                else
+                                    feedColumn.name :: fk.columnNames
+                          }
+                        )
+                    )
+    }
+
+
+feedColumn : CreateTable.ColumnDefinition
+feedColumn =
+    { name = "feed"
+    , tipe = Just SQLite.Types.Text
+    , constraints =
+        [ { name = Nothing, constraint = CreateTable.ColumnNotNull Nothing } ]
+    }
