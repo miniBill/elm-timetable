@@ -5,6 +5,8 @@ import GTFS.ToSQL as SQLSource
 import Html exposing (Html)
 import Html.Attributes
 import SQLite.Statement as Statement
+import Ui
+import Ui.Font
 
 
 main : Html msg
@@ -35,7 +37,13 @@ main =
     ]
         |> List.map (\statement -> statement |> Statement.toString)
         |> String.join "\n\n"
-        |> Html.text
-        |> List.singleton
-        |> Html.pre
-            [ Html.Attributes.style "font-size" "1rem" ]
+        |> Ui.text
+        |> Ui.el
+            [ Ui.htmlAttribute (Html.Attributes.style "white-space" "pre")
+            , Ui.Font.family [ Ui.Font.monospace ]
+            , Ui.width Ui.shrink
+            ]
+        |> Ui.embed
+            [ Ui.padding 8
+            , Ui.width Ui.shrink
+            ]

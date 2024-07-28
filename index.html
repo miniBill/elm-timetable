@@ -7,12 +7,14 @@
     </head>
 
     <body>
-        <aside></aside>
-        <main></main>
+        <main style="display: flex; gap: 16px">
+            <aside></aside>
+            <article></article>
+        </main>
         <script src="./build/main.js"></script>
         <script>
             Elm.Main.init({
-                node: document.querySelector("main"),
+                node: document.querySelector("article"),
                 flags: {},
             });
             Elm.SQL.init({
