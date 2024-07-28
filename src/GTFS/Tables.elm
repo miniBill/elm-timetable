@@ -12,6 +12,8 @@ module GTFS.Tables exposing
     , Area, areas
     , StopArea, stopAreas
     , LocationGroup, locationGroups
+    , Network, networks
+    , RouteNetwork, routeNetworks
     )
 
 {-|
@@ -29,6 +31,8 @@ module GTFS.Tables exposing
 @docs Area, areas
 @docs StopArea, stopAreas
 @docs LocationGroup, locationGroups
+@docs Network, networks
+@docs RouteNetwork, routeNetworks
 
 -}
 
@@ -294,6 +298,34 @@ stopAreas =
         |> Table.with (Column.notNull "area_id" .area_id id |> Column.withForeignKey areas)
         |> Table.with (Column.notNull "stop_id" .stop_id id |> Column.withForeignKey stops)
         |> Table.withPrimaryKey [ "area_id", "stop_id" ]
+
+
+type alias Network =
+    { id : Id NetworkId
+    , name : Maybe String
+    }
+
+
+networks : Table Network
+networks =
+    Table.table "networks.txt" "networks" Network
+        |> Table.with (Column.notNull "network_id" .id id)
+        |> Table.with (Column.nullable "network_name" .name string)
+        |> Table.withPrimaryKey [ "network_id" ]
+
+
+type alias RouteNetwork =
+    { network_id : Id NetworkId
+    , route_id : Id RouteId
+    }
+
+
+routeNetworks : Table RouteNetwork
+routeNetworks =
+    Table.table "route_networks.txt" "route_networks" RouteNetwork
+        |> Table.with (Column.notNull "network_id" .network_id id |> Column.withForeignKey networks)
+        |> Table.with (Column.notNull "route_id" .route_id id |> Column.withForeignKey routes)
+        |> Table.withPrimaryKey [ "route_id" ]
 
 
 type alias Stop =
