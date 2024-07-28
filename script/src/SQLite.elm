@@ -53,9 +53,16 @@ serialize (Database db) statements =
               , statements
                     |> Json.Encode.list
                         (\statement ->
-                            statement
-                                |> Statement.toString
-                                |> Json.Encode.string
+                            Json.Encode.object
+                                [ ( "statement"
+                                  , statement
+                                        |> Statement.toString
+                                        |> Json.Encode.string
+                                  )
+                                , ( "params"
+                                  , Json.Encode.list never []
+                                  )
+                                ]
                         )
               )
             ]

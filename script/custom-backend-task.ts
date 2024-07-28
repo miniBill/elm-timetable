@@ -32,21 +32,20 @@ export async function sqlite_serialize({
     statements,
 }: {
     db: sqlite3.Database;
-    statements: string[];
+    statements: { statement: string; params: any }[];
 }): Promise<{}> {
     const run = promisify(
         (
-            statement: string,
+            { statement, params }: { statement: string; params: any },
             callback: (err: Error | null, result: sqlite3.RunResult) => void
         ) =>
-            db.run(statement, [], function (err: Error | null) {
+            db.run(statement, params, function (err: Error | null) {
                 callback(err, this);
             })
     );
     const promises: Promise<sqlite3.RunResult>[] = [];
     db.serialize(() => {
         for (const statement of statements) {
-            console.info(statement);
             promises.push(run(statement));
         }
     });
