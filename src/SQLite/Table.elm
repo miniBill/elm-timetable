@@ -28,7 +28,7 @@ type alias Table a =
     , filename : String
     , primaryKey : List String
     , columns : List ColumnDefinition
-    , encode : a -> Json.Encode.Value
+    , encode : a -> List ( String, Json.Encode.Value )
     , decoder : Csv.Decode.Decoder a
     , foreignKeys : List ( List String, ForeignKeyClause )
     }
@@ -83,11 +83,7 @@ withPrimaryKey primaryKey { name, filename, encode, decoder, columns } =
     { name = name
     , filename = filename
     , columns = List.reverse columns
-    , encode =
-        \value ->
-            value
-                |> encode
-                |> Json.Encode.object
+    , encode = encode
     , decoder = decoder
     , primaryKey = primaryKey
     , foreignKeys = []
