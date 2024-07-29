@@ -1,4 +1,4 @@
-module SQLite exposing (Database, close, loadTableFromCsv, open, serialize, withDb)
+module SQLite exposing (Database, loadTableFromCsv, serialize, withDb)
 
 import BackendTask exposing (BackendTask)
 import BackendTask.Custom
