@@ -21,9 +21,29 @@ task =
     SQLite.withDb "../feeds.sqlite"
         (\db ->
             let
-                loadTable : Table a -> Spinner.Steps FatalError () -> Spinner.Steps FatalError ()
-                loadTable table =
-                    Spinner.withStep ("Loading data for table " ++ table.name) (\_ -> SQLite.loadTableFromCsv db "../feeds" "micotra-2024" table)
+                loadTable : String -> Table a -> Spinner.Steps FatalError () -> Spinner.Steps FatalError ()
+                loadTable feed table =
+                    Spinner.withStep ("[" ++ feed ++ "] Loading data for table " ++ table.name) (\_ -> SQLite.loadTableFromCsv db "../feeds" feed table)
+
+                loadFeed : String -> Spinner.Steps FatalError () -> Spinner.Steps FatalError ()
+                loadFeed feed steps =
+                    steps
+                        |> loadTable feed GTFS.Tables.agency
+                        |> loadTable feed GTFS.Tables.levels
+                        |> loadTable feed GTFS.Tables.stops
+                        |> loadTable feed GTFS.Tables.routes
+                        |> loadTable feed GTFS.Tables.trips
+                        |> loadTable feed GTFS.Tables.stopTimes
+                        |> loadTable feed GTFS.Tables.calendars
+                        |> loadTable feed GTFS.Tables.calendarDates
+                        |> loadTable feed GTFS.Tables.areas
+                        |> loadTable feed GTFS.Tables.stopAreas
+                        |> loadTable feed GTFS.Tables.networks
+                        |> loadTable feed GTFS.Tables.routeNetworks
+                        |> loadTable feed GTFS.Tables.shapePoints
+                        |> loadTable feed GTFS.Tables.frequencies
+                        |> loadTable feed GTFS.Tables.pathways
+                        |> loadTable feed GTFS.Tables.locationGroups
             in
             Spinner.steps
                 |> Spinner.withStep "Create tables"
@@ -31,21 +51,7 @@ task =
                         SQLite.serialize db
                             GTFS.Tables.allCreates
                     )
-                |> loadTable GTFS.Tables.agency
-                |> loadTable GTFS.Tables.levels
-                |> loadTable GTFS.Tables.stops
-                |> loadTable GTFS.Tables.routes
-                |> loadTable GTFS.Tables.trips
-                |> loadTable GTFS.Tables.stopTimes
-                |> loadTable GTFS.Tables.calendars
-                |> loadTable GTFS.Tables.calendarDates
-                |> loadTable GTFS.Tables.areas
-                |> loadTable GTFS.Tables.stopAreas
-                |> loadTable GTFS.Tables.networks
-                |> loadTable GTFS.Tables.routeNetworks
-                |> loadTable GTFS.Tables.shapePoints
-                |> loadTable GTFS.Tables.frequencies
-                |> loadTable GTFS.Tables.pathways
-                |> loadTable GTFS.Tables.locationGroups
+                |> loadFeed "micotra-2024"
+                |> loadFeed "oebb-2024"
                 |> Spinner.runSteps
         )
