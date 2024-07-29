@@ -27,13 +27,13 @@ toCreate config t =
 
 
 toTableDefinition : Table a cols -> CreateTable.TableDefinition
-toTableDefinition { columns, primaryKey, foreignKeys } =
+toTableDefinition { columnList, primaryKey, foreignKeys } =
     CreateTable.TableDefinitionColumns
         { options =
             { strict = True
             , withoutRowid = False
             }
-        , columns = columns
+        , columns = columnList
         , constraints =
             primaryKeyToConstraint primaryKey
                 :: List.map foreignKeyToConstraint foreignKeys

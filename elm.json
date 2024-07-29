@@ -15,6 +15,7 @@
         "direct": {
             "avh4/elm-color": "1.0.0",
             "elm/browser": "1.0.2",
+            "elm/bytes": "1.0.8",
             "elm/core": "1.0.5",
             "elm/html": "1.0.0",
             "elm/http": "2.0.0",
@@ -30,13 +31,13 @@
             "folkertdev/one-true-path-experiment": "6.0.1",
             "ianmackenzie/elm-units": "2.10.0",
             "justinmimbs/date": "4.1.0",
+            "jxxcarlson/hex": "4.0.1",
             "mdgriffith/elm-bezier": "1.0.0",
             "miniBill/elm-fast-dict": "1.1.0",
             "miniBill/elm-rope": "1.0.0"
         },
         "indirect": {
             "avh4/elm-fifo": "1.0.4",
-            "elm/bytes": "1.0.8",
             "elm/file": "1.0.5",
             "elm/random": "1.0.0",
             "elm/regex": "1.0.0",

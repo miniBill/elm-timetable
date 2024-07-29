@@ -10,7 +10,7 @@ import IdDict exposing (IdDict)
 import IdDict.Extra
 import IdSet exposing (IdSet)
 import List.Extra
-import SQLite.Table
+import SQLite.Codec
 import Time exposing (Weekday(..))
 
 
@@ -93,7 +93,7 @@ filterTrips today calendarDates calendars trips =
                 case
                     calendarDates
                         |> IdDict.get trip.service_id
-                        |> Maybe.andThen (Dict.get (SQLite.Table.dateToInt today))
+                        |> Maybe.andThen (Dict.get (SQLite.Codec.dateToInt today))
                 of
                     Just { exception_type } ->
                         exception_type == GTFS.ServiceAdded

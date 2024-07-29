@@ -15,6 +15,7 @@ import IdSet exposing (IdSet)
 import Pathfinding
 import Platform exposing (Task)
 import RemoteData
+import SQLite.Codec
 import SQLite.Table exposing (Table)
 import Table
 import Task
@@ -95,7 +96,7 @@ init _ =
                                         IdDict.insert calendarDate.service_id
                                             (IdDict.get calendarDate.service_id acc
                                                 |> Maybe.withDefault Dict.empty
-                                                |> Dict.insert (SQLite.Table.dateToInt calendarDate.date)
+                                                |> Dict.insert (SQLite.Codec.dateToInt calendarDate.date)
                                                     calendarDate
                                             )
                                             acc
@@ -121,7 +122,7 @@ init _ =
 
 getCSVId :
     Id FeedId
-    -> Table { a | id : Id kind }
+    -> Table { a | id : Id kind } cols
     -> Task Http.Error (IdDict kind { a | id : Id kind })
 getCSVId feed table =
     getCSV feed table
@@ -140,7 +141,7 @@ toDictFromId list =
 
 getCSV :
     Id FeedId
-    -> Table a
+    -> Table a cols
     -> Task Http.Error (List a)
 getCSV feed { filename, decoder } =
     Http.task

@@ -47,13 +47,14 @@ import Date exposing (Date)
 import Duration exposing (Duration)
 import GTFS exposing (Accessibility(..), ExceptionType(..), LocationType(..), PathwayMode(..), PickupDropOffType(..), RouteType(..), Timezone)
 import GTFS.ToSQL
-import Id exposing (AgencyId, AreaId, BlockId, Id, LevelId, LocationGroupId, LocationId, NetworkId, PathwayId, RouteId, ServiceId, ShapeId, StopId, TripId, ZoneId)
+import Id exposing (AgencyId, AreaId, BlockId, BookingRuleId, Id, LevelId, LocationGroupId, LocationId, NetworkId, PathwayId, RouteId, ServiceId, ShapeId, StopId, TripId, ZoneId)
 import Length exposing (Length)
 import List.Extra
-import SQLite.Column as Column exposing (Color)
+import SQLite.Codec as Codec exposing (Codec)
+import SQLite.Column as Column exposing (Color, Column, NullableColumn)
 import SQLite.Statement as Statement
 import SQLite.Statement.CreateTable as CreateTable
-import SQLite.Table as Table exposing (Codec, Column, Table)
+import SQLite.Table as Table exposing (Table)
 import SQLite.Types
 import Url exposing (Url)
 
@@ -81,56 +82,56 @@ type alias StopTime =
 
     -- False for approximate, True or Nothing for exact
     , timepoint : Maybe Bool
-    , pickup_booking_rule_id : Maybe (Id Never)
-    , drop_off_booking_rule_id : Maybe (Id Never)
+    , pickup_booking_rule_id : Maybe (Id BookingRuleId)
+    , drop_off_booking_rule_id : Maybe (Id BookingRuleId)
     }
 
 
 type alias StopTimeColumns =
     { trip_id : Column StopTime (Id TripId)
-    , arrival_time : Column StopTime (Maybe Clock)
-    , departure_time : Column StopTime (Maybe Clock)
-    , stop_id : Column StopTime (Maybe (Id StopId))
-    , location_group_id : Column StopTime (Maybe (Id LocationGroupId))
-    , location_id : Column StopTime (Maybe (Id LocationId))
+    , arrival_time : NullableColumn StopTime Clock
+    , departure_time : NullableColumn StopTime Clock
+    , stop_id : NullableColumn StopTime (Id StopId)
+    , location_group_id : NullableColumn StopTime (Id LocationGroupId)
+    , location_id : NullableColumn StopTime (Id LocationId)
     , stop_sequence : Column StopTime Int
-    , stop_headsign : Column StopTime (Maybe String)
-    , start_pickup_drop_off_window : Column StopTime (Maybe Clock)
-    , end_pickup_drop_off_window : Column StopTime (Maybe Clock)
-    , pickup_type : Column StopTime (Maybe PickupDropOffType)
-    , drop_off_type : Column StopTime (Maybe PickupDropOffType)
-    , continuous_pickup : Column StopTime (Maybe PickupDropOffType)
-    , continuous_drop_off : Column StopTime (Maybe PickupDropOffType)
-    , shape_dist_traveled : Column StopTime (Maybe Float)
+    , stop_headsign : NullableColumn StopTime String
+    , start_pickup_drop_off_window : NullableColumn StopTime Clock
+    , end_pickup_drop_off_window : NullableColumn StopTime Clock
+    , pickup_type : NullableColumn StopTime PickupDropOffType
+    , drop_off_type : NullableColumn StopTime PickupDropOffType
+    , continuous_pickup : NullableColumn StopTime PickupDropOffType
+    , continuous_drop_off : NullableColumn StopTime PickupDropOffType
+    , shape_dist_traveled : NullableColumn StopTime Float
 
     -- False for approximate, True or Nothing for exact
-    , timepoint : Column StopTime (Maybe Bool)
-    , pickup_booking_rule_id : Column StopTime (Maybe (Id Never))
-    , drop_off_booking_rule_id : Column StopTime (Maybe (Id Never))
+    , timepoint : NullableColumn StopTime Bool
+    , pickup_booking_rule_id : NullableColumn StopTime (Id BookingRuleId)
+    , drop_off_booking_rule_id : NullableColumn StopTime (Id BookingRuleId)
     }
 
 
 stopTimes : Table StopTime StopTimeColumns
 stopTimes =
     Table.table "stop_times.txt" "stop_times" StopTime StopTimeColumns
-        |> Table.with (Column.notNull "trip_id" .trip_id Column.id |> Column.withForeignKey trips .id)
-        |> Table.with (Column.nullable "arrival_time" .arrival_time Column.clock)
-        |> Table.with (Column.nullable "departure_time" .departure_time Column.clock)
-        |> Table.with (Column.nullable "stop_id" .stop_id Column.id |> Column.withForeignKeyNullable stops .id)
-        |> Table.with (Column.nullable "location_group_id" .location_group_id Column.id |> Column.withForeignKeyNullable locationGroups .id)
-        |> Table.with (Column.nullable "location_id" .location_id Column.id {- |> Column.withForeignKey locations -})
-        |> Table.with (Column.notNull "stop_sequence" .stop_sequence Column.int)
-        |> Table.with (Column.nullable "stop_headsign" .stop_headsign Column.string)
-        |> Table.with (Column.nullable "start_pickup_drop_off_window" .start_pickup_drop_off_window Column.clock)
-        |> Table.with (Column.nullable "end_pickup_drop_off_window" .end_pickup_drop_off_window Column.clock)
+        |> Table.with (Column.column "trip_id" .trip_id Codec.id |> Column.withForeignKey trips .id)
+        |> Table.with (Column.nullable "arrival_time" .arrival_time Codec.clock)
+        |> Table.with (Column.nullable "departure_time" .departure_time Codec.clock)
+        |> Table.with (Column.nullable "stop_id" .stop_id Codec.id |> Column.withForeignKey stops .id)
+        |> Table.with (Column.nullable "location_group_id" .location_group_id Codec.id |> Column.withForeignKey locationGroups .id)
+        |> Table.with (Column.nullable "location_id" .location_id Codec.id {- |> Column.withForeignKey locations -})
+        |> Table.with (Column.column "stop_sequence" .stop_sequence Codec.int)
+        |> Table.with (Column.nullable "stop_headsign" .stop_headsign Codec.string)
+        |> Table.with (Column.nullable "start_pickup_drop_off_window" .start_pickup_drop_off_window Codec.clock)
+        |> Table.with (Column.nullable "end_pickup_drop_off_window" .end_pickup_drop_off_window Codec.clock)
         |> Table.with (Column.nullable "pickup_type" .pickup_type pickupDropOffType)
         |> Table.with (Column.nullable "drop_off_type" .drop_off_type pickupDropOffType)
         |> Table.with (Column.nullable "continuous_pickup" .continuous_pickup pickupDropOffType)
         |> Table.with (Column.nullable "continuous_drop_off" .continuous_drop_off pickupDropOffType)
-        |> Table.with (Column.nullable "shape_dist_traveled" .shape_dist_traveled Column.float)
-        |> Table.with (Column.nullable "timepoint" .timepoint Column.bool)
-        |> Table.with (Column.nullable "pickup_booking_rule_id" .pickup_booking_rule_id Column.id {- |> Column.withForeignKey booking_rules -})
-        |> Table.with (Column.nullable "drop_off_booking_rule_id" .drop_off_booking_rule_id Column.id {- |> Column.withForeignKey booking_rules -})
+        |> Table.with (Column.nullable "shape_dist_traveled" .shape_dist_traveled Codec.float)
+        |> Table.with (Column.nullable "timepoint" .timepoint Codec.bool)
+        |> Table.with (Column.nullable "pickup_booking_rule_id" .pickup_booking_rule_id Codec.id {- |> Column.withForeignKey booking_rules -})
+        |> Table.with (Column.nullable "drop_off_booking_rule_id" .drop_off_booking_rule_id Codec.id {- |> Column.withForeignKey booking_rules -})
         |> Table.withPrimaryKey [ "trip_id", "stop_sequence" ]
 
 
@@ -142,15 +143,15 @@ type alias LocationGroup =
 
 type alias LocationGroupColumns =
     { id : Column LocationGroup (Id LocationGroupId)
-    , group_name : Column LocationGroup (Maybe String)
+    , group_name : NullableColumn LocationGroup String
     }
 
 
 locationGroups : Table LocationGroup LocationGroupColumns
 locationGroups =
     Table.table "location_groups.txt" "location_groups" LocationGroup LocationGroupColumns
-        |> Table.with (Column.notNull "location_group_id" .id Column.id)
-        |> Table.with (Column.nullable "location_group_name" .group_name Column.string)
+        |> Table.with (Column.column "location_group_id" .id Codec.id)
+        |> Table.with (Column.nullable "location_group_name" .group_name Codec.string)
         |> Table.withPrimaryKey [ "location_group_id" ]
 
 
@@ -175,20 +176,20 @@ type alias Stop =
 
 type alias StopColumns =
     { id : Column Stop (Id StopId)
-    , code : Column Stop (Maybe String)
-    , name : Column Stop (Maybe String)
-    , tts_name : Column Stop (Maybe String)
-    , description : Column Stop (Maybe String)
-    , lat : Column Stop (Maybe Angle)
-    , lon : Column Stop (Maybe Angle)
-    , zone_id : Column Stop (Maybe (Id ZoneId))
-    , url : Column Stop (Maybe Url)
-    , location_type : Column Stop (Maybe LocationType)
-    , parent_station : Column Stop (Maybe (Id StopId))
-    , timezone : Column Stop (Maybe Timezone)
-    , wheelchair_boarding : Column Stop (Maybe Accessibility)
-    , level_id : Column Stop (Maybe (Id LevelId))
-    , platform_code : Column Stop (Maybe String)
+    , code : NullableColumn Stop String
+    , name : NullableColumn Stop String
+    , tts_name : NullableColumn Stop String
+    , description : NullableColumn Stop String
+    , lat : NullableColumn Stop Angle
+    , lon : NullableColumn Stop Angle
+    , zone_id : NullableColumn Stop (Id ZoneId)
+    , url : NullableColumn Stop Url
+    , location_type : NullableColumn Stop LocationType
+    , parent_station : NullableColumn Stop (Id StopId)
+    , timezone : NullableColumn Stop Timezone
+    , wheelchair_boarding : NullableColumn Stop Accessibility
+    , level_id : NullableColumn Stop (Id LevelId)
+    , platform_code : NullableColumn Stop String
     }
 
 
@@ -200,21 +201,21 @@ stops =
             "stops"
     in
     Table.table "stops.txt" name Stop StopColumns
-        |> Table.with (Column.notNull "stop_id" .id Column.id)
-        |> Table.with (Column.nullable "stop_code" .code Column.string)
-        |> Table.with (Column.nullable "stop_name" .name Column.string)
-        |> Table.with (Column.nullable "tts_stop_name" .tts_name Column.string)
-        |> Table.with (Column.nullable "stop_desc" .description Column.string)
-        |> Table.with (Column.nullable "stop_lat" .lat Column.angle)
-        |> Table.with (Column.nullable "stop_lon" .lon Column.angle)
-        |> Table.with (Column.nullable "zone_id" .zone_id Column.id)
-        |> Table.with (Column.nullable "stop_url" .url Column.url)
+        |> Table.with (Column.column "stop_id" .id Codec.id)
+        |> Table.with (Column.nullable "stop_code" .code Codec.string)
+        |> Table.with (Column.nullable "stop_name" .name Codec.string)
+        |> Table.with (Column.nullable "tts_stop_name" .tts_name Codec.string)
+        |> Table.with (Column.nullable "stop_desc" .description Codec.string)
+        |> Table.with (Column.nullable "stop_lat" .lat Codec.angle)
+        |> Table.with (Column.nullable "stop_lon" .lon Codec.angle)
+        |> Table.with (Column.nullable "zone_id" .zone_id Codec.id)
+        |> Table.with (Column.nullable "stop_url" .url Codec.url)
         |> Table.with (Column.nullable "location_type" .location_type locationType)
-        |> Table.with (Column.nullable "parent_station" .parent_station Column.id |> Column.withSelfForeignKey name "stop_id")
-        |> Table.with (Column.nullable "stop_timezone" .timezone Column.string)
+        |> Table.with (Column.nullable "parent_station" .parent_station Codec.id |> Column.withSelfForeignKey name "stop_id")
+        |> Table.with (Column.nullable "stop_timezone" .timezone Codec.string)
         |> Table.with (Column.nullable "wheelchair_boarding" .wheelchair_boarding accessibility)
-        |> Table.with (Column.nullable "level_id" .level_id Column.id |> Column.withForeignKeyNullable levels .id)
-        |> Table.with (Column.nullable "platform_code" .platform_code Column.string)
+        |> Table.with (Column.nullable "level_id" .level_id Codec.id |> Column.withForeignKey levels .id)
+        |> Table.with (Column.nullable "platform_code" .platform_code Codec.string)
         |> Table.withPrimaryKey [ "stop_id" ]
 
 
@@ -237,37 +238,37 @@ type alias Route =
 
 type alias RouteColumns =
     { id : Column Route (Id RouteId)
-    , agency_id : Column Route (Maybe (Id AgencyId))
-    , short_name : Column Route (Maybe String)
-    , long_name : Column Route (Maybe String)
-    , description : Column Route (Maybe String)
+    , agency_id : NullableColumn Route (Id AgencyId)
+    , short_name : NullableColumn Route String
+    , long_name : NullableColumn Route String
+    , description : NullableColumn Route String
     , tipe : Column Route RouteType
-    , url : Column Route (Maybe String)
-    , color : Column Route (Maybe Color)
-    , text_color : Column Route (Maybe Color)
-    , sort_order : Column Route (Maybe Int)
-    , continuous_pickup : Column Route (Maybe PickupDropOffType)
-    , continuous_drop_off : Column Route (Maybe PickupDropOffType)
-    , network_id : Column Route (Maybe (Id NetworkId))
+    , url : NullableColumn Route String
+    , color : NullableColumn Route Color
+    , text_color : NullableColumn Route Color
+    , sort_order : NullableColumn Route Int
+    , continuous_pickup : NullableColumn Route PickupDropOffType
+    , continuous_drop_off : NullableColumn Route PickupDropOffType
+    , network_id : NullableColumn Route (Id NetworkId)
     }
 
 
 routes : Table Route RouteColumns
 routes =
     Table.table "routes.txt" "routes" Route RouteColumns
-        |> Table.with (Column.notNull "route_id" .id Column.id)
-        |> Table.with (Column.nullable "agency_id" .agency_id Column.id |> Column.withForeignKeyNullable agency .id)
-        |> Table.with (Column.nullable "route_short_name" .short_name Column.string)
-        |> Table.with (Column.nullable "route_long_name" .long_name Column.string)
-        |> Table.with (Column.nullable "route_desc" .description Column.string)
-        |> Table.with (Column.notNull "route_type" .tipe routeType)
-        |> Table.with (Column.nullable "route_url" .url Column.string)
+        |> Table.with (Column.column "route_id" .id Codec.id)
+        |> Table.with (Column.nullable "agency_id" .agency_id Codec.id |> Column.withForeignKey agency .id)
+        |> Table.with (Column.nullable "route_short_name" .short_name Codec.string)
+        |> Table.with (Column.nullable "route_long_name" .long_name Codec.string)
+        |> Table.with (Column.nullable "route_desc" .description Codec.string)
+        |> Table.with (Column.column "route_type" .tipe routeType)
+        |> Table.with (Column.nullable "route_url" .url Codec.string)
         |> Table.with (Column.nullable "route_color" .color Column.color)
         |> Table.with (Column.nullable "route_text_color" .text_color Column.color)
-        |> Table.with (Column.nullable "route_sort_order" .sort_order Column.int)
+        |> Table.with (Column.nullable "route_sort_order" .sort_order Codec.int)
         |> Table.with (Column.nullable "continuous_pickup" .continuous_pickup pickupDropOffType)
         |> Table.with (Column.nullable "continuous_drop_off" .continuous_drop_off pickupDropOffType)
-        |> Table.with (Column.nullable "network_id" .network_id Column.id)
+        |> Table.with (Column.nullable "network_id" .network_id Codec.id)
         |> Table.withPrimaryKey [ "route_id" ]
 
 
@@ -289,27 +290,27 @@ type alias TripColumns =
     { route_id : Column Trip (Id RouteId)
     , service_id : Column Trip (Id ServiceId)
     , id : Column Trip (Id TripId)
-    , headsign : Column Trip (Maybe String)
-    , short_name : Column Trip (Maybe String)
-    , direction_id : Column Trip (Maybe Bool)
-    , block_id : Column Trip (Maybe (Id BlockId))
-    , shape_id : Column Trip (Maybe (Id ShapeId))
-    , wheelchair_accessible : Column Trip (Maybe Accessibility)
-    , bikes_allowed : Column Trip (Maybe Accessibility)
+    , headsign : NullableColumn Trip String
+    , short_name : NullableColumn Trip String
+    , direction_id : NullableColumn Trip Bool
+    , block_id : NullableColumn Trip (Id BlockId)
+    , shape_id : NullableColumn Trip (Id ShapeId)
+    , wheelchair_accessible : NullableColumn Trip Accessibility
+    , bikes_allowed : NullableColumn Trip Accessibility
     }
 
 
 trips : Table Trip TripColumns
 trips =
     Table.table "trips.txt" "trips" Trip TripColumns
-        |> Table.with (Column.notNull "route_id" .route_id Column.id |> Column.withForeignKey routes .id)
-        |> Table.with (Column.notNull "service_id" .service_id Column.id {- |> Column.withForeignKey calendars/calendarDate -})
-        |> Table.with (Column.notNull "trip_id" .id Column.id)
-        |> Table.with (Column.nullable "trip_headsign" .headsign Column.string)
-        |> Table.with (Column.nullable "trip_short_name" .short_name Column.string)
-        |> Table.with (Column.nullable "direction_id" .direction_id Column.bool)
-        |> Table.with (Column.nullable "block_id" .block_id Column.id)
-        |> Table.with (Column.nullable "shape_id" .shape_id Column.id {- |> Column.withForeignKey shapePoints -})
+        |> Table.with (Column.column "route_id" .route_id Codec.id |> Column.withForeignKey routes .id)
+        |> Table.with (Column.column "service_id" .service_id Codec.id {- |> Column.withForeignKey calendars/calendarDate -})
+        |> Table.with (Column.column "trip_id" .id Codec.id)
+        |> Table.with (Column.nullable "trip_headsign" .headsign Codec.string)
+        |> Table.with (Column.nullable "trip_short_name" .short_name Codec.string)
+        |> Table.with (Column.nullable "direction_id" .direction_id Codec.bool)
+        |> Table.with (Column.nullable "block_id" .block_id Codec.id)
+        |> Table.with (Column.nullable "shape_id" .shape_id Codec.id {- |> Column.withForeignKey shapePoints -})
         |> Table.with (Column.nullable "wheelchair_accessible" .wheelchair_accessible accessibility)
         |> Table.with (Column.nullable "bikes_allowed" .bikes_allowed accessibility)
         |> Table.withPrimaryKey [ "trip_id" ]
@@ -329,18 +330,18 @@ type alias ShapePointColumns =
     , latitude : Column ShapePoint Angle
     , longitude : Column ShapePoint Angle
     , sequence : Column ShapePoint Int
-    , distance_traveled : Column ShapePoint (Maybe Length)
+    , distance_traveled : NullableColumn ShapePoint Length
     }
 
 
 shapePoints : Table ShapePoint ShapePointColumns
 shapePoints =
     Table.table "shapes.txt" "shape_points" ShapePoint ShapePointColumns
-        |> Table.with (Column.notNull "shape_id" .shape_id Column.id)
-        |> Table.with (Column.notNull "shape_pt_lat" .latitude Column.angle)
-        |> Table.with (Column.notNull "shape_pt_lon" .longitude Column.angle)
-        |> Table.with (Column.notNull "shape_pt_sequence" .sequence Column.int)
-        |> Table.with (Column.nullable "shape_dist_traveled" .distance_traveled Column.kilometers)
+        |> Table.with (Column.column "shape_id" .shape_id Codec.id)
+        |> Table.with (Column.column "shape_pt_lat" .latitude Codec.angle)
+        |> Table.with (Column.column "shape_pt_lon" .longitude Codec.angle)
+        |> Table.with (Column.column "shape_pt_sequence" .sequence Codec.int)
+        |> Table.with (Column.nullable "shape_dist_traveled" .distance_traveled Codec.kilometers)
         |> Table.withPrimaryKey [ "shape_id", "shape_pt_sequence" ]
 
 
@@ -358,18 +359,18 @@ type alias FrequencyColumns =
     , start_time : Column Frequency Clock
     , end_time : Column Frequency Clock
     , headway : Column Frequency Duration
-    , exact_times : Column Frequency (Maybe Bool)
+    , exact_times : NullableColumn Frequency Bool
     }
 
 
 frequencies : Table Frequency FrequencyColumns
 frequencies =
     Table.table "frequencies.txt" "frequencies" Frequency FrequencyColumns
-        |> Table.with (Column.notNull "trip_id" .trip_id Column.id |> Column.withForeignKey trips .id)
-        |> Table.with (Column.notNull "start_time" .start_time Column.clock)
-        |> Table.with (Column.notNull "end_time" .end_time Column.clock)
-        |> Table.with (Column.notNull "headway" .headway Column.seconds)
-        |> Table.with (Column.nullable "exact_times" .exact_times Column.bool)
+        |> Table.with (Column.column "trip_id" .trip_id Codec.id |> Column.withForeignKey trips .id)
+        |> Table.with (Column.column "start_time" .start_time Codec.clock)
+        |> Table.with (Column.column "end_time" .end_time Codec.clock)
+        |> Table.with (Column.column "headway" .headway Codec.seconds)
+        |> Table.with (Column.nullable "exact_times" .exact_times Codec.bool)
         |> Table.withPrimaryKey [ "trip_id", "start_time" ]
 
 
@@ -390,24 +391,24 @@ type alias AgencyColumns =
     , name : Column Agency String
     , url : Column Agency Url
     , timezone : Column Agency Timezone
-    , lang : Column Agency (Maybe String)
-    , phone : Column Agency (Maybe String)
-    , fare_url : Column Agency (Maybe String)
-    , email : Column Agency (Maybe String)
+    , lang : NullableColumn Agency String
+    , phone : NullableColumn Agency String
+    , fare_url : NullableColumn Agency String
+    , email : NullableColumn Agency String
     }
 
 
 agency : Table Agency AgencyColumns
 agency =
     Table.table "agency.txt" "agencies" Agency AgencyColumns
-        |> Table.with (Column.notNull "agency_id" .id Column.id)
-        |> Table.with (Column.notNull "agency_name" .name Column.string)
-        |> Table.with (Column.notNull "agency_url" .url Column.url)
-        |> Table.with (Column.notNull "agency_timezone" .timezone Column.string)
-        |> Table.with (Column.nullable "agency_lang" .lang Column.string)
-        |> Table.with (Column.nullable "agency_phone" .phone Column.string)
-        |> Table.with (Column.nullable "agency_fare_url" .fare_url Column.string)
-        |> Table.with (Column.nullable "agency_email" .email Column.string)
+        |> Table.with (Column.column "agency_id" .id Codec.id)
+        |> Table.with (Column.column "agency_name" .name Codec.string)
+        |> Table.with (Column.column "agency_url" .url Codec.url)
+        |> Table.with (Column.column "agency_timezone" .timezone Codec.string)
+        |> Table.with (Column.nullable "agency_lang" .lang Codec.string)
+        |> Table.with (Column.nullable "agency_phone" .phone Codec.string)
+        |> Table.with (Column.nullable "agency_fare_url" .fare_url Codec.string)
+        |> Table.with (Column.nullable "agency_email" .email Codec.string)
         |> Table.withPrimaryKey [ "agency_id" ]
 
 
@@ -442,16 +443,16 @@ type alias CalendarColumns =
 calendars : Table Calendar CalendarColumns
 calendars =
     Table.table "calendar.txt" "calendars" Calendar CalendarColumns
-        |> Table.with (Column.notNull "service_id" .id Column.id)
-        |> Table.with (Column.notNull "monday" .monday Column.bool)
-        |> Table.with (Column.notNull "tuesday" .tuesday Column.bool)
-        |> Table.with (Column.notNull "wednesday" .wednesday Column.bool)
-        |> Table.with (Column.notNull "thursday" .thursday Column.bool)
-        |> Table.with (Column.notNull "friday" .friday Column.bool)
-        |> Table.with (Column.notNull "saturday" .saturday Column.bool)
-        |> Table.with (Column.notNull "sunday" .sunday Column.bool)
-        |> Table.with (Column.notNull "start_date" .start_date Column.date)
-        |> Table.with (Column.notNull "end_date" .end_date Column.date)
+        |> Table.with (Column.column "service_id" .id Codec.id)
+        |> Table.with (Column.column "monday" .monday Codec.bool)
+        |> Table.with (Column.column "tuesday" .tuesday Codec.bool)
+        |> Table.with (Column.column "wednesday" .wednesday Codec.bool)
+        |> Table.with (Column.column "thursday" .thursday Codec.bool)
+        |> Table.with (Column.column "friday" .friday Codec.bool)
+        |> Table.with (Column.column "saturday" .saturday Codec.bool)
+        |> Table.with (Column.column "sunday" .sunday Codec.bool)
+        |> Table.with (Column.column "start_date" .start_date Codec.date)
+        |> Table.with (Column.column "end_date" .end_date Codec.date)
         |> Table.withPrimaryKey [ "service_id" ]
 
 
@@ -472,9 +473,9 @@ type alias CalendarDateColumns =
 calendarDates : Table CalendarDate CalendarDateColumns
 calendarDates =
     Table.table "calendar_dates.txt" "calendar_dates" CalendarDate CalendarDateColumns
-        |> Table.with (Column.notNull "service_id" .service_id Column.id)
-        |> Table.with (Column.notNull "date" .date Column.date)
-        |> Table.with (Column.notNull "exception_type" .exception_type exceptionType)
+        |> Table.with (Column.column "service_id" .service_id Codec.id)
+        |> Table.with (Column.column "date" .date Codec.date)
+        |> Table.with (Column.column "exception_type" .exception_type exceptionType)
         |> Table.withPrimaryKey [ "service_id", "date" ]
 
 
@@ -486,15 +487,15 @@ type alias Area =
 
 type alias AreaColumns =
     { id : Column Area (Id AreaId)
-    , name : Column Area (Maybe String)
+    , name : NullableColumn Area String
     }
 
 
 areas : Table Area AreaColumns
 areas =
     Table.table "areas.txt" "areas" Area AreaColumns
-        |> Table.with (Column.notNull "area_id" .id Column.id)
-        |> Table.with (Column.nullable "area_name" .name Column.string)
+        |> Table.with (Column.column "area_id" .id Codec.id)
+        |> Table.with (Column.nullable "area_name" .name Codec.string)
         |> Table.withPrimaryKey [ "area_id" ]
 
 
@@ -513,8 +514,8 @@ type alias StopAreaColumns =
 stopAreas : Table StopArea StopAreaColumns
 stopAreas =
     Table.table "stop_areas.txt" "stop_areas" StopArea StopAreaColumns
-        |> Table.with (Column.notNull "area_id" .area_id Column.id |> Column.withForeignKey areas .id)
-        |> Table.with (Column.notNull "stop_id" .stop_id Column.id |> Column.withForeignKey stops .id)
+        |> Table.with (Column.column "area_id" .area_id Codec.id |> Column.withForeignKey areas .id)
+        |> Table.with (Column.column "stop_id" .stop_id Codec.id |> Column.withForeignKey stops .id)
         |> Table.withPrimaryKey [ "area_id", "stop_id" ]
 
 
@@ -526,15 +527,15 @@ type alias Network =
 
 type alias NetworkColumns =
     { id : Column Network (Id NetworkId)
-    , name : Column Network (Maybe String)
+    , name : NullableColumn Network String
     }
 
 
 networks : Table Network NetworkColumns
 networks =
     Table.table "networks.txt" "networks" Network NetworkColumns
-        |> Table.with (Column.notNull "network_id" .id Column.id)
-        |> Table.with (Column.nullable "network_name" .name Column.string)
+        |> Table.with (Column.column "network_id" .id Codec.id)
+        |> Table.with (Column.nullable "network_name" .name Codec.string)
         |> Table.withPrimaryKey [ "network_id" ]
 
 
@@ -553,8 +554,8 @@ type alias RouteNetworkColumns =
 routeNetworks : Table RouteNetwork RouteNetworkColumns
 routeNetworks =
     Table.table "route_networks.txt" "route_networks" RouteNetwork RouteNetworkColumns
-        |> Table.with (Column.notNull "network_id" .network_id Column.id |> Column.withForeignKey networks .id)
-        |> Table.with (Column.notNull "route_id" .route_id Column.id |> Column.withForeignKey routes .id)
+        |> Table.with (Column.column "network_id" .network_id Codec.id |> Column.withForeignKey networks .id)
+        |> Table.with (Column.column "route_id" .route_id Codec.id |> Column.withForeignKey routes .id)
         |> Table.withPrimaryKey [ "route_id" ]
 
 
@@ -580,31 +581,31 @@ type alias PathwayColumns =
     , to_stop_id : Column Pathway (Id StopId)
     , mode : Column Pathway PathwayMode
     , is_bidirectional : Column Pathway Bool
-    , length : Column Pathway (Maybe Length)
-    , traversal_time : Column Pathway (Maybe Duration)
-    , stair_count : Column Pathway (Maybe Int)
-    , max_slope : Column Pathway (Maybe Float)
-    , min_width : Column Pathway (Maybe Length)
-    , signposted_as : Column Pathway (Maybe String)
-    , reversed_signposted_as : Column Pathway (Maybe String)
+    , length : NullableColumn Pathway Length
+    , traversal_time : NullableColumn Pathway Duration
+    , stair_count : NullableColumn Pathway Int
+    , max_slope : NullableColumn Pathway Float
+    , min_width : NullableColumn Pathway Length
+    , signposted_as : NullableColumn Pathway String
+    , reversed_signposted_as : NullableColumn Pathway String
     }
 
 
 pathways : Table Pathway PathwayColumns
 pathways =
     Table.table "pathways.txt" "pathways" Pathway PathwayColumns
-        |> Table.with (Column.notNull "pathway_id" .id Column.id)
-        |> Table.with (Column.notNull "from_stop_id" .from_stop_id Column.id |> Column.withForeignKey stops .id)
-        |> Table.with (Column.notNull "to_stop_id" .to_stop_id Column.id |> Column.withForeignKey stops .id)
-        |> Table.with (Column.notNull "pathway_mode" .mode pathwayMode)
-        |> Table.with (Column.notNull "is_bidirectional" .is_bidirectional Column.bool)
-        |> Table.with (Column.nullable "length" .length Column.meters)
-        |> Table.with (Column.nullable "traversal_time" .traversal_time Column.seconds)
-        |> Table.with (Column.nullable "stair_count" .stair_count Column.int)
-        |> Table.with (Column.nullable "max_slope" .max_slope Column.float)
-        |> Table.with (Column.nullable "min_width" .min_width Column.meters)
-        |> Table.with (Column.nullable "signposted_as" .signposted_as Column.string)
-        |> Table.with (Column.nullable "reversed_signposted_as" .reversed_signposted_as Column.string)
+        |> Table.with (Column.column "pathway_id" .id Codec.id)
+        |> Table.with (Column.column "from_stop_id" .from_stop_id Codec.id |> Column.withForeignKey stops .id)
+        |> Table.with (Column.column "to_stop_id" .to_stop_id Codec.id |> Column.withForeignKey stops .id)
+        |> Table.with (Column.column "pathway_mode" .mode pathwayMode)
+        |> Table.with (Column.column "is_bidirectional" .is_bidirectional Codec.bool)
+        |> Table.with (Column.nullable "length" .length Codec.meters)
+        |> Table.with (Column.nullable "traversal_time" .traversal_time Codec.seconds)
+        |> Table.with (Column.nullable "stair_count" .stair_count Codec.int)
+        |> Table.with (Column.nullable "max_slope" .max_slope Codec.float)
+        |> Table.with (Column.nullable "min_width" .min_width Codec.meters)
+        |> Table.with (Column.nullable "signposted_as" .signposted_as Codec.string)
+        |> Table.with (Column.nullable "reversed_signposted_as" .reversed_signposted_as Codec.string)
         |> Table.withPrimaryKey [ "pathway_id" ]
 
 
@@ -618,16 +619,16 @@ type alias Level =
 type alias LevelColumns =
     { id : Column Level (Id LevelId)
     , index : Column Level Float
-    , name : Column Level (Maybe String)
+    , name : NullableColumn Level String
     }
 
 
 levels : Table Level LevelColumns
 levels =
     Table.table "levels.txt" "levels" Level LevelColumns
-        |> Table.with (Column.notNull "level_id" .id Column.id)
-        |> Table.with (Column.notNull "level_index" .index Column.float)
-        |> Table.with (Column.nullable "level_name" .name Column.string)
+        |> Table.with (Column.column "level_id" .id Codec.id)
+        |> Table.with (Column.column "level_index" .index Codec.float)
+        |> Table.with (Column.nullable "level_name" .name Codec.string)
         |> Table.withPrimaryKey [ "level_id" ]
 
 
@@ -637,7 +638,7 @@ levels =
 
 exceptionType : Codec ExceptionType
 exceptionType =
-    Column.andThen parseExceptionType exceptionTypeToInt Column.int
+    Codec.andThen parseExceptionType exceptionTypeToInt Codec.int
 
 
 exceptionTypeToInt : ExceptionType -> Int
@@ -665,7 +666,7 @@ parseExceptionType input =
 
 pickupDropOffType : Codec PickupDropOffType
 pickupDropOffType =
-    Column.andThen parsePickupDropOffType pickupDropOffTypeToInt Column.int
+    Codec.andThen parsePickupDropOffType pickupDropOffTypeToInt Codec.int
 
 
 pickupDropOffTypeToInt : PickupDropOffType -> Int
@@ -705,7 +706,7 @@ parsePickupDropOffType input =
 
 locationType : Codec LocationType
 locationType =
-    Column.andThen parseLocationType locationTypeToInt Column.int
+    Codec.andThen parseLocationType locationTypeToInt Codec.int
 
 
 locationTypeToInt : LocationType -> Int
@@ -751,7 +752,7 @@ parseLocationType input =
 
 accessibility : Codec Accessibility
 accessibility =
-    Column.andThen parseAccessibility accessibilityToInt Column.int
+    Codec.andThen parseAccessibility accessibilityToInt Codec.int
 
 
 accessibilityToInt : Accessibility -> Int
@@ -785,7 +786,7 @@ parseAccessibility input =
 
 pathwayMode : Codec PathwayMode
 pathwayMode =
-    Column.andThen parsePathwayMode pathwayModeToInt Column.int
+    Codec.andThen parsePathwayMode pathwayModeToInt Codec.int
 
 
 pathwayModeToInt : PathwayMode -> Int
@@ -843,7 +844,7 @@ parsePathwayMode input =
 
 routeType : Codec RouteType
 routeType =
-    Column.andThen parseRouteType routeTypeToInt Column.int
+    Codec.andThen parseRouteType routeTypeToInt Codec.int
 
 
 routeTypeToInt : RouteType -> Int

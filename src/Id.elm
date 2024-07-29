@@ -2,6 +2,7 @@ module Id exposing
     ( AgencyId
     , AreaId
     , BlockId
+    , BookingRuleId
     , FeedId
     , Id
     , LevelId
@@ -27,6 +28,10 @@ type AgencyId
 
 type AreaId
     = AreaId
+
+
+type BookingRuleId
+    = BookingRuleId
 
 
 type BlockId

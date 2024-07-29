@@ -10,7 +10,7 @@ import Ui.Font
 
 main : Html msg
 main =
-    GTFS.Tables.allCreates True
+    GTFS.Tables.allCreates
         |> List.map (\statement -> statement |> Statement.toString)
         |> String.join "\n\n"
         |> Ui.text

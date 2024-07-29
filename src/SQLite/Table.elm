@@ -1,9 +1,9 @@
-module SQLite.Table exposing (Codec, Column, Table, TableBuilder, table, with, withPrimaryKey)
+module SQLite.Table exposing (Table, TableBuilder, table, with, withPrimaryKey)
 
 import Csv.Decode
 import Json.Encode
+import SQLite.Column as Column exposing (InnerColumn)
 import SQLite.Statement.CreateTable exposing (ColumnDefinition, ForeignKeyClause)
-import SQLite.Types
 
 
 type alias TableBuilder a ctor colsCtor =
@@ -28,26 +28,12 @@ type alias Table a cols =
     }
 
 
-type alias Column a p =
-    { definition : ColumnDefinition
-    , encode : a -> Json.Encode.Value
-    , decoder : Csv.Decode.Decoder p
-    }
-
-
 
 -- type alias ForeignKey =
 --     { columnNames : List String
 --     , tableName : String
 --     , mapsTo : Maybe (List String)
 --     }
-
-
-type alias Codec a =
-    ( SQLite.Types.Type
-    , a -> Json.Encode.Value
-    , Csv.Decode.Decoder a
-    )
 
 
 table : String -> String -> ctor -> colsCtor -> TableBuilder a ctor colsCtor
@@ -61,16 +47,22 @@ table filename name ctor columns =
     }
 
 
-with : Column a p -> TableBuilder a (p -> b) (Column a p -> c) -> TableBuilder a b c
+with : InnerColumn a t p -> TableBuilder a (p -> b) (InnerColumn a t p -> c) -> TableBuilder a b c
 with column builder =
+    let
+        definition : ColumnDefinition
+        definition =
+            Column.definition column
+    in
     { name = builder.name
     , filename = builder.filename
     , columns = builder.columns column
-    , columnList = column.definition :: builder.columnList
-    , encode = \v -> ( column.definition.name, column.encode v ) :: builder.encode v
+    , columnList = definition :: builder.columnList
+    , encode = \v -> ( definition.name, Column.encode column v ) :: builder.encode v
     , decoder =
         builder.decoder
-            |> Csv.Decode.pipeline column.decoder
+            |> Csv.Decode.pipeline
+                (Column.decoder column)
     }
 
 
