@@ -86,7 +86,7 @@ export async function sqlite_load_csv({
         .pipe(csvParse.parse({ columns: true }));
 
     for await (const line of stream) {
-        const withDollar = { feed: feed };
+        const withDollar = { $feed: feed };
         for (const key of Object.keys(line)) {
             withDollar["$" + key] = line[key];
         }
@@ -98,7 +98,7 @@ export async function sqlite_load_csv({
                 table +
                 " (feed, " +
                 Object.keys(line).join(", ") +
-                ") VALUES ($feed, " +
+                ") VALUES (" +
                 Object.keys(withDollar).join(", ") +
                 ")",
             params: withDollar,
