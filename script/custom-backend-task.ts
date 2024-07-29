@@ -115,28 +115,24 @@ export async function sqlite_load_csv({
         })
     );
 
-    const promises: Promise<sqlite3.RunResult>[] = [];
     for await (const line of stream) {
         const withDollar = { $feed: feed };
         for (const key of Object.keys(line)) {
             withDollar["$" + key] = line[key];
         }
-        promises.push(
-            sqlite_run({
-                db: db,
-                statement:
-                    "INSERT INTO " +
-                    table +
-                    " (feed, " +
-                    Object.keys(line).join(", ") +
-                    ") VALUES (" +
-                    Object.keys(withDollar).join(", ") +
-                    ")",
-                params: withDollar,
-            })
-        );
+        await sqlite_run({
+            db: db,
+            statement:
+                "INSERT INTO " +
+                table +
+                " (feed, " +
+                Object.keys(line).join(", ") +
+                ") VALUES (" +
+                Object.keys(withDollar).join(", ") +
+                ")",
+            params: withDollar,
+        });
     }
-    await Promise.all(promises);
     await sqlite_run({ db, statement: "COMMIT" });
 
     return {};
