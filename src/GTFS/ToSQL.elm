@@ -14,7 +14,7 @@ import SQLite.Table exposing (Table)
 toCreate :
     { ifNotExists : Bool
     }
-    -> Table a
+    -> Table a cols
     -> Statement.Statement
 toCreate config t =
     Statement.CreateTable
@@ -26,7 +26,7 @@ toCreate config t =
         }
 
 
-toTableDefinition : Table a -> CreateTable.TableDefinition
+toTableDefinition : Table a cols -> CreateTable.TableDefinition
 toTableDefinition { columns, primaryKey, foreignKeys } =
     CreateTable.TableDefinitionColumns
         { options =

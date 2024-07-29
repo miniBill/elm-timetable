@@ -12,7 +12,6 @@ module Id exposing
     , RouteId
     , ServiceId
     , ShapeId
-    , StopAreaId
     , StopId
     , TripId
     , ZoneId
@@ -72,10 +71,6 @@ type ShapeId
 
 type StopId
     = StopId
-
-
-type StopAreaId
-    = StopAreaId
 
 
 type TripId

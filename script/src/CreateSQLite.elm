@@ -19,7 +19,7 @@ task =
     SQLite.withDb "../feeds.sqlite"
         (\db ->
             let
-                loadTable : String -> Table a -> Spinner.Steps FatalError () -> Spinner.Steps FatalError ()
+                loadTable : String -> Table a cols -> Spinner.Steps FatalError () -> Spinner.Steps FatalError ()
                 loadTable feed table =
                     Spinner.withStep ("[" ++ feed ++ "] Loading data for table " ++ table.name) (\_ -> SQLite.loadTableFromCsv db "../feeds" feed table)
 

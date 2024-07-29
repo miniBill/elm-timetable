@@ -1,4 +1,4 @@
-module SQLite.Column exposing (Color, andThen, angle, bool, clock, color, date, float, id, int, kilometers, meters, notNull, nullable, seconds, string, url, withForeignKey, withForeignKeyTo)
+module SQLite.Column exposing (Color, andThen, angle, bool, clock, color, date, float, id, int, kilometers, meters, notNull, nullable, seconds, string, url, withForeignKey, withForeignKeyNullable, withSelfForeignKey)
 
 import Angle exposing (Angle)
 import Clock exposing (Clock)
@@ -11,7 +11,7 @@ import Length exposing (Length)
 import Maybe.Extra
 import Parser exposing (Parser)
 import SQLite.Statement.CreateTable as CreateTable
-import SQLite.Table exposing (Codec, Column)
+import SQLite.Table exposing (Codec, Column, Table)
 import SQLite.Types
 import Url exposing (Url)
 
@@ -59,8 +59,8 @@ nullable name getter ( tipe, encode, decoder ) =
     }
 
 
-withForeignKeyTo : { t | name : String } -> String -> Column a p -> Column a p
-withForeignKeyTo { name } columnName ({ definition } as column) =
+withForeignKey : Table t cols -> (cols -> Column t p) -> Column a p -> Column a p
+withForeignKey { name, columns } getColumn ({ definition } as column) =
     { column
         | definition =
             { definition
@@ -69,7 +69,7 @@ withForeignKeyTo { name } columnName ({ definition } as column) =
                     , constraint =
                         CreateTable.ColumnForeignKey
                             { foreignTable = name
-                            , columnNames = [ columnName ]
+                            , columnNames = [ (getColumn columns).definition.name ]
                             , onDelete = Nothing
                             , onUpdate = Nothing
                             , match = Nothing
@@ -81,8 +81,8 @@ withForeignKeyTo { name } columnName ({ definition } as column) =
     }
 
 
-withForeignKey : { t | name : String } -> Column a p -> Column a p
-withForeignKey { name } ({ definition } as column) =
+withForeignKeyNullable : Table t cols -> (cols -> Column t p) -> Column a (Maybe p) -> Column a (Maybe p)
+withForeignKeyNullable { name, columns } getColumn ({ definition } as column) =
     { column
         | definition =
             { definition
@@ -91,7 +91,29 @@ withForeignKey { name } ({ definition } as column) =
                     , constraint =
                         CreateTable.ColumnForeignKey
                             { foreignTable = name
-                            , columnNames = []
+                            , columnNames = [ (getColumn columns).definition.name ]
+                            , onDelete = Nothing
+                            , onUpdate = Nothing
+                            , match = Nothing
+                            , defer = Nothing
+                            }
+                    }
+                        :: definition.constraints
+            }
+    }
+
+
+withSelfForeignKey : String -> String -> Column a p -> Column a p
+withSelfForeignKey name columnName ({ definition } as column) =
+    { column
+        | definition =
+            { definition
+                | constraints =
+                    { name = Just ("to_" ++ name)
+                    , constraint =
+                        CreateTable.ColumnForeignKey
+                            { foreignTable = name
+                            , columnNames = [ columnName ]
                             , onDelete = Nothing
                             , onUpdate = Nothing
                             , match = Nothing

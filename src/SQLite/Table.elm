@@ -6,20 +6,22 @@ import SQLite.Statement.CreateTable exposing (ColumnDefinition, ForeignKeyClause
 import SQLite.Types
 
 
-type alias TableBuilder a ctor =
+type alias TableBuilder a ctor colsCtor =
     { name : String
     , filename : String
-    , columns : List ColumnDefinition
+    , columnList : List ColumnDefinition
+    , columns : colsCtor
     , encode : a -> List ( String, Json.Encode.Value )
     , decoder : Csv.Decode.Decoder ctor
     }
 
 
-type alias Table a =
+type alias Table a cols =
     { name : String
     , filename : String
     , primaryKey : List String
-    , columns : List ColumnDefinition
+    , columnList : List ColumnDefinition
+    , columns : cols
     , encode : a -> List ( String, Json.Encode.Value )
     , decoder : Csv.Decode.Decoder a
     , foreignKeys : List ( List String, ForeignKeyClause )
@@ -48,21 +50,23 @@ type alias Codec a =
     )
 
 
-table : String -> String -> ctor -> TableBuilder a ctor
-table filename name ctor =
+table : String -> String -> ctor -> colsCtor -> TableBuilder a ctor colsCtor
+table filename name ctor columns =
     { name = name
     , filename = filename
-    , columns = []
+    , columns = columns
+    , columnList = []
     , encode = \_ -> []
     , decoder = Csv.Decode.succeed ctor
     }
 
 
-with : Column a p -> TableBuilder a (p -> b) -> TableBuilder a b
+with : Column a p -> TableBuilder a (p -> b) (Column a p -> c) -> TableBuilder a b c
 with column builder =
     { name = builder.name
     , filename = builder.filename
-    , columns = column.definition :: builder.columns
+    , columns = builder.columns column
+    , columnList = column.definition :: builder.columnList
     , encode = \v -> ( column.definition.name, column.encode v ) :: builder.encode v
     , decoder =
         builder.decoder
@@ -70,11 +74,12 @@ with column builder =
     }
 
 
-withPrimaryKey : List String -> TableBuilder a a -> Table a
-withPrimaryKey primaryKey { name, filename, encode, decoder, columns } =
+withPrimaryKey : List String -> TableBuilder a a cols -> Table a cols
+withPrimaryKey primaryKey { name, filename, encode, decoder, columns, columnList } =
     { name = name
     , filename = filename
-    , columns = List.reverse columns
+    , columns = columns
+    , columnList = List.reverse columnList
     , encode = encode
     , decoder = decoder
     , primaryKey = primaryKey

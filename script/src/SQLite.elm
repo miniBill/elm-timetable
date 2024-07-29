@@ -77,7 +77,7 @@ serialize (Database db) statements =
         |> BackendTask.allowFatal
 
 
-loadTableFromCsv : Database -> String -> String -> Table a -> BackendTask FatalError ()
+loadTableFromCsv : Database -> String -> String -> Table a cols -> BackendTask FatalError ()
 loadTableFromCsv (Database db) dir feed table =
     BackendTask.Custom.run "sqlite_load_csv"
         (Json.Encode.object
