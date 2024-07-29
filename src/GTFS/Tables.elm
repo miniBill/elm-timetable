@@ -819,7 +819,27 @@ allCreates addFeed =
                 withFeedColumn table
 
             else
-                { table | name = table.name ++ "_without_feed" }
+                { table
+                    | name = table.name ++ "_without_feed"
+                    , foreignKeys = []
+                    , columns = List.map removeForeignKey table.columns
+                }
+
+        removeForeignKey : CreateTable.ColumnDefinition -> CreateTable.ColumnDefinition
+        removeForeignKey column =
+            { column
+                | constraints =
+                    List.Extra.removeWhen
+                        (\{ constraint } ->
+                            case constraint of
+                                CreateTable.ColumnForeignKey _ ->
+                                    True
+
+                                _ ->
+                                    False
+                        )
+                        column.constraints
+            }
     in
     [ GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed agency)
     , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed stops)
