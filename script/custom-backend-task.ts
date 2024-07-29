@@ -71,7 +71,13 @@ export async function sqlite_run({
                 callback(err, this);
             })
     );
-    return await run({ statement, params });
+    try {
+        return await run({ statement, params });
+    } catch (e) {
+        debugger;
+        // File does not exist?
+        throw e;
+    }
 }
 
 export async function sqlite_load_csv({
@@ -81,28 +87,52 @@ export async function sqlite_load_csv({
     filename,
     table,
 }): Promise<{}> {
-    const stream = fs
-        .createReadStream(path.join(dir, feed, filename))
-        .pipe(csvParse.parse({ columns: true }));
-
-    for await (const line of stream) {
-        const withDollar = { $feed: feed };
-        for (const key of Object.keys(line)) {
-            withDollar["$" + key] = line[key];
-        }
+    const fullPath = path.join(dir, feed, filename);
+    try {
+        await promisify(fs.stat)(fullPath);
+    } catch {
         debugger;
-        sqlite_run({
-            db: db,
-            statement:
-                "INSERT INTO " +
-                table +
-                " (feed, " +
-                Object.keys(line).join(", ") +
-                ") VALUES (" +
-                Object.keys(withDollar).join(", ") +
-                ")",
-            params: withDollar,
-        });
+        // File does not exist?
+        return {};
+    }
+    try {
+        const stream = fs.createReadStream(fullPath).pipe(
+            csvParse.parse({
+                columns: true,
+                cast: (input) => {
+                    if (input.length == 0) {
+                        return null;
+                    }
+                    const asNumber = parseFloat(input);
+                    if (isNaN(asNumber)) {
+                        return input;
+                    } else {
+                        return asNumber;
+                    }
+                },
+            })
+        );
+
+        for await (const line of stream) {
+            const withDollar = { $feed: feed };
+            for (const key of Object.keys(line)) {
+                withDollar["$" + key] = line[key];
+            }
+            sqlite_run({
+                db: db,
+                statement:
+                    "INSERT INTO " +
+                    table +
+                    " (feed, " +
+                    Object.keys(line).join(", ") +
+                    ") VALUES (" +
+                    Object.keys(withDollar).join(", ") +
+                    ")",
+                params: withDollar,
+            });
+        }
+    } catch {
+        debugger;
     }
     return {};
 }
