@@ -1,9 +1,9 @@
-import sqlite3 from "sqlite3";
+import sqlite3, { Statement } from "sqlite3";
 import { promisify } from "node:util";
 
 export async function sqlite_open(filename: string): Promise<sqlite3.Database> {
     const db = new sqlite3.Database(filename);
-    return await new Promise<sqlite3.Database>((resolve, reject) => {
+    await new Promise<{}>((resolve, reject) => {
         const error = function (err: Error) {
             db.off("open", success);
             db.off("error", error);
@@ -12,11 +12,17 @@ export async function sqlite_open(filename: string): Promise<sqlite3.Database> {
         const success = function () {
             db.off("open", success);
             db.off("error", error);
-            resolve(db);
+            resolve({});
         };
         db.on("error", error);
         db.on("open", success);
     });
+    await sqlite_run({
+        db,
+        statement: "PRAGMA foreign_keys = ON;",
+        params: [],
+    });
+    return db;
 }
 
 export async function sqlite_close(db: sqlite3.Database): Promise<{}> {
@@ -34,6 +40,25 @@ export async function sqlite_serialize({
     db: sqlite3.Database;
     statements: { statement: string; params: any }[];
 }): Promise<{}> {
+    const promises: Promise<sqlite3.RunResult>[] = [];
+    db.serialize(() => {
+        for (const { statement, params } of statements) {
+            promises.push(sqlite_run({ db, statement, params }));
+        }
+    });
+    await Promise.all(promises);
+    return {};
+}
+
+export async function sqlite_run({
+    db,
+    statement,
+    params,
+}: {
+    db: sqlite3.Database;
+    statement: string;
+    params: any;
+}): Promise<sqlite3.RunResult> {
     const run = promisify(
         (
             { statement, params }: { statement: string; params: any },
@@ -43,12 +68,5 @@ export async function sqlite_serialize({
                 callback(err, this);
             })
     );
-    const promises: Promise<sqlite3.RunResult>[] = [];
-    db.serialize(() => {
-        for (const statement of statements) {
-            promises.push(run(statement));
-        }
-    });
-    await Promise.all(promises);
-    return {};
+    return await run({ statement, params });
 }
