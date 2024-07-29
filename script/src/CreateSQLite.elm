@@ -32,6 +32,7 @@ task =
                             GTFS.Tables.allCreates
                     )
                 |> loadTable GTFS.Tables.agency
+                |> loadTable GTFS.Tables.levels
                 |> loadTable GTFS.Tables.stops
                 |> loadTable GTFS.Tables.routes
                 |> loadTable GTFS.Tables.trips
@@ -45,7 +46,6 @@ task =
                 |> loadTable GTFS.Tables.shapePoints
                 |> loadTable GTFS.Tables.frequencies
                 |> loadTable GTFS.Tables.pathways
-                |> loadTable GTFS.Tables.levels
                 |> loadTable GTFS.Tables.locationGroups
                 |> Spinner.runSteps
         )

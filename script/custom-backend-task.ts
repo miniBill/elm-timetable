@@ -60,24 +60,18 @@ export async function sqlite_run({
 }: {
     db: sqlite3.Database;
     statement: string;
-    params: any;
+    params?: any;
 }): Promise<sqlite3.RunResult> {
     const run = promisify(
         (
-            { statement, params }: { statement: string; params: any },
+            { statement, params }: { statement: string; params?: any },
             callback: (err: Error | null, result: sqlite3.RunResult) => void
         ) =>
-            db.run(statement, params, function (err: Error | null) {
+            db.run(statement, params ?? [], function (err: Error | null) {
                 callback(err, this);
             })
     );
-    try {
-        return await run({ statement, params });
-    } catch (e) {
-        debugger;
-        // File does not exist?
-        throw e;
-    }
+    return await run({ statement, params });
 }
 
 export async function sqlite_load_csv({
@@ -86,38 +80,53 @@ export async function sqlite_load_csv({
     feed,
     filename,
     table,
+}: {
+    db: sqlite3.Database;
+    dir: string;
+    feed: string;
+    filename: string;
+    table: string;
 }): Promise<{}> {
     const fullPath = path.join(dir, feed, filename);
     try {
         await promisify(fs.stat)(fullPath);
-    } catch {
-        debugger;
-        // File does not exist?
-        return {};
+    } catch (e) {
+        if (e.code == "ENOENT") {
+            // File does not exist
+            return {};
+        }
+        throw e;
     }
-    try {
-        const stream = fs.createReadStream(fullPath).pipe(
-            csvParse.parse({
-                columns: true,
-                cast: (input) => {
-                    if (input.length == 0) {
-                        return null;
-                    }
-                    const asNumber = parseFloat(input);
-                    if (isNaN(asNumber)) {
-                        return input;
-                    } else {
-                        return asNumber;
-                    }
-                },
-            })
-        );
 
-        for await (const line of stream) {
-            const withDollar = { $feed: feed };
-            for (const key of Object.keys(line)) {
-                withDollar["$" + key] = line[key];
-            }
+    await sqlite_run({
+        db,
+        statement: "PRAGMA defer_foreign_keys = ON;",
+    });
+    await sqlite_run({ db, statement: "BEGIN" });
+    const stream = fs.createReadStream(fullPath).pipe(
+        csvParse.parse({
+            columns: true,
+            cast: (input) => {
+                if (input.length == 0) {
+                    return null;
+                }
+                const asNumber = parseFloat(input);
+                if (isNaN(asNumber)) {
+                    return input;
+                } else {
+                    return asNumber;
+                }
+            },
+        })
+    );
+
+    const promises: Promise<sqlite3.RunResult>[] = [];
+    for await (const line of stream) {
+        const withDollar = { $feed: feed };
+        for (const key of Object.keys(line)) {
+            withDollar["$" + key] = line[key];
+        }
+        promises.push(
             sqlite_run({
                 db: db,
                 statement:
@@ -129,10 +138,11 @@ export async function sqlite_load_csv({
                     Object.keys(withDollar).join(", ") +
                     ")",
                 params: withDollar,
-            });
-        }
-    } catch {
-        debugger;
+            })
+        );
     }
+    await Promise.all(promises);
+    await sqlite_run({ db, statement: "COMMIT" });
+
     return {};
 }
