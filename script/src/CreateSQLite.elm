@@ -40,7 +40,7 @@ task =
                         |> loadTable feed GTFS.Tables.stopAreas
                         |> loadTable feed GTFS.Tables.networks
                         |> loadTable feed GTFS.Tables.routeNetworks
-                        |> loadTable feed GTFS.Tables.shapePoints
+                        -- |> loadTable feed GTFS.Tables.shapePoints
                         |> loadTable feed GTFS.Tables.frequencies
                         |> loadTable feed GTFS.Tables.pathways
                         |> loadTable feed GTFS.Tables.locationGroups
