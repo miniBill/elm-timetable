@@ -1,8 +1,6 @@
 module CreateSQLite exposing (run)
 
 import BackendTask exposing (BackendTask)
-import BackendTask.Do as Do
-import BackendTask.File as File
 import FatalError exposing (FatalError)
 import GTFS.Tables
 import Pages.Script as Script exposing (Script)
