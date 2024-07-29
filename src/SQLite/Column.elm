@@ -65,7 +65,7 @@ withForeignKeyTo { name } columnName ({ definition } as column) =
         | definition =
             { definition
                 | constraints =
-                    { name = Nothing
+                    { name = Just ("to_" ++ name)
                     , constraint =
                         CreateTable.ColumnForeignKey
                             { foreignTable = name
@@ -87,7 +87,7 @@ withForeignKey { name } ({ definition } as column) =
         | definition =
             { definition
                 | constraints =
-                    { name = Nothing
+                    { name = Just ("to_" ++ name)
                     , constraint =
                         CreateTable.ColumnForeignKey
                             { foreignTable = name
