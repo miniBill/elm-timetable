@@ -110,12 +110,7 @@ export async function sqlite_load_csv({
                 if (input.length == 0) {
                     return null;
                 }
-                const asNumber = parseFloat(input);
-                if (isNaN(asNumber)) {
-                    return input;
-                } else {
-                    return asNumber;
-                }
+                return input;
             },
         })
     );
