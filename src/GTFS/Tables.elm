@@ -791,7 +791,7 @@ withFeedColumn t =
                         , { fk
                             | columnNames =
                                 if List.isEmpty fk.columnNames then
-                                    []
+                                    feedColumn.name :: colNames
 
                                 else
                                     feedColumn.name :: fk.columnNames
