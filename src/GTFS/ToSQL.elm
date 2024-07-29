@@ -42,7 +42,7 @@ toTableDefinition { columns, primaryKey, foreignKeys } =
 
 primaryKeyToConstraint : List String -> CreateTable.TableConstraint
 primaryKeyToConstraint primaryKey =
-    { name = Nothing
+    { name = Just "pk"
     , constraint =
         CreateTable.TablePrimaryKey
             (List.map
@@ -60,6 +60,6 @@ primaryKeyToConstraint primaryKey =
 
 foreignKeyToConstraint : ( List String, CreateTable.ForeignKeyClause ) -> CreateTable.TableConstraint
 foreignKeyToConstraint ( columnNames, clause ) =
-    { name = Nothing
+    { name = Just <| "fk_" ++ clause.foreignTable
     , constraint = CreateTable.TableForeignKey columnNames clause
     }
