@@ -1,4 +1,4 @@
-module SQLite exposing (Database, close, open, serialize, withDb)
+module SQLite exposing (Database, close, loadTableFromCsv, open, serialize, withDb)
 
 import BackendTask exposing (BackendTask)
 import BackendTask.Custom
@@ -7,6 +7,7 @@ import FatalError exposing (FatalError)
 import Json.Decode
 import Json.Encode
 import SQLite.Statement as Statement
+import SQLite.Table exposing (Table)
 
 
 type Database
@@ -17,9 +18,9 @@ withDb :
     String
     ->
         (Database
-         -> BackendTask { fatal : FatalError, recoverable : BackendTask.Custom.Error } a
+         -> BackendTask FatalError a
         )
-    -> BackendTask { fatal : FatalError, recoverable : BackendTask.Custom.Error } a
+    -> BackendTask FatalError a
 withDb name op =
     Do.do (open name) <| \db ->
     Do.do (op db) <| \res ->
@@ -27,24 +28,28 @@ withDb name op =
     BackendTask.succeed res
 
 
-open : String -> BackendTask { fatal : FatalError, recoverable : BackendTask.Custom.Error } Database
+open : String -> BackendTask FatalError Database
 open name =
     BackendTask.Custom.run "sqlite_open"
         (Json.Encode.string name)
         (Json.Decode.map Database Json.Decode.value)
+        |> BackendTask.quiet
+        |> BackendTask.allowFatal
 
 
-close : Database -> BackendTask { fatal : FatalError, recoverable : BackendTask.Custom.Error } ()
+close : Database -> BackendTask FatalError ()
 close (Database db) =
     BackendTask.Custom.run "sqlite_close"
         db
         (Json.Decode.succeed ())
+        |> BackendTask.quiet
+        |> BackendTask.allowFatal
 
 
 serialize :
     Database
     -> List Statement.Statement
-    -> BackendTask { fatal : FatalError, recoverable : BackendTask.Custom.Error } ()
+    -> BackendTask FatalError ()
 serialize (Database db) statements =
     BackendTask.Custom.run "sqlite_serialize"
         (Json.Encode.object
@@ -68,3 +73,21 @@ serialize (Database db) statements =
             ]
         )
         (Json.Decode.succeed ())
+        |> BackendTask.quiet
+        |> BackendTask.allowFatal
+
+
+loadTableFromCsv : Database -> String -> String -> Table a -> BackendTask FatalError ()
+loadTableFromCsv (Database db) dir feed table =
+    BackendTask.Custom.run "sqlite_load_csv"
+        (Json.Encode.object
+            [ ( "db", db )
+            , ( "dir", Json.Encode.string dir )
+            , ( "feed", Json.Encode.string feed )
+            , ( "filename", Json.Encode.string table.filename )
+            , ( "table", Json.Encode.string table.name )
+            ]
+        )
+        (Json.Decode.succeed ())
+        |> BackendTask.quiet
+        |> BackendTask.allowFatal

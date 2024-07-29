@@ -810,58 +810,29 @@ feedColumn =
     }
 
 
-allCreates : Bool -> List Statement.Statement
-allCreates addFeed =
-    let
-        maybeAddFeed : Table a -> Table a
-        maybeAddFeed table =
-            if addFeed then
-                withFeedColumn table
+allCreates : List Statement.Statement
+allCreates =
+    [ GTFS.ToSQL.toCreate { ifNotExists = False } (withFeedColumn agency)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (withFeedColumn stops)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (withFeedColumn routes)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (withFeedColumn trips)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (withFeedColumn stopTimes)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (withFeedColumn calendars)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (withFeedColumn calendarDates)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (withFeedColumn areas)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (withFeedColumn stopAreas)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (withFeedColumn networks)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (withFeedColumn routeNetworks)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (withFeedColumn shapePoints)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (withFeedColumn frequencies)
 
-            else
-                { table
-                    | name = table.name ++ "_without_feed"
-                    , foreignKeys = []
-                    , columns = List.map removeForeignKey table.columns
-                }
+    -- , GTFS.ToSQL.toCreate { ifNotExists = False } (withFeedColumn transfers)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (withFeedColumn pathways)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (withFeedColumn levels)
+    , GTFS.ToSQL.toCreate { ifNotExists = False } (withFeedColumn locationGroups)
 
-        removeForeignKey : CreateTable.ColumnDefinition -> CreateTable.ColumnDefinition
-        removeForeignKey column =
-            { column
-                | constraints =
-                    List.Extra.removeWhen
-                        (\{ constraint } ->
-                            case constraint of
-                                CreateTable.ColumnForeignKey _ ->
-                                    True
-
-                                _ ->
-                                    False
-                        )
-                        column.constraints
-            }
-    in
-    [ GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed agency)
-    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed stops)
-    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed routes)
-    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed trips)
-    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed stopTimes)
-    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed calendars)
-    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed calendarDates)
-    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed areas)
-    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed stopAreas)
-    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed networks)
-    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed routeNetworks)
-    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed shapePoints)
-    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed frequencies)
-
-    -- , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed transfers)
-    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed pathways)
-    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed levels)
-    , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed locationGroups)
-
-    -- , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed locationGroupStops)
-    -- , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed translations)
-    -- , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed feedInfo)
-    -- , GTFS.ToSQL.toCreate { ifNotExists = False } (maybeAddFeed attributions)
+    -- , GTFS.ToSQL.toCreate { ifNotExists = False } (withFeedColumn locationGroupStops)
+    -- , GTFS.ToSQL.toCreate { ifNotExists = False } (withFeedColumn translations)
+    -- , GTFS.ToSQL.toCreate { ifNotExists = False } (withFeedColumn feedInfo)
+    -- , GTFS.ToSQL.toCreate { ifNotExists = False } (withFeedColumn attributions)
     ]

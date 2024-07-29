@@ -1,5 +1,8 @@
-import sqlite3, { Statement } from "sqlite3";
+import sqlite3 from "sqlite3";
 import { promisify } from "node:util";
+import * as csvParse from "csv-parse";
+import fs from "fs";
+import path from "path";
 
 export async function sqlite_open(filename: string): Promise<sqlite3.Database> {
     const db = new sqlite3.Database(filename);
@@ -69,4 +72,37 @@ export async function sqlite_run({
             })
     );
     return await run({ statement, params });
+}
+
+export async function sqlite_load_csv({
+    db,
+    dir,
+    feed,
+    filename,
+    table,
+}): Promise<{}> {
+    const stream = fs
+        .createReadStream(path.join(dir, feed, filename))
+        .pipe(csvParse.parse({ columns: true }));
+
+    for await (const line of stream) {
+        const withDollar = { feed: feed };
+        for (const key of Object.keys(line)) {
+            withDollar["$" + key] = line[key];
+        }
+        debugger;
+        sqlite_run({
+            db: db,
+            statement:
+                "INSERT INTO " +
+                table +
+                " (feed, " +
+                Object.keys(line).join(", ") +
+                ") VALUES ($feed, " +
+                Object.keys(withDollar).join(", ") +
+                ")",
+            params: withDollar,
+        });
+    }
+    return {};
 }
