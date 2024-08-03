@@ -1,4 +1,4 @@
-module SQLite.Column exposing (Color, Column, InnerColumn, NullableColumn, color, column, decoder, definition, encode, nullable, withForeignKey, withSelfForeignKey)
+module SQLite.Column exposing (Color, Column, InnerColumn, NullableColumn, Table, color, column, decoder, definition, encode, nullable, withForeignKey, withSelfForeignKey)
 
 import Csv.Decode
 import Json.Encode

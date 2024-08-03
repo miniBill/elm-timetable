@@ -1,41 +1,41 @@
 module GTFS.Tables exposing
-    ( Agency, agency
-    , Stop, stops
-    , Route, routes
-    , Trip, trips
-    , StopTime, stopTimes
-    , Calendar, calendars
-    , CalendarDate, calendarDates
-    , ShapePoint, shapePoints
-    , Frequency, frequencies
-    , Pathway, pathways
-    , Level, levels
-    , Area, areas
-    , StopArea, stopAreas
-    , LocationGroup, locationGroups
-    , Network, networks
-    , RouteNetwork, routeNetworks
+    ( Agency, agency, AgencyColumns
+    , Stop, stops, StopColumns
+    , Route, routes, RouteColumns
+    , Trip, trips, TripColumns
+    , StopTime, stopTimes, StopTimeColumns
+    , Calendar, calendars, CalendarColumns
+    , CalendarDate, calendarDates, CalendarDateColumns
+    , ShapePoint, shapePoints, ShapePointColumns
+    , Frequency, frequencies, FrequencyColumns
+    , Pathway, pathways, PathwayColumns
+    , Level, levels, LevelColumns
+    , Area, areas, AreaColumns
+    , StopArea, stopAreas, StopAreaColumns
+    , LocationGroup, locationGroups, LocationGroupColumns
+    , Network, networks, NetworkColumns
+    , RouteNetwork, routeNetworks, RouteNetworkColumns
     , allCreates
     )
 
 {-|
 
-@docs Agency, agency
-@docs Stop, stops
-@docs Route, routes
-@docs Trip, trips
-@docs StopTime, stopTimes
-@docs Calendar, calendars
-@docs CalendarDate, calendarDates
-@docs ShapePoint, shapePoints
-@docs Frequency, frequencies
-@docs Pathway, pathways
-@docs Level, levels
-@docs Area, areas
-@docs StopArea, stopAreas
-@docs LocationGroup, locationGroups
-@docs Network, networks
-@docs RouteNetwork, routeNetworks
+@docs Agency, agency, AgencyColumns
+@docs Stop, stops, StopColumns
+@docs Route, routes, RouteColumns
+@docs Trip, trips, TripColumns
+@docs StopTime, stopTimes, StopTimeColumns
+@docs Calendar, calendars, CalendarColumns
+@docs CalendarDate, calendarDates, CalendarDateColumns
+@docs ShapePoint, shapePoints, ShapePointColumns
+@docs Frequency, frequencies, FrequencyColumns
+@docs Pathway, pathways, PathwayColumns
+@docs Level, levels, LevelColumns
+@docs Area, areas, AreaColumns
+@docs StopArea, stopAreas, StopAreaColumns
+@docs LocationGroup, locationGroups, LocationGroupColumns
+@docs Network, networks, NetworkColumns
+@docs RouteNetwork, routeNetworks, RouteNetworkColumns
 
 @docs allCreates
 
