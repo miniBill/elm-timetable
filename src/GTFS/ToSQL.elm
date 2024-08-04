@@ -17,13 +17,16 @@ toCreate :
     -> Table a cols
     -> Statement.Statement
 toCreate config t =
-    Statement.CreateTable
-        { name = t.name
-        , ifNotExists = config.ifNotExists
-        , temporary = False
-        , schemaName = Nothing
-        , definition = toTableDefinition t
-        }
+    { explain = Nothing
+    , statement =
+        Statement.CreateTable
+            { name = t.name
+            , ifNotExists = config.ifNotExists
+            , temporary = False
+            , schemaName = Nothing
+            , definition = toTableDefinition t
+            }
+    }
 
 
 toTableDefinition : Table a cols -> CreateTable.TableDefinition
