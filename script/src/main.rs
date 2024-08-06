@@ -131,7 +131,7 @@ fn main_2() -> Result<(), MyError> {
                     "INSERT INTO {table_name} (feed, {columns}) VALUES ('{feed_name}', {values})"
                 ))?;
 
-                if table_name == "stops" {
+                let rows = if table_name == "stops" {
                     let parent_station_index = headers.iter().position(|n| n == "parent_station");
                     let mut rows = reader.into_records().collect::<Vec<_>>();
                     if let Some(parent_station_index) = parent_station_index {
@@ -151,30 +151,9 @@ fn main_2() -> Result<(), MyError> {
                             }
                         })
                     };
-                    for row in rows {
-                        statement.execute(rusqlite::params_from_iter(row?.into_iter().map(
-                            |v| {
-                                if v.is_empty() {
-                                    None
-                                } else {
-                                    Some(v)
-                                }
-                            },
-                        )))?;
-                    }
+                    insert_all(&mut statement, rows)?;
                 } else {
-                    let rows = reader.into_records().into_iter();
-                    for row in rows {
-                        statement.execute(rusqlite::params_from_iter(row?.into_iter().map(
-                            |v| {
-                                if v.is_empty() {
-                                    None
-                                } else {
-                                    Some(v)
-                                }
-                            },
-                        )))?;
-                    }
+                    insert_all(&mut statement, reader.into_records())?;
                 };
             }
             println!("Feed loaded, committing");
@@ -184,6 +163,24 @@ fn main_2() -> Result<(), MyError> {
 
     let _ = fs::remove_file("../feeds.sqlite");
     conn.backup(rusqlite::MAIN_DB, "../feeds.sqlite", None)?;
+
+    Ok(())
+}
+
+fn insert_all<'a, T>(statement: &mut rusqlite::Statement, rows: T) -> Result<(), MyError>
+// impl Iterator<Item = String>
+where
+    T: IntoIterator<Item = csv::Result<csv::StringRecord>>,
+{
+    for row in rows {
+        statement.execute(rusqlite::params_from_iter(row?.into_iter().map(|v| {
+            if v.is_empty() {
+                None
+            } else {
+                Some(v)
+            }
+        })))?;
+    }
 
     Ok(())
 }
