@@ -168,7 +168,6 @@ fn main_2() -> Result<(), MyError> {
 }
 
 fn insert_all<'a, T>(statement: &mut rusqlite::Statement, rows: T) -> Result<(), MyError>
-// impl Iterator<Item = String>
 where
     T: IntoIterator<Item = csv::Result<csv::StringRecord>>,
 {
