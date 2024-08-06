@@ -283,7 +283,7 @@ CREATE TABLE frequencies (
   trip_id TEXT NOT NULL,
   start_time TEXT NOT NULL,
   end_time TEXT NOT NULL,
-  headway REAL NOT NULL,
+  headway_secs REAL NOT NULL,
   exact_times INTEGER,
   CONSTRAINT pk PRIMARY KEY (
     feed,
