@@ -317,14 +317,14 @@ CREATE TABLE pathways (
     feed,
     pathway_id
   ),
-  CONSTRAINT fk_stops FOREIGN KEY (
+  CONSTRAINT fk_stops_from FOREIGN KEY (
     feed,
     from_stop_id
   ) REFERENCES stops (
     feed,
     stop_id
   ),
-  CONSTRAINT fk_stops FOREIGN KEY (
+  CONSTRAINT fk_stops_to FOREIGN KEY (
     feed,
     to_stop_id
   ) REFERENCES stops (
@@ -351,5 +351,68 @@ CREATE TABLE location_groups (
   CONSTRAINT pk PRIMARY KEY (
     feed,
     location_group_id
+  )
+) STRICT;
+
+CREATE TABLE transfers (
+  feed TEXT NOT NULL,
+  from_stop_id TEXT NOT NULL,
+  to_stop_id TEXT NOT NULL,
+  from_route_id TEXT,
+  to_route_id TEXT,
+  from_trip_id TEXT,
+  to_trip_id TEXT,
+  transfer_type INTEGER NOT NULL,
+  min_transfer_time INTEGER,
+  CONSTRAINT fk_stops_from FOREIGN KEY (
+    feed,
+    from_stop_id
+  ) REFERENCES stops (
+    feed,
+    stop_id
+  ),
+  CONSTRAINT fk_stops_to FOREIGN KEY (
+    feed,
+    to_stop_id
+  ) REFERENCES stops (
+    feed,
+    stop_id
+  ),
+  CONSTRAINT fk_routes_from FOREIGN KEY (
+    feed,
+    from_route_id
+  ) REFERENCES routes (
+    feed,
+    route_id
+  ),
+  CONSTRAINT fk_routes_to FOREIGN KEY (
+    feed,
+    to_route_id
+  ) REFERENCES routes (
+    feed,
+    route_id
+  ),
+  CONSTRAINT fk_trips_from FOREIGN KEY (
+    feed,
+    from_trip_id
+  ) REFERENCES trips (
+    feed,
+    trip_id
+  ),
+  CONSTRAINT fk_trips_to FOREIGN KEY (
+    feed,
+    to_trip_id
+  ) REFERENCES trips (
+    feed,
+    trip_id
+  ),
+  CONSTRAINT pk PRIMARY KEY (
+    feed,
+    from_stop_id,
+    to_stop_id,
+    from_trip_id,
+    to_trip_id,
+    from_route_id,
+    to_route_id
   )
 ) STRICT;
