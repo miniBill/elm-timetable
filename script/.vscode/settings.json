@@ -1,4 +1,4 @@
 {
     "elmLS.elmFormatPath": "elm-format-hack",
-    "cSpell.words": ["GTFS"]
+    "cSpell.words": ["GTFS", "rusqlite"]
 }
