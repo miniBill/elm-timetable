@@ -131,7 +131,7 @@ fn main_2() -> Result<(), MyError> {
                     "INSERT INTO {table_name} (feed, {columns}) VALUES ('{feed_name}', {values})"
                 ))?;
 
-                let rows = if table_name == "stops" {
+                if table_name == "stops" {
                     let parent_station_index = headers.iter().position(|n| n == "parent_station");
                     let mut rows = reader.into_records().collect::<Vec<_>>();
                     if let Some(parent_station_index) = parent_station_index {
