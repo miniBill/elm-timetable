@@ -1,4 +1,4 @@
-use rusqlite::{Connection, ToSql};
+use rusqlite::Connection;
 use std::fmt;
 use std::fs;
 use std::io;
@@ -42,8 +42,7 @@ fn main() -> Result<(), String> {
 }
 
 fn main_2() -> Result<(), MyError> {
-    let _ = fs::remove_file("../feeds.sqlite");
-    let conn = Connection::open("../feeds.sqlite")?;
+    let conn = Connection::open_in_memory()?;
 
     let creation_sql = fs::read_to_string("../src/structure.sql")?;
 
@@ -56,12 +55,50 @@ fn main_2() -> Result<(), MyError> {
             .expect(&format!("Invalid filename: {:?}", path))
             .to_string_lossy()
             .to_string();
+
+        if feed_name == "de-2024" {
+            // continue;
+        }
+
         println!("Loading feed {feed_name}");
         if path.is_dir() {
-            conn.execute("PRAGMA defer_foreign_keys = ON;", ())?;
+            conn.pragma_update(None, "synchronous", "OFF")?;
+            conn.pragma_update(None, "journal_mode", "MEMORY")?;
             conn.execute("BEGIN", ())?;
-            for table in fs::read_dir(path)? {
-                let table_path = table?.path();
+
+            let mut path_entries = fs::read_dir(path)?
+                .into_iter()
+                .filter_map(|table| Some(table.ok()?.path()))
+                .collect::<Vec<_>>();
+            path_entries.sort_by_key(|table_path| {
+                match &*table_path
+                    .file_stem()
+                    .expect(&format!("Invalid filename: {:?}", table_path))
+                    .to_string_lossy()
+                    .to_string()
+                {
+                    "feed_info" => 0,
+                    "agency" => 1,
+                    "levels" => 2,
+                    "stops" => 3,
+                    "routes" => 4,
+                    "trips" => 5,
+                    "location_groups" => 6,
+                    "stop_times" => 7,
+                    "calendar" => 8,
+                    "calendar_dates" => 9,
+                    "areas" => 10,
+                    "stop_areas" => 11,
+                    "networks" => 12,
+                    "route_networks" => 13,
+                    "shapes" => 14,
+                    "frequencies" => 15,
+                    "pathways" => 16,
+
+                    _ => 70,
+                }
+            });
+            for table_path in path_entries.into_iter() {
                 if let Some(extension) = table_path.extension() {
                     if extension.to_string_lossy().to_string() != "txt" {
                         continue;
@@ -81,6 +118,10 @@ fn main_2() -> Result<(), MyError> {
                 }
 
                 println!("  Loading table {table_name}");
+
+                if table_name == "stops" {
+                    conn.pragma_update(None, "defer_foreign_keys", "ON")?;
+                }
 
                 let mut reader = csv::Reader::from_path(table_path)?;
                 let headers = reader.headers()?;
@@ -102,11 +143,18 @@ fn main_2() -> Result<(), MyError> {
                         }
                     })))?;
                 }
+
+                if table_name == "stops" {
+                    conn.pragma_update(None, "defer_foreign_keys", "OFF")?;
+                }
             }
             println!("Feed loaded, committing");
             conn.execute("COMMIT", ())?;
         }
     }
+
+    let _ = fs::remove_file("../feeds.sqlite");
+    conn.backup(rusqlite::MAIN_DB, "../feeds.sqlite", None)?;
 
     Ok(())
 }
