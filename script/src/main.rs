@@ -161,6 +161,7 @@ fn main_2() -> Result<(), MyError> {
         }
     }
 
+    println!("Writing the database to disk");
     let _ = fs::remove_file("../feeds.sqlite");
     conn.backup(rusqlite::MAIN_DB, "../feeds.sqlite", None)?;
 
