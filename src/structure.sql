@@ -405,14 +405,5 @@ CREATE TABLE transfers (
   ) REFERENCES trips (
     feed,
     trip_id
-  ),
-  CONSTRAINT pk PRIMARY KEY (
-    feed,
-    from_stop_id,
-    to_stop_id,
-    from_trip_id,
-    to_trip_id,
-    from_route_id,
-    to_route_id
   )
 ) STRICT;

@@ -134,8 +134,8 @@ fn main_2() -> Result<(), MyError> {
                 if table_name == "stops" {
                     let parent_station_index = headers.iter().position(|n| n == "parent_station");
                     let mut rows = reader.into_records().collect::<Vec<_>>();
-                    rows.sort_by_key(|r| {
-                        if let Some(parent_station_index) = parent_station_index {
+                    if let Some(parent_station_index) = parent_station_index {
+                        rows.sort_by_key(|r| {
                             if let Ok(row) = r {
                                 if let Some(parent_station) = row.get(parent_station_index) {
                                     if !parent_station.is_empty() {
@@ -149,10 +149,8 @@ fn main_2() -> Result<(), MyError> {
                             } else {
                                 0
                             }
-                        } else {
-                            0
-                        }
-                    });
+                        })
+                    };
                     for row in rows {
                         statement.execute(rusqlite::params_from_iter(row?.into_iter().map(
                             |v| {
