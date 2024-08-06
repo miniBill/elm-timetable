@@ -119,10 +119,6 @@ fn main_2() -> Result<(), MyError> {
 
                 println!("  Loading table {table_name}");
 
-                if table_name == "stops" {
-                    conn.pragma_update(None, "defer_foreign_keys", "ON")?;
-                }
-
                 let mut reader = csv::Reader::from_path(table_path)?;
                 let headers = reader.headers()?;
                 let columns = headers.into_iter().collect::<Vec<_>>().join(", ");
@@ -134,19 +130,54 @@ fn main_2() -> Result<(), MyError> {
                 let mut statement = conn.prepare(&format!(
                     "INSERT INTO {table_name} (feed, {columns}) VALUES ('{feed_name}', {values})"
                 ))?;
-                for row in reader.into_records() {
-                    statement.execute(rusqlite::params_from_iter(row?.into_iter().map(|v| {
-                        if v.is_empty() {
-                            None
-                        } else {
-                            Some(v)
-                        }
-                    })))?;
-                }
 
                 if table_name == "stops" {
-                    conn.pragma_update(None, "defer_foreign_keys", "OFF")?;
-                }
+                    let parent_station_index = headers.iter().position(|n| n == "parent_station");
+                    let mut rows = reader.into_records().collect::<Vec<_>>();
+                    rows.sort_by_key(|r| {
+                        if let Some(parent_station_index) = parent_station_index {
+                            if let Ok(row) = r {
+                                if let Some(parent_station) = row.get(parent_station_index) {
+                                    if !parent_station.is_empty() {
+                                        1
+                                    } else {
+                                        0
+                                    }
+                                } else {
+                                    0
+                                }
+                            } else {
+                                0
+                            }
+                        } else {
+                            0
+                        }
+                    });
+                    for row in rows {
+                        statement.execute(rusqlite::params_from_iter(row?.into_iter().map(
+                            |v| {
+                                if v.is_empty() {
+                                    None
+                                } else {
+                                    Some(v)
+                                }
+                            },
+                        )))?;
+                    }
+                } else {
+                    let rows = reader.into_records().into_iter();
+                    for row in rows {
+                        statement.execute(rusqlite::params_from_iter(row?.into_iter().map(
+                            |v| {
+                                if v.is_empty() {
+                                    None
+                                } else {
+                                    Some(v)
+                                }
+                            },
+                        )))?;
+                    }
+                };
             }
             println!("Feed loaded, committing");
             conn.execute("COMMIT", ())?;
