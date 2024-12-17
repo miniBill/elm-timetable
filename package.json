@@ -9,5 +9,13 @@
     "license": "BSD-3-Clause",
     "scripts": {
         "start": "yarn elm-watch hot"
+    },
+    "overrides": {
+        "elm-doc-preview": ">=6.0.0",
+        "cross-spawn": ">=7.0.3"
+    },
+    "resolutions": {
+        "elm-doc-preview": ">=6.0.0",
+        "cross-spawn": ">=7.0.3"
     }
 }
