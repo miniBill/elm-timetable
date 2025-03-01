@@ -13,15 +13,14 @@ import Graph
 import Html exposing (Html)
 import Html.Attributes
 import Id exposing (Id, StopId, TripId)
-import IdDict exposing (IdDict)
-import IdSet
 import Pathfinding
 import Quantity
-import QuantityDict exposing (QuantityDict)
 import Render
 import Render.StandardDrawers
 import Render.StandardDrawers.Attributes
 import Render.StandardDrawers.Types
+import SeqDict exposing (SeqDict)
+import SeqSet
 import Set
 import TypedSvg exposing (circle, g, line, style, svg, text_, title)
 import TypedSvg.Attributes exposing (class, id, stroke, textAnchor, transform, viewBox)
@@ -96,7 +95,7 @@ view timetable =
                         Station
                         { min : Clock
                         , max : Clock
-                        , events : QuantityDict Int Seconds Event
+                        , events : SeqDict Clock Event
                         }
                 stations =
                     timetable
@@ -200,32 +199,32 @@ addStation :
             Station
             { min : Clock
             , max : Clock
-            , events : QuantityDict Int Seconds Event
+            , events : SeqDict Clock Event
             }
     ->
         Dict
             Station
             { min : Clock
             , max : Clock
-            , events : QuantityDict Int Seconds Event
+            , events : SeqDict Clock Event
             }
 addStation station time event dict =
     let
-        new : { min : Clock, max : Clock, events : QuantityDict Int Seconds Event }
+        new : { min : Clock, max : Clock, events : SeqDict Clock Event }
         new =
             case Dict.get station dict of
                 Nothing ->
                     { min = time
                     , max = time
                     , events =
-                        QuantityDict.singleton time event
+                        SeqDict.singleton time event
                     }
 
                 Just existing ->
                     { min = liftTime Quantity.min (Just existing.min) time
                     , max = liftTime Quantity.max (Just existing.max) time
                     , events =
-                        QuantityDict.insert time event existing.events
+                        SeqDict.insert time event existing.events
                     }
     in
     Dict.insert station new dict
@@ -563,14 +562,14 @@ viewDAG toName edgeList =
         ids =
             edgeList
                 |> List.concatMap (\( from, to ) -> [ from, to ])
-                |> IdSet.fromList
-                |> IdSet.toList
+                |> SeqSet.fromList
+                |> SeqSet.toList
 
-        idToNodeId : IdDict kind Int
+        idToNodeId : SeqDict (Id kind) Int
         idToNodeId =
             ids
                 |> List.indexedMap (\i id -> ( id, i ))
-                |> IdDict.fromList
+                |> SeqDict.fromList
 
         edges : List (Graph.Edge ())
         edges =
@@ -584,8 +583,8 @@ viewDAG toName edgeList =
                                 , label = ()
                                 }
                             )
-                            (IdDict.get from idToNodeId)
-                            (IdDict.get to idToNodeId)
+                            (SeqDict.get from idToNodeId)
+                            (SeqDict.get to idToNodeId)
                     )
 
         nodes : List (Graph.Node String)
@@ -644,11 +643,11 @@ build :
     -> Timetable
 build today { trips, stopTimes, calendarDates, stops, calendars } =
     let
-        filteredStops : IdDict StopId Stop
+        filteredStops : SeqDict (Id StopId) Stop
         filteredStops =
             Pathfinding.filterStops stops
 
-        filteredTrips : IdDict TripId Trip
+        filteredTrips : SeqDict (Id TripId) Trip
         filteredTrips =
             Pathfinding.filterTrips today calendarDates calendars trips
 
@@ -658,7 +657,7 @@ build today { trips, stopTimes, calendarDates, stops, calendars } =
 
         stopName : { a | stop_id : Id StopId } -> String
         stopName stopTime =
-            case IdDict.get stopTime.stop_id stops of
+            case SeqDict.get stopTime.stop_id stops of
                 Nothing ->
                     Id.toString stopTime.stop_id
 
@@ -673,7 +672,7 @@ build today { trips, stopTimes, calendarDates, stops, calendars } =
                             Maybe.withDefault idString stop.name
 
                         Just parent_id ->
-                            case IdDict.get parent_id stops of
+                            case SeqDict.get parent_id stops of
                                 Nothing ->
                                     stop.name
                                         |> Maybe.withDefault idString
@@ -688,7 +687,7 @@ build today { trips, stopTimes, calendarDates, stops, calendars } =
     filteredStopTimes
         |> List.concatMap
             (\( trip_id, tripStopTimes ) ->
-                case IdDict.get trip_id trips of
+                case SeqDict.get trip_id trips of
                     Nothing ->
                         []
 

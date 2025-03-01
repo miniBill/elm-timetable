@@ -2,52 +2,51 @@ module Feed exposing (Feed, empty, merge)
 
 import Dict exposing (Dict)
 import GTFS.Tables exposing (Calendar, CalendarDate, Pathway, Stop, StopTime, Trip)
-import Id exposing (PathwayId, ServiceId, StopId, TripId)
-import IdDict exposing (IdDict)
-import IdDict.Extra
+import Id exposing (Id, PathwayId, ServiceId, StopId, TripId)
+import SeqDict exposing (SeqDict)
 
 
 type alias Feed =
-    { stops : IdDict StopId Stop
-    , pathways : IdDict PathwayId Pathway
+    { stops : SeqDict (Id StopId) Stop
+    , pathways : SeqDict (Id PathwayId) Pathway
     , stopTimes : List StopTime
-    , calendars : IdDict ServiceId Calendar
-    , trips : IdDict TripId Trip
-    , calendarDates : IdDict ServiceId (Dict Int CalendarDate)
+    , calendars : SeqDict (Id ServiceId) Calendar
+    , trips : SeqDict (Id TripId) Trip
+    , calendarDates : SeqDict (Id ServiceId) (Dict Int CalendarDate)
     }
 
 
 empty : Feed
 empty =
-    { stops = IdDict.empty
-    , pathways = IdDict.empty
+    { stops = SeqDict.empty
+    , pathways = SeqDict.empty
     , stopTimes = []
-    , calendars = IdDict.empty
-    , trips = IdDict.empty
-    , calendarDates = IdDict.empty
+    , calendars = SeqDict.empty
+    , trips = SeqDict.empty
+    , calendarDates = SeqDict.empty
     }
 
 
 merge : Feed -> Feed -> Feed
 merge l r =
-    { trips = IdDict.Extra.union l.trips r.trips
+    { trips = SeqDict.union l.trips r.trips
     , stopTimes = l.stopTimes ++ r.stopTimes
     , calendarDates = mergeWithUnion l.calendarDates r.calendarDates
-    , stops = IdDict.Extra.union l.stops r.stops
-    , calendars = IdDict.Extra.union l.calendars r.calendars
-    , pathways = IdDict.Extra.union l.pathways r.pathways
+    , stops = SeqDict.union l.stops r.stops
+    , calendars = SeqDict.union l.calendars r.calendars
+    , pathways = SeqDict.union l.pathways r.pathways
     }
 
 
 mergeWithUnion :
-    IdDict kind (Dict comparable v)
-    -> IdDict kind (Dict comparable v)
-    -> IdDict kind (Dict comparable v)
+    SeqDict kind (Dict comparable v)
+    -> SeqDict kind (Dict comparable v)
+    -> SeqDict kind (Dict comparable v)
 mergeWithUnion l r =
-    IdDict.Extra.merge
+    SeqDict.merge
         (\_ _ acc -> acc)
         (\k le re acc ->
-            IdDict.insert
+            SeqDict.insert
                 k
                 (Dict.union le re)
                 acc
@@ -55,4 +54,4 @@ mergeWithUnion l r =
         (\_ _ acc -> acc)
         l
         r
-        IdDict.empty
+        SeqDict.empty

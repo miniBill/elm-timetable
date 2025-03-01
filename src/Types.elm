@@ -5,14 +5,14 @@ import Date exposing (Date)
 import Feed exposing (Feed)
 import Http
 import Id exposing (FeedId, Id, StopId)
-import IdDict exposing (IdDict)
 import RemoteData exposing (RemoteData)
+import SeqDict exposing (SeqDict)
 
 
 type alias Model =
     { today : Date
     , timetable : Timetable
-    , feeds : IdDict FeedId (RemoteData Feed)
+    , feeds : SeqDict (Id FeedId) (RemoteData Feed)
     , from : Id StopId
     , to : Id StopId
     , search : String

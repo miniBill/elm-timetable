@@ -32,9 +32,11 @@
             "ianmackenzie/elm-units": "2.10.0",
             "justinmimbs/date": "4.1.0",
             "jxxcarlson/hex": "4.0.1",
+            "lamdera/containers": "1.0.0",
             "mdgriffith/elm-bezier": "1.0.0",
             "miniBill/elm-fast-dict": "1.1.0",
-            "miniBill/elm-rope": "1.0.0"
+            "miniBill/elm-rope": "1.0.0",
+            "turboMaCk/non-empty-list-alias": "1.4.0"
         },
         "indirect": {
             "avh4/elm-fifo": "1.0.4",
@@ -50,7 +52,8 @@
             "ianmackenzie/elm-geometry": "3.11.0",
             "ianmackenzie/elm-interval": "3.1.0",
             "ianmackenzie/elm-triangular-mesh": "1.1.0",
-            "ianmackenzie/elm-units-interval": "3.2.0"
+            "ianmackenzie/elm-units-interval": "3.2.0",
+            "lamdera/codecs": "1.0.0"
         }
     },
     "test-dependencies": {

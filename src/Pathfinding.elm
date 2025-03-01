@@ -6,18 +6,18 @@ import Dict exposing (Dict)
 import GTFS
 import GTFS.Tables exposing (Calendar, CalendarDate, Pathway, Stop, StopTime, Trip)
 import Id exposing (Id, PathwayId, ServiceId, StopId, TripId)
-import IdDict exposing (IdDict)
-import IdDict.Extra
-import IdSet exposing (IdSet)
 import List.Extra
 import SQLite.Codec
+import SeqDict exposing (SeqDict)
+import SeqDict.Extra
+import SeqSet exposing (SeqSet)
 import Time exposing (Weekday(..))
 
 
-filterStops : IdDict StopId Stop -> IdDict StopId Stop
+filterStops : SeqDict (Id StopId) Stop -> SeqDict (Id StopId) Stop
 filterStops stops =
     let
-        stations : IdSet StopId
+        stations : SeqSet (Id StopId)
         stations =
             [ "Pde:09162:100" -- München Hbf - ÖBB
             , "Pit:22095:7049" -- Udine - ÖBB
@@ -32,45 +32,45 @@ filterStops stops =
             -- "Pde:09162:10" -- Pasing - ÖBB
             ]
                 |> List.map Id.fromString
-                |> IdSet.fromList
+                |> SeqSet.fromList
     in
     stops
-        |> IdDict.toList
+        |> SeqDict.toList
         |> List.filter
             (\( _, stop ) ->
-                IdSet.member stop.id stations
+                SeqSet.member stop.id stations
                     || (case stop.parent_station of
                             Nothing ->
                                 False
 
                             Just parent_id ->
-                                IdSet.member parent_id stations
+                                SeqSet.member parent_id stations
                        )
             )
         |> List.take 1000
-        |> IdDict.fromList
+        |> SeqDict.fromList
 
 
-filterStopTimes : IdDict TripId Trip -> IdDict StopId Stop -> List StopTime -> List ( Id TripId, List StopTime )
+filterStopTimes : SeqDict (Id TripId) Trip -> SeqDict (Id StopId) Stop -> List StopTime -> List ( Id TripId, List StopTime )
 filterStopTimes filteredTrips stops stopTimes =
     let
-        stopIds : IdSet StopId
+        stopIds : SeqSet (Id StopId)
         stopIds =
-            IdSet.fromList (IdDict.keys stops)
+            SeqSet.fromList (SeqDict.keys stops)
     in
     stopTimes
         |> List.filter
             (\stopTime ->
                 case stopTime.stop_id of
                     Just stop_id ->
-                        IdDict.member stopTime.trip_id filteredTrips
-                            && IdSet.member stop_id stopIds
+                        SeqDict.member stopTime.trip_id filteredTrips
+                            && SeqSet.member stop_id stopIds
 
                     Nothing ->
                         False
             )
-        |> IdDict.Extra.groupBy (\{ trip_id } -> trip_id)
-        |> IdDict.toList
+        |> SeqDict.Extra.groupBy (\{ trip_id } -> trip_id)
+        |> SeqDict.toList
         |> List.map
             (\( k, v ) ->
                 ( k
@@ -82,24 +82,24 @@ filterStopTimes filteredTrips stops stopTimes =
 
 filterTrips :
     Date
-    -> IdDict ServiceId (Dict Int CalendarDate)
-    -> IdDict ServiceId Calendar
-    -> IdDict TripId Trip
-    -> IdDict TripId Trip
+    -> SeqDict (Id ServiceId) (Dict Int CalendarDate)
+    -> SeqDict (Id ServiceId) Calendar
+    -> SeqDict (Id TripId) Trip
+    -> SeqDict (Id TripId) Trip
 filterTrips today calendarDates calendars trips =
     trips
-        |> IdDict.filter
+        |> SeqDict.filter
             (\_ trip ->
                 case
                     calendarDates
-                        |> IdDict.get trip.service_id
+                        |> SeqDict.get trip.service_id
                         |> Maybe.andThen (Dict.get (SQLite.Codec.dateToInt today))
                 of
                     Just { exception_type } ->
                         exception_type == GTFS.ServiceAdded
 
                     Nothing ->
-                        case IdDict.get trip.service_id calendars of
+                        case SeqDict.get trip.service_id calendars of
                             Nothing ->
                                 let
                                     _ =
@@ -111,27 +111,9 @@ filterTrips today calendarDates calendars trips =
                                 let
                                     correctDay : Bool
                                     correctDay =
-                                        case Date.weekday today of
-                                            Mon ->
-                                                calendar.monday
-
-                                            Tue ->
-                                                calendar.tuesday
-
-                                            Wed ->
-                                                calendar.wednesday
-
-                                            Thu ->
-                                                calendar.thursday
-
-                                            Fri ->
-                                                calendar.friday
-
-                                            Sat ->
-                                                calendar.saturday
-
-                                            Sun ->
-                                                calendar.sunday
+                                        getWeekdayValueFromCalendar
+                                            (Date.weekday today)
+                                            calendar
                                 in
                                 correctDay
                                     && (Date.compare calendar.start_date today /= GT)
@@ -139,19 +121,44 @@ filterTrips today calendarDates calendars trips =
             )
 
 
+getWeekdayValueFromCalendar : Weekday -> Calendar -> Bool
+getWeekdayValueFromCalendar weekday calendar =
+    case weekday of
+        Mon ->
+            calendar.monday
+
+        Tue ->
+            calendar.tuesday
+
+        Wed ->
+            calendar.wednesday
+
+        Thu ->
+            calendar.thursday
+
+        Fri ->
+            calendar.friday
+
+        Sat ->
+            calendar.saturday
+
+        Sun ->
+            calendar.sunday
+
+
 pathfind :
     { from : Id StopId, to : Id StopId }
-    -> IdDict StopId Stop
+    -> SeqDict (Id StopId) Stop
     -> List StopTime
-    -> IdDict TripId Trip
+    -> SeqDict TripId Trip
     -> Maybe (List String)
 pathfind =
     Debug.todo "pathfind"
 
 
 pathfind2 :
-    IdDict StopId Stop
-    -> IdDict PathwayId Pathway
+    SeqDict (Id StopId) Stop
+    -> SeqDict PathwayId Pathway
     -> Stop
     -> Stop
     -> Maybe (List String)
@@ -171,11 +178,11 @@ pathfind2 stops pathways from to =
         getPathwaysFrom : Stop -> List { to : Stop, pathway : Pathway }
         getPathwaysFrom a =
             pathways
-                |> IdDict.foldl
+                |> SeqDict.foldl
                     (\_ pathway acc ->
                         case
-                            ( IdDict.get pathway.from_stop_id stops
-                            , IdDict.get pathway.to_stop_id stops
+                            ( SeqDict.get pathway.from_stop_id stops
+                            , SeqDict.get pathway.to_stop_id stops
                             )
                         of
                             ( Just pathFrom, Just pathTo ) ->
@@ -212,22 +219,22 @@ pathfind2 stops pathways from to =
                     )
 
         go :
-            IdDict StopId (List { to : Stop, pathway : Pathway })
+            SeqDict (Id StopId) (List { to : Stop, pathway : Pathway })
             -> Stop
-            -> IdSet StopId
+            -> SeqSet (Id StopId)
             -> Maybe (List a)
         go cache a visited =
-            if IdSet.member a.id visited then
+            if SeqSet.member a.id visited then
                 Nothing
 
             else if a == to then
                 Just []
 
             else
-                case IdDict.get a.id cache of
+                case SeqDict.get a.id cache of
                     Nothing ->
                         go
-                            (IdDict.insert a.id (getPathwaysFrom a) cache)
+                            (SeqDict.insert a.id (getPathwaysFrom a) cache)
                             a
                             visited
 
@@ -235,7 +242,7 @@ pathfind2 stops pathways from to =
                         options
                             |> List.Extra.findMap
                                 (\pathway ->
-                                    go cache pathway.to (IdSet.insert pathway.to.id visited)
+                                    go cache pathway.to (SeqSet.insert pathway.to.id visited)
                                 )
     in
-    go IdDict.empty from IdSet.empty
+    go SeqDict.empty from SeqSet.empty

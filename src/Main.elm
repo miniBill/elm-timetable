@@ -10,13 +10,13 @@ import GTFS.Tables as Tables exposing (Pathway, Stop, StopTime, Trip)
 import Html.Lazy
 import Http
 import Id exposing (FeedId, Id, StopId, TripId)
-import IdDict exposing (IdDict)
-import IdSet exposing (IdSet)
 import Pathfinding
 import Platform exposing (Task)
 import RemoteData
 import SQLite.Codec
 import SQLite.Table exposing (Table)
+import SeqDict exposing (SeqDict)
+import SeqSet exposing (SeqSet)
 import Table
 import Task
 import Theme
@@ -43,7 +43,7 @@ main =
 rebuildTimetable : Model -> Model
 rebuildTimetable model =
     case
-        IdDict.foldl
+        SeqDict.foldl
             (\_ -> RemoteData.map2 Feed.merge)
             (RemoteData.Loaded Feed.empty)
             model.feeds
@@ -61,8 +61,8 @@ init _ =
         feeds : List (Id FeedId)
         feeds =
             [ -- Id.fromString "de" ,
-              -- Id.fromString "oebb-2024" ,
-              Id.fromString "micotra-2024"
+              Id.fromString "oebb-2024"
+            , Id.fromString "micotra-2024"
             ]
 
         model : Model
@@ -72,7 +72,7 @@ init _ =
             , feeds =
                 feeds
                     |> List.map (\feed -> ( feed, RemoteData.Loading ))
-                    |> IdDict.fromList
+                    |> SeqDict.fromList
             , from = Id.fromString "Pde:09162:100"
             , to = Id.fromString "Pit:22095:7049"
             , search = ""
@@ -93,15 +93,15 @@ init _ =
                             calendarDates
                                 |> List.foldl
                                     (\calendarDate acc ->
-                                        IdDict.insert calendarDate.service_id
-                                            (IdDict.get calendarDate.service_id acc
+                                        SeqDict.insert calendarDate.service_id
+                                            (SeqDict.get calendarDate.service_id acc
                                                 |> Maybe.withDefault Dict.empty
                                                 |> Dict.insert (SQLite.Codec.dateToInt calendarDate.date)
                                                     calendarDate
                                             )
                                             acc
                                     )
-                                    IdDict.empty
+                                    SeqDict.empty
                         }
                     )
                     (Task.map3 (\l m r -> ( l, m, r ))
@@ -123,7 +123,7 @@ init _ =
 getCSVId :
     Id FeedId
     -> Table { a | id : Id kind } cols
-    -> Task Http.Error (IdDict kind { a | id : Id kind })
+    -> Task Http.Error (SeqDict (Id kind) { a | id : Id kind })
 getCSVId feed table =
     getCSV feed table
         |> Task.map toDictFromId
@@ -131,11 +131,11 @@ getCSVId feed table =
 
 toDictFromId :
     List { a | id : Id kind }
-    -> IdDict kind { a | id : Id kind }
+    -> SeqDict (Id kind) { a | id : Id kind }
 toDictFromId list =
     List.foldl
-        (\stop acc -> IdDict.insert stop.id stop acc)
-        IdDict.empty
+        (\stop acc -> SeqDict.insert stop.id stop acc)
+        SeqDict.empty
         list
 
 
@@ -226,7 +226,7 @@ view model =
         feedViews : List (Element msg)
         feedViews =
             model.feeds
-                |> IdDict.toList
+                |> SeqDict.toList
                 |> List.map
                     (\( feedId, feed ) ->
                         case feed of
@@ -275,7 +275,7 @@ viewFeed search today feedId feed =
 viewTrips : String -> Date -> Feed -> Element msg
 viewTrips search today { calendarDates, stopTimes, trips, calendars, stops } =
     let
-        filteredTrips : IdDict TripId Trip
+        filteredTrips : SeqDict (Id TripId) Trip
         filteredTrips =
             Pathfinding.filterTrips today calendarDates calendars trips
 
@@ -286,7 +286,7 @@ viewTrips search today { calendarDates, stopTimes, trips, calendars, stops } =
     filteredStopTimes
         |> List.filterMap
             (\( trip_id, tripStops ) ->
-                IdDict.get trip_id filteredTrips
+                SeqDict.get trip_id filteredTrips
                     |> Maybe.andThen
                         (\trip ->
                             if
@@ -377,7 +377,7 @@ viewStops search { stops } =
         data : List Stop
         data =
             stops
-                |> IdDict.values
+                |> SeqDict.values
                 |> List.filter
                     (\stop ->
                         fuzzyMatch search (Maybe.withDefault "" stop.name)
@@ -387,9 +387,9 @@ viewStops search { stops } =
     Theme.table [] columns data
 
 
-stopName : IdDict StopId Stop -> Id StopId -> String
+stopName : SeqDict (Id StopId) Stop -> Id StopId -> String
 stopName stops id =
-    case IdDict.get id stops of
+    case SeqDict.get id stops of
         Nothing ->
             Id.toString id
 
@@ -429,20 +429,20 @@ normalize s =
 viewPathways : Feed -> Element msg
 viewPathways { pathways, stops } =
     let
-        stopIds : IdSet StopId
+        stopIds : SeqSet (Id StopId)
         stopIds =
             stops
-                |> IdDict.keys
-                |> IdSet.fromList
+                |> SeqDict.keys
+                |> SeqSet.fromList
 
         filteredPathways : List Pathway
         filteredPathways =
             pathways
-                |> IdDict.values
+                |> SeqDict.values
                 |> List.filter
                     (\walkway ->
-                        IdSet.member walkway.from_stop_id stopIds
-                            && IdSet.member walkway.to_stop_id stopIds
+                        SeqSet.member walkway.from_stop_id stopIds
+                            && SeqSet.member walkway.to_stop_id stopIds
                     )
 
         maybeColumn :
@@ -499,7 +499,7 @@ viewPathways { pathways, stops } =
         ]
 
 
-viewStopTimes : Trip -> IdDict StopId Stop -> List StopTime -> Element msg
+viewStopTimes : Trip -> SeqDict (Id StopId) Stop -> List StopTime -> Element msg
 viewStopTimes trip stops filteredStopTimes =
     let
         maybeColumn :
@@ -547,13 +547,13 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         GotFeed feed (Ok res) ->
-            ( { model | feeds = IdDict.insert feed (RemoteData.Loaded res) model.feeds }
+            ( { model | feeds = SeqDict.insert feed (RemoteData.Loaded res) model.feeds }
                 |> rebuildTimetable
             , Cmd.none
             )
 
         GotFeed feed (Err e) ->
-            ( { model | feeds = IdDict.insert feed (RemoteData.Error e) model.feeds }
+            ( { model | feeds = SeqDict.insert feed (RemoteData.Error e) model.feeds }
                 |> rebuildTimetable
             , Cmd.none
             )
